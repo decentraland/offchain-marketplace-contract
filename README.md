@@ -56,34 +56,28 @@ TODO:
 
 ## Examples
 
-The examples found on this section will describe some of the many Trade types that the different Marketplace smart contracts found on this repository can enable.
+The examples found on this section will describe some of the many Trade types that the Marketplace smart contracts in this repository can enable.
 
-For simplicity, the base Trade all examples will use will look like:
+For simplicity, the checks on all Trades and Coupons will default to the following values:
 
 ```js
 {
-    checks: {
-        uses: 1, // The trade can only be executed once
-        expiration: 1719971471, // 30 days from today (2nd of July 2024)
-        effective: 0, // The Trade can be executed from now onwards
-        salt: 0x61647662736664627364666273646662736466627364666264626664736e7479, // Some random salt, used to make the signature as unique as possible to avoid collisions with other Trades with the same data.
-        contractSignatureIndex: 0, // The current contract signature index
-        signerSignatureIndex: 0, // The current signer signature index of the creator of this Trade
-        allowedRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, // Anyone can accept this Trade
-        externalChecks: [], // No external checks are validated
-    },
-    sent: [], // Sent assets will be defined in the examples
-    received: [] // Received assets will be defined in the examples
+    uses: 1, // The trade can only be used once
+    expiration: 1719971471, // 30 days from today (2nd of July 2024)
+    effective: 0, // The trade can be used from the time it has been signed onwards
+    salt: 0x61647662736664627364666273646662736466627364666264626664736e7479, // Some random salt, used to make the signature as unique as possible to avoid collisions with other Trades with the same data.
+    contractSignatureIndex: 0, // The current contract signature index
+    signerSignatureIndex: 0, // The current signer signature index of the signer of this Trade
+    allowedRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, // The merkle root of the allowed addresses that can accept the Trade. In this case, it is open for everyone to accept
+    externalChecks: [], // The external checks that will be validated on external contracts. No external checks will be performed in this case
 }
 ```
 
-Things to keep in mind:
+**1. Creating a Public Order**
 
-- Before executing a Trade, users must have allowed the marketplace contract used to transfer those assets.
+In this example, the owner of a LAND on coords 100,100, wants to list it for sale at a price of 100 MANA.
 
-**Creating a Public Order** (List a LAND for sale)
-
-In this example, the owner of a the LAND found in coords 100,100 wants to list it for sale at a price of 100 MANA.
+The owner of the LAND will have to sign a Trade containing the following properties.
 
 ```js
 {
@@ -92,27 +86,29 @@ In this example, the owner of a the LAND found in coords 100,100 wants to list i
     },
     sent: [
         {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND contract address
-            value: 34028236692093846346337460743176821145700, // Token id of parcel 100,100
-            extra: 0x// No extra data is needed
+            assetType: 2, // ERC721
+            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND
+            value: 34028236692093846346337460743176821145700, // Token id of LAND at coords 100,100
+            extra: 0x // Empty extra data
         }
     ],
     received: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA contract address
+            assetType: 1, // ERC20
+            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA
             value: 100000000000000000000, // 100 MANA
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000, // The signer of the Trade (the seller) will receive the MANA.
         }
     ]
 }
 ```
 
-**Creating a Bid** (Offer 100 MANA for an Estate)
+**2. Creating a Bid**
 
-In this example, some user wants to place a bid for the Estate with id 100, offering 100 MANA.
+Bids are similar to Orders with the difference that it is the buyer the one signing the Trade instead of the seller.
+
+For this example, the buyer wants to offer 100 MANA for an Estate.
 
 ```js
 {
@@ -121,54 +117,60 @@ In this example, some user wants to place a bid for the Estate with id 100, offe
     },
     sent: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA contract address
+            assetType: 1, // ERC20
+            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA
             value: 100000000000000000000, // 100 MANA
-            extra: 0x // No extra data is needed
+            extra: 0x // Empty extra data
         }
     ],
     received: [
         {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0x959e104e1a4db6317fa58f8295f586e1a978c297, // Estate contract address
-            value: 100, // Estate id
-            extra: abi.encode(0xa12a0c5cb9a6747da8a8b212604c12f2533b476461f62720c21760c7fb05cd0c), // The encoded fingerprint of the Estate
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
+            assetType: 2, // ERC721
+            contractAddress: 0x959e104e1a4db6317fa58f8295f586e1a978c297, // Estate
+            value: 100, // Estate token id
+            extra: abi.encode(0xa12a0c5cb9a6747da8a8b212604c12f2533b476461f62720c21760c7fb05cd0c), // Encoded estate fingerprint
+            beneficiary: 0x0000000000000000000000000000000000000000, // The signer of the Trade (the buyer) will receive the Estate.
         }
     ]
 }
 ```
 
-**Create a Private Order** (List a Wearable for sale, for only a few addresses)
+As you can see from the Trade, the only real difference with an Order is that the sent and received assets are swapped. This simple abstraction is what differentiates a Bid from an Order.
 
-In this example, the owner of a Wearable with ID `0` from Collection `0x024ca955066ce48464ce1eae6106e6fa454ec42a` wants to sell it for 50 MANA. However, this trade is executable only by the addresses `0x2e234DAe75C793f67A35089C9d99245E1C58470b`, `0x24e5F44999c151f08609F8e27b2238c773C4D020`, `0x2f89eC84e0413950d9ADF8e56dd56c2B2f5066cb`.
+**3. Create a Private Order**
+
+There might be some cases in which the owner of an asset wants to put it on sale, but only for a handful of users to be able to buy it. Maybe because of an event, or maybe as a special discount for some winners.
+
+For this example, the owner a Decentraland wearable wants to sell it for 50 MANA. But only the addresses `0x2e234DAe75C793f67A35089C9d99245E1C58470b`, `0x24e5F44999c151f08609F8e27b2238c773C4D020` and `0x2f89eC84e0413950d9ADF8e56dd56c2B2f5066cb` are allowed to buy it.
+
+This can be achieved with the `allowedRoot` check. Which contains a merkle root for the allowed addresses that are allowed to accept it.
 
 ```js
 {
     checks: {
-        allowedRoot: 0xb22d9e7d0895dfb81a418295969a1a2f03c46ba31cfcf5ba1e8c83332fe554d0 // The merkle root created from the allowed addresses
+        allowedRoot: 0xb22d9e7d0895dfb81a418295969a1a2f03c46ba31cfcf5ba1e8c83332fe554d0 // Merkle root for the allowed addresses
     },
     sent: [
         {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0x024ca955066ce48464ce1eae6106e6fa454ec42a, // Collection contract address
-            value: 0, // Wearable ID
-            extra: 0x // No extra data is needed
+            assetType: 2, // ERC721
+            contractAddress: 0x024ca955066ce48464ce1eae6106e6fa454ec42a, // Wearable Collection
+            value: 0, // Token Id
+            extra: 0x // Empty extra data
         }
     ],
     received: [
         {
             assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA contract address
+            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA
             value: 50000000000000000000, // 50 MANA
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the trade will receive the asset
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000, // The signer of the Trade (the seller) will receive the MANA.
         }
     ]
 }
 ```
 
-One of the allowed callers must call the `accept` function with the signed trade, providing the extra merkle proof for their address.
+One of the allowed callers must then execute the Trade by providing a merkle proof used to validate that they are allowed to do so.
 
 ```js
 {
@@ -178,7 +180,9 @@ One of the allowed callers must call the `accept` function with the signed trade
 }
 ```
 
-**Auction** (Auction a Decentraland NAME)
+In this case, `0x2e234DAe75C793f67A35089C9d99245E1C58470b` provides a valid proof, succefuly executing the Trade.
+
+**Auction**
 
 Auctions are an abstract concept that are handled mostly off-chain. The Marketplace contract provides, through the Trade ID, a way for all signatures for a particular auction to be revoked at once when an auction bid is accepted.
 
