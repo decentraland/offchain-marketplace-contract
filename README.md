@@ -355,7 +355,7 @@ This time the bidder will sign a Trade determining that they want to purchase 3 
 }
 ```
 
-**Asset Swaps**
+**6. Asset Swaps**
 
 Trades could be made between any kind of assets, not necessarily between an ERC721 and ERC20. 
 
@@ -388,7 +388,7 @@ For this example, a user is willing to trade their LAND for a Decentraland NAME
 
 As long as the assets are supported by the marketplace implementations of the network being used, the combinations are plenty.
 
-**Hot Sale**
+**7. Hot Sale**
 
 Imagine that you already have a Decentraland wearable on sale for 100 MANA. You now want, as some sort of promotion, sell the item for 50 MANA instead but for the next 12 hours only. After the 12 hours, the sell price returns to 100.
 
@@ -450,7 +450,7 @@ The same user can then sign a new Trade with an expiration of 12 hours and a low
 
 Whatever is shown to the user is to be handled off chain. In this case, as long as the discounted Trade is valid, the frontend could show that one instead of the original.
 
-**Discounts**
+**8. Discounts**
 
 For single elements, discounts can be applied similarly to Hot Sales.
 
@@ -547,7 +547,7 @@ For example
 
 This coupon only works for Decentraland Collection Items, trying to apply it on different assets will fail.
 
-**Revenue Share**
+**9. Revenue Share**
 
 When trading, maybe the seller want to share the tokens earned between different addresses.
 
@@ -588,6 +588,68 @@ The Trade for this would be:
     ]
 }
 ```
+
+**10. Shopping Cart**
+
+The marketplace accepts multiple trades to be executed. This allows dapps to implement a shopping cart by providing the user with all the trades and signatures of the assets they want to purchase and execute them with a single transaction.
+
+The only drawback is that the shopping cart should support same network assets. In the case of Decentraland, the shopping cart would NOT be able to hold LAND/Estates and Wearables at the same time.
+
+For example, there are 2 different Trades,
+
+```js
+{
+    checks: {
+        ...
+    },
+    sent: [
+        {
+            assetType: 2, // ERC721
+            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND
+            value: 34028236692093846346337460743176821145700, // Token id of LAND at coords 100,100
+            extra: 0x // Empty extra data
+        }
+    ],
+    received: [
+        {
+            assetType: 1, // ERC20
+            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA
+            value: 100000000000000000000, // 100 MANA
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
+        }
+    ]
+}
+```
+
+&
+
+```js
+{
+    checks: {
+        ...
+    },
+    sent: [
+        {
+            assetType: 2, // ERC721
+            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND
+            value: 17014118346046923173168730371588410572850, // Token id of LAND at coords 50,50
+            extra: 0x // Empty extra data
+        }
+    ],
+    received: [
+        {
+            assetType: 1, // ERC20
+            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA
+            value: 200000000000000000000, // 200 MANA
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
+        }
+    ]
+}
+```
+
+Any user can add those LANDs to the shopping cart, and when ready, execute both trades in a single transaction by calling the `accept(Trade[] _trades)` function with both LAND trades.
 
 ## Development
 
