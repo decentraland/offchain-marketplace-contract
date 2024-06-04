@@ -164,7 +164,7 @@ This can be achieved with the `allowedRoot` check. Which contains a merkle root 
             contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA
             value: 50000000000000000000, // 50 MANA
             extra: 0x, // Empty extra data
-            beneficiary: 0x0000000000000000000000000000000000000000, // The signer of the Trade (the seller) will receive the MANA.
+            beneficiary: 0x0000000000000000000000000000000000000000
         }
     ]
 }
@@ -182,133 +182,139 @@ One of the allowed callers must then execute the Trade by providing a merkle pro
 
 In this case, `0x2e234DAe75C793f67A35089C9d99245E1C58470b` provides a valid proof, succefuly executing the Trade.
 
-**Auction**
+**4. Auction**
 
-Auctions are an abstract concept that are handled mostly off-chain. The Marketplace contract provides, through the Trade ID, a way for all signatures for a particular auction to be revoked at once when an auction bid is accepted.
+Auctions using this marketplace are basically multiple bids for a certain asset (or assets).
 
-The idea for auctions is for the owner of an item to request a backend server to start an auction for a given asset. A salt for this particular auction will be created.
+The marketplace provides 2 different tools to make the UX on Auctions better.
 
-When a user wants to bid in the auction, they will create and sign a trade, determining in the sent assets what they are willing to pay.
+These are:
 
-This is an example of users bidding for a Decentraland NAME in an auction.
+- The `effective` timestamp. Which determines at which point in time an auction trade can be executed.
 
-Auction Bid #1
+- The `trade id`. An id composed by hashing the trade salt, caller (the one who accepts the Trade, which for auctions, would be the owner of the auctioned assets) and the received assets. Used to revoke all signatures on the auction once finished.
+
+Let's say that a user wants to auction a Decentraland NAME they own. Starting price at 20 MANA, with an auction duration of 1 week.
+
+This data will be stored on a server off-chain, accessible by users on the marketplace UI.
+
+Users that want to participate in the auction can sign bid trades, using the auction data as reference.
+
+For example:
+
+Bid #1
 
 ```js
 {
     checks: {
-        effective: 1719971471, // 30 days from today (2nd of July 2024), time in which the owner of the NAME can accept the trade
-        expiration: 1722660671, // 60 days from today (2nd of July 2024), an extra month after the effective date to allow the owner of the NAME to accept it
-        allowedRoot: 0x6c9e33165e145e2ae0303097f79b5a91721d83c34291a94e769c65d7cb8bc1a7, // Merkle root allowing only the owner of the asset to accept the trade
+        effective: 1720587071, // 7 days from today (2nd of July 2024)
         salt: 0x61647662736664627364666273646662736466627364666264626664736e7479 // The salt created for the auction
     },
     sent: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA contract address
-            value: 100000000000000000000, // 100 MANA
-            extra: 0x // No extra data is needed
+            assetType: 1, // ERC20
+            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA
+            value: 30000000000000000000, // 30 MANA
+            extra: 0x // Empty extra data
         }
     ],
     received: [
         {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0x7518456ae93eb98f3e64571b689c626616bb7f30, // DCL Registrar contract address
-            value: 20297805150211737582237783260270391886773425187705606004622572049666906448004, // NAME token ID
-            extra: 0x, // No extra data required
-            beneficiary: 0x0000000000000000000000000000000000000000 // The creator of the trade will receive the asset
+            assetType: 2, // ERC721
+            contractAddress: 0x7518456ae93eb98f3e64571b689c626616bb7f30, // DCL Registrar
+            value: 20297805150211737582237783260270391886773425187705606004622572049666906448004, // Token id
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
         }
     ]
 }
 ```
 
-Auction Bid #2
+Bid #2
 
 ```js
 {
     checks: {
-        effective: 1719971471, // 30 days from today (2nd of July 2024), time in which the owner of the NAME can accept the trade
-        expiration: 1722660671, // 60 days from today (2nd of July 2024), an extra month after the effective date to allow the owner of the NAME to accept it
-        allowedRoot: 0x6c9e33165e145e2ae0303097f79b5a91721d83c34291a94e769c65d7cb8bc1a7, // Merkle root allowing only the owner of the asset to accept the trade
-        salt: 0x61647662736664627364666273646662736466627364666264626664736e7479 // The salt created for the auction
+        effective: 1720587071, // 7 days from today (2nd of July 2024)
+        salt: 0x61647662736664627364666273646662736466627364666264626664736e7479 // Needs to use the same salt so both bids can have the same trade id
     },
     sent: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA contract address
-            value: 200000000000000000000, // 200 MANA
-            extra: 0x // No extra data is needed
+            assetType: 1, // ERC20
+            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA
+            value: 50000000000000000000, // 50 MANA
+            extra: 0x // Empty extra data
         }
     ],
     received: [
         {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0x7518456ae93eb98f3e64571b689c626616bb7f30, // DCL Registrar contract address
-            value: 20297805150211737582237783260270391886773425187705606004622572049666906448004, // NAME token ID
-            extra: 0x, // No extra data required
-            beneficiary: 0x0000000000000000000000000000000000000000 // The creator of the trade will receive the asset
+            assetType: 2, // ERC721
+            contractAddress: 0x7518456ae93eb98f3e64571b689c626616bb7f30, // DCL Registrar
+            value: 20297805150211737582237783260270391886773425187705606004622572049666906448004, // Token id
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
         }
     ]
 }
 ```
 
-Bid #2 has a better offer for the owner of the NAME, meaning that when the trade becomes effective, it is the one with the highest chance of being accepted.
+The effective date is a way in which bidders can be certain that the auctioner will not end the auction sooner than expected. It is not required, this just provides a way to create "strict" auctions that cannot be finished early.
 
-The marketplace contract introduces the concept of a Trade ID, which is formed by hashing the `salt`, the caller of the `accept` function (which in this case would be the owner of the asset), and the received assets. With this Trade ID, when an offer is accepted, all other auction signatures will be revoked to prevent future usage (and preventing the need for users to manually cancel them). In this case, if Bid #2 is accepted, Bid #1 becomes revoked automatically.
+Given that bid #2 has a better offer, the owner of the asset will probably accept that one when the time comes. And because both bids have the same trade id, once bid #2 is accepted, the bid #1 becomes invalidated, preventing any future use in case the asset comes back to the original owner.
 
-**Creating a Public Order for Multiple Items** (Put 3 different items from the same collection on sale for 100 MANA)
+The `allowedRoot` check, explained in the **Private Order** example, should be used as well so only the auctioner can accept the bids. This combined with the trade id, gives the best auctioning experience with this contract.
 
-In this example, the owner of collection `0xf8a87150ca602dbeb2e748ad7c9c790d55d10528` wants to sell (as primary sale) for 100 MANA the 3 items found in the collection (with item ids 0,1,2)
+**5. Creating a Public Order for Multiple Items**
 
-This can be achieved with the following Trade.
+Any user might want to be able to sell items in batch. For example, as a promotion, a Decentraland wearable creator might want to sell 3 items in batch for 100 MANA.
+
+Any amount of assets can be defined on the sent and received properties of the Trade. In this case, the creator would define the 3 items as being sent, and the 100 MANA as the received asset.
 
 ```js
 {
     checks: {
-        uses: 0 // The creator might want this Trade to be used multiple times. Useful for these kind of assets given that they are minted and the creator does not need to sign a new Trade each time.
+        ...
     },
     sent: [
         {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
+            assetType: 3, // Decentraland Collection Item (Primary Sale);
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 0, // Item id
-            extra: 0x// No extra data is needed
-
+            extra: 0x // Empty extra data
         },
         {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
+            assetType: 3, // Decentraland Collection Item (Primary Sale);
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 1, // Item id
-            extra: 0x// No extra data is needed
-
+            extra: 0x // Empty extra data
         },
         {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
+            assetType: 3, // Decentraland Collection Item (Primary Sale);
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 2, // Item id
-            extra: 0x// No extra data is needed
+            extra: 0x // Empty extra data
 
         },
     ],
     received: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA contract address
+            assetType: 1, // ERC20
+            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA
             value: 100000000000000000000, // 100 MANA
             extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
+            beneficiary: 0x0000000000000000000000000000000000000000
         }
     ]
 }
 ```
 
-This is not limited to just collection items, Orders for multiple items can be done with any kind of assets.
+For this particular case, when the Trade is accepted, the items will be bough for 100 MANA total.
 
-**Bidding for Multiple Items** (Bid 100 MANA to buy 3 different collection items)
+**6. Bidding for Multiple Items** (Bid 100 MANA to buy 3 different collection items)
 
-In this example, a user wants to offer 100 MANA to buy the items 0,1,2 from the collection `0xf8a87150ca602dbeb2e748ad7c9c790d55d10528`
+Similar to mutiple item orders, but with the sent and received assets swapped.
 
-This can be achieved with the following Trade.
+This time the bidder will sign a Trade determining that they want to purchase 3 items for 100 MANA.
 
 ```js
 {
@@ -317,177 +323,142 @@ This can be achieved with the following Trade.
     },
     sent: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA contract address
+            assetType: 1, // ERC20
+            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA
             value: 100000000000000000000, // 100 MANA
-            extra: 0x, // No extra data is needed
-        }
-    ],
-    received: [
-
-        {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
-            value: 0, // Item id
-            extra: 0x// No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
-        },
-        {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
-            value: 1, // Item id
-            extra: 0x// No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
-
-        },
-        {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
-            value: 2, // Item id
-            extra: 0x// No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
-        },
-    ]
-}
-```
-
-This is not limited to just collection items, Bids for multiple items can be done with any kind of assets.
-
-**Bundles** (Selling a bundle consisting of a LAND and a Decentraland NAME for 100 MANA)
-
-In this example, a user wants to sell a LAND with id `34028236692093846346337460743176821145700` and a NAME with id `20297805150211737582237783260270391886773425187705606004622572049666906448004` for 100 MANA as a bundle.
-
-```js
-{
-    checks: {
-        ...
-    },
-    sent: [
-        {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND contract address
-            value: 34028236692093846346337460743176821145700, // LAND Token id
-            extra: 0x// No extra data is needed
-        },
-        {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0x7518456ae93eb98f3e64571b689c626616bb7f30, // DCL Registrar contract address
-            value: 20297805150211737582237783260270391886773425187705606004622572049666906448004, // NAME token id
-            extra: 0x// No extra data is needed
-        },
-    ],
-    received: [
-        {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA contract address
-            value: 100000000000000000000, // 100 MANA
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
-        }
-    ]
-}
-```
-
-**Asset Swaps** (Swapping a Decentraland NAME for a LAND)
-
-In this example, a user wants to swap a LAND with id `34028236692093846346337460743176821145700` for a NAME with id `20297805150211737582237783260270391886773425187705606004622572049666906448004`.
-
-```js
-{
-    checks: {
-        ...
-    },
-    sent: [
-        {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND contract address
-            value: 34028236692093846346337460743176821145700, // LAND Token id
             extra: 0x // No extra data is needed
-        },
+        }
     ],
     received: [
         {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0x7518456ae93eb98f3e64571b689c626616bb7f30, // DCL Registrar contract address
-            value: 20297805150211737582237783260270391886773425187705606004622572049666906448004, // NAME token id
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
+            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
+            value: 0, // Item id
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
+        },
+        {
+            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
+            value: 1, // Item id
+            extra: 0x // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
+        },
+        {
+            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
+            value: 2, // Item id
+            extra: 0x // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
         },
     ]
 }
 ```
 
-**Hot Sale** (Listing a Wearable on sale for 100 MANA, with a Hot Sale at 50 MANA)
+**Asset Swaps**
 
-A user has a Wearable on sale for sale for 100 MANA, this user created a Trade to list is for sale with the following characteristics:
+Trades could be made between any kind of assets, not necessarily between an ERC721 and ERC20. 
+
+For this example, a user is willing to trade their LAND for a Decentraland NAME
 
 ```js
 {
     checks: {
-        uses: 0, // This trade can be used an unlimited amount of times until cancelled
-        expiration: 1719971471 // 30 days from today (2nd of July 2024)
+        ...
     },
     sent: [
         {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
+            assetType: 2, // ERC721
+            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND
+            value: 34028236692093846346337460743176821145700
+            extra: 0x // Empty extra data
+        },
+    ],
+    received: [
+        {
+            assetType: 2, // ERC721
+            contractAddress: 0x7518456ae93eb98f3e64571b689c626616bb7f30, // DCL Registrar
+            value: 20297805150211737582237783260270391886773425187705606004622572049666906448004,
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
+        },
+    ]
+}
+```
+
+As long as the assets are supported by the marketplace implementations of the network being used, the combinations are plenty.
+
+**Hot Sale**
+
+Imagine that you already have a Decentraland wearable on sale for 100 MANA. You now want, as some sort of promotion, sell the item for 50 MANA instead but for the next 12 hours only. After the 12 hours, the sell price returns to 100.
+
+The original Trade, asking for 100 MANA would look like:
+
+```js
+{
+    checks: {
+        ...
+    },
+    sent: [
+        {
+            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection
             value: 0, // Item id
-            extra: 0x// No extra data is needed
+            extra: 0x // Empty extra data
 
         },
     ],
     received: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA contract address
+            assetType: 1, // ERC20
+            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA
             value: 100000000000000000000, // 100 MANA
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
         }
     ]
 }
 ```
 
-If the user wants to create a hot sale for selling this item at a price of 50 MANA, that only lasts 12 hours. They just need to sign a new trade with a shorter expiration.
+The same user can then sign a new Trade with an expiration of 12 hours and a lowered price, which users can enjoy for a limited time only.
 
 ```js
 {
     checks: {
-        uses: 0, // This trade can be used an unlimited amount of times until cancelled
         expiration: 1720025471 // 12 hours from now (2nd of July 2024)
     },
     sent: [
         {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
+            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection
             value: 0, // Item id
-            extra: 0x// No extra data is needed
+            extra: 0x // Empty extra data
 
         },
     ],
     received: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA contract address
+            assetType: 1, // ERC20
+            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA
             value: 50000000000000000000, // 50 MANA
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
         }
     ]
 }
 ```
 
-The item would be on a "Hot Sale" until the 12 hours pass.
-
-Other properties can be used to play with it, like a "Hot Sale" for the first 10 buyers "uses: 10".
+Whatever is shown to the user is to be handled off chain. In this case, as long as the discounted Trade is valid, the frontend could show that one instead of the original.
 
 **Discounts**
 
-Discounts for single items can be applied just like hot sales.
+For single elements, discounts can be applied similarly to Hot Sales.
 
-For more broad discounts, we present Coupons.
+For more broad discounts, the marketplace smart contract provides Coupons.
 
-Imagine the user wants to create a Coupon were all Trades involving their collection items have a 10% discount.
+For this example, a Decentraland creator wants to generate a discount of 50% for all the collection items they have on sale.
+
+This particular case is already supported by the CollectionDiscountCoupon, a smart contract containing this coupon logic.
 
 First the user must create the Trade:
 
@@ -498,20 +469,20 @@ First the user must create the Trade:
     },
     sent: [
         {
-            assetType: 3, // ASSET_TYPE_COLLECTION_ITEM;
-            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection contract address
+            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection
             value: 0, // Item id
-            extra: 0x// No extra data is needed
+            extra: 0x // Empty extra data
 
         },
     ],
     received: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA contract address
+            assetType: 1, // ERC20
+            contractAddress: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4, // Polygon MANA
             value: 100000000000000000000, // 100 MANA
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
         }
     ]
 }
@@ -522,30 +493,28 @@ Then create the Coupon:
 ```js
 {
     checks: {
-        ... // Coupons have the same checks as Trades
+        ...
     },
     couponAddress: 0xd35147be6401dcb20811f2104c33de8e97ed6818 // The address of the CollectionDiscountCoupon, TODO: when deployed, update it with the real one for this example
     data: abi.encode({
-        discountType: 1, // DISCOUNT_TYPE_RATE,
+        discountType: 1, // Percentage, 2 would be for a flat rate
         discount: 500_000, // 50% discount
         root: 0x8b51132a209611e5b135381b6e9758608c0ae75f58713c085c07b1078000835d // Merkle root of all the collection addresses that are included in the discount
     })
 }
 ```
 
-Any user can then accept the Trade with the Coupon calling the `acceptWithCoupon` function. One thing to take into consideration, is that the coupon has to be sent with the extra `callerData` property, containing the proof for the collection of the item being bought.
+Any user that has access to the Coupon signature can then apply it to a Trade and execute it.
+
+Sending the proof that the collection is part of the root has to be done by the caller by providing it in the `callerData` of the Coupon argument.
 
 ```js
 {
     checks: {
-        ... // Coupons have the same checks as Trades
+        ...
     },
-    couponAddress: 0xd35147be6401dcb20811f2104c33de8e97ed6818 // The address of the CollectionDiscountCoupon, TODO: when deployed, update it with the real one for this example
-    data: abi.encode({
-        discountType: 1, // DISCOUNT_TYPE_RATE,
-        discount: 500_000, // 50% discount
-        root: 0x8b51132a209611e5b135381b6e9758608c0ae75f58713c085c07b1078000835d // Merkle root of all the collection addresses that are included in the discount
-    }),
+    couponAddress: ...
+    data: ...
     callerData: abi.encode({
         proofs: [[
             "0xc167b0e3c82238f4f2d1a50a8b3a44f96311d77b148c30dc0ef863e1a060dcb6",
@@ -556,29 +525,37 @@ Any user can then accept the Trade with the Coupon calling the `acceptWithCoupon
 }
 ```
 
-Maybe the seller is selling 3 items in the same Trade, 2 from the same collection and 1 from a different.
+This coupon implementation allows for multiple item Orders as well.
 
-For the coupon to work in this case, all collections should be supported in the coupon, as well as defined in the correct order.
+The only requirement is that the proof of each collection item being traded is in the same order.
 
-```
-Trade {
-    sent [collection1Item1, collection1Item2, collection2Item1]
+For example
+
+```js
+// Trade
+{
+    sent: [collection1Item1, collection1Item2, collection2Item1]
 }
 
-Coupon {
-    callerData {
-        proofs [collection1Proof, collection1Proof, collection2Proof]
+// Coupon
+{
+    callerData: {
+        proofs: [collection1Proof, collection1Proof, collection2Proof]
     }
 }
 ```
 
-CollectionDiscountCoupon discounts can also be flat. Meaning that the discount can be a given amount instead of a rate. This can be done with `discountType: 2`. The provided `discount` value will be deducted from the ERC20 asset price.
+This coupon only works for Decentraland Collection Items, trying to apply it on different assets will fail.
 
 **Revenue Share**
 
-For this example, an user wants to sell a LAND for 100 MANA, but can decide that 70 MANA goes to himself, and 30 to another address.
+When trading, maybe the seller want to share the tokens earned between different addresses.
 
-They can do so by creating a Trade with 2 different MANA Assets being received:
+This can easily be done by defining extra ERC20 assets in the trade.
+
+For example, some user wants to sell a LAND for 100 MANA, but chooses that the MANA should go 20% to themselves and 80% to charity.
+
+The Trade for this would be:
 
 ```js
 {
@@ -587,26 +564,26 @@ They can do so by creating a Trade with 2 different MANA Assets being received:
     },
     sent: [
         {
-            assetType: 2, // ASSET_TYPE_ERC721
-            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND contract address
-            value: 34028236692093846346337460743176821145700, // Token id of parcel 100,100
-            extra: 0x// No extra data is needed
+            assetType: 2, // ERC721
+            contractAddress: 0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d, // LAND
+            value: 34028236692093846346337460743176821145700,
+            extra: 0x // Empty extra data
         }
     ],
     received: [
         {
-            assetType: 1, // ASSET_TYPE_ERC20
-            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA contract address
-            value: 70000000000000000000, // 70 MANA
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x0000000000000000000000000000000000000000, // The creator of the Trade will receive the asset
+            assetType: 1, // ERC20
+            contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA
+            value: 20000000000000000000, // 20 MANA
+            extra: 0x, // Empty extra data
+            beneficiary: 0x0000000000000000000000000000000000000000
         },
         {
             assetType: 1, // ASSET_TYPE_ERC20
             contractAddress: 0x0f5d2fb29fb7d3cfee444a200298f468908cc942, // MANA contract address
-            value: 30000000000000000000, // 30 MANA
-            extra: 0x, // No extra data is needed
-            beneficiary: 0x24e5F44999c151f08609F8e27b2238c773C4D020, // This address will receive the MANA, instead of the creator of the Trade
+            value: 80000000000000000000, // 80 MANA
+            extra: 0x, // Empty extra data
+            beneficiary: 0x24e5F44999c151f08609F8e27b2238c773C4D020, // The address of the charity wallet
         }
     ]
 }
