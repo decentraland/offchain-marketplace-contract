@@ -651,6 +651,68 @@ For example, there are 2 different Trades,
 
 Any user can add those LANDs to the shopping cart, and when ready, execute both trades in a single transaction by calling the `accept(Trade[] _trades)` function with both LAND trades.
 
+**11. External Checks**
+
+Users are able to indicate who can accept a trade not only using the `allowedRoot` (explained in the "Create a Private Order" example). Users can limit who is allowed by defining external checks.
+
+External checks are validations performed on external smart contracts. 
+
+Some examples are; Having x amount of tokens from an NFT collection or fungible asset; Owning a particular NFT.
+
+For example, Some user wants to create a collection discount coupon that can only be applied by users that have at least one wearable from a particular collection they created.
+
+To do so, they must add an external check to the coupon:
+
+```js
+{
+    checks: {
+        externalChecks: [
+            {
+                contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection
+                selector: 0x70a08231, // balanceOf(address,uint256) selector, will check the balance the caller has for that collection
+                value: 1, // Will check that the balance is 1 or more
+                required: true // This check has to pass. For cases in which there is only 1 check, true or false is the same
+            }
+        ]
+    },
+    couponAddress: ...
+    data: ...
+    callerData: ...
+}
+```
+
+This coupon can only be used if the caller has at least 1 wearable from the `0xf8a87150ca602dbeb2e748ad7c9c790d55d10528` collection.
+
+Maybe the user wants to be more flexible and allow users to apply the coupon if they own a wearable of one collection or another.
+
+They can do so by adding more external checks like:
+
+```js
+{
+    checks: {
+        externalChecks: [
+            {
+                contractAddress: collectionA, // First collection to check
+                selector: 0x70a08231,
+                value: 1
+                required: false // This means optional
+            },
+            {
+                contractAddress: collectionB, // Second collection to check
+                selector: 0x70a08231,
+                value: 1,
+                required: false // At least one optional check has to pass in order to be valid
+            },
+        ]
+    },
+    couponAddress: ...
+    data: ...
+    callerData: ...
+}
+```
+
+The contract supports checking `balanceOf` and `ownerOf` natively. But if the selector provided does not match any of those, it will fallback to using the provided selector with the caller and provided value, and expect that the function returns `true`. The user could provide a selector that is `myCustomCheck(address,uint256)`, and it should return true.
+
 ## Development
 
 Run tests with `forge test` and build contracts with `forge build`
