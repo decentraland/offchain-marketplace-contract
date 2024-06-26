@@ -13,6 +13,7 @@ import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCoupo
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
 import {IRoyaltiesManager} from "src/marketplace/interfaces/IRoyaltiesManager.sol";
 import {FeeCollector} from "src/marketplace/FeeCollector.sol";
+import {IAggregator} from "src/marketplace/interfaces/IAggregator.sol";
 
 /// @notice Decentraland Marketplace contract for the Polygon network assets. MANA, Wearables, Emotes, etc.
 contract DecentralandMarketplacePolygon is
@@ -21,6 +22,14 @@ contract DecentralandMarketplacePolygon is
     NativeMetaTransaction,
     FeeCollector
 {
+    /// @notice The MANA token address.
+    /// @dev Used to transfer MANA tokens on for assets of type ASSET_TYPE_USD_PEGGED_MANA.
+    address public immutable manaAddress;
+
+    /// @notice The MANA/USD price aggregator.
+    /// @dev Used to obtain the price of MANA in USD.
+    IAggregator public immutable manaUsdAggregator;
+
     /// @notice The royalties manager contract. Used to get the royalties receiver for collection nft trades.
     IRoyaltiesManager public royaltiesManager;
 
@@ -31,6 +40,7 @@ contract DecentralandMarketplacePolygon is
     event RoyaltiesRateUpdated(address indexed _caller, uint256 _royaltiesRate);
 
     error NotCreator();
+    error PayableAmountExceedsMaximumValue();
 
     /// @param _owner The owner of the contract.
     /// @param _couponManager The address of the coupon manager contract.
@@ -38,14 +48,18 @@ contract DecentralandMarketplacePolygon is
     /// @param _feeRate The rate of the fee. 25_000 is 2.5%
     /// @param _royaltiesManager The address of the royalties manager contract.
     /// @param _royaltiesRate The rate of the royalties. 25_000 is 2.5%
+    /// @param _manaAddress The address of the MANA token.
+    /// @param _manaUsdAggregator The address of the MANA/USD price aggregator.
     constructor(
         address _owner,
         address _couponManager,
         address _feeCollector,
         uint256 _feeRate,
         address _royaltiesManager,
-        uint256 _royaltiesRate
-    ) 
+        uint256 _royaltiesRate,
+        address _manaAddress,
+        address _manaUsdAggregator
+    )
         Ownable(_owner)
         MarketplaceWithCouponManager(_couponManager)
         FeeCollector(_feeCollector, _feeRate)
@@ -53,6 +67,9 @@ contract DecentralandMarketplacePolygon is
     {
         _updateRoyaltiesManager(_royaltiesManager);
         _updateRoyaltiesRate(_royaltiesRate);
+
+        manaAddress = _manaAddress;
+        manaUsdAggregator = IAggregator(_manaUsdAggregator);
     }
 
     /// @notice Updates the fee collector address.
@@ -142,9 +159,28 @@ contract DecentralandMarketplacePolygon is
     }
 
     /// @dev Iterate through the provided assets and update the ERC20 assets to include the fees and royalties data.
-    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _encodedFeeAndRoyaltyData) private pure returns (Asset[] memory) {
+    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _encodedFeeAndRoyaltyData) private view returns (Asset[] memory) {
         for (uint256 i = 0; i < _assets.length; i++) {
-            if (_assets[i].assetType == ASSET_TYPE_ERC20) {
+            // These assets have the value in USD, and have to be converted to MANA.
+            if (_assets[i].assetType == ASSET_TYPE_USD_PEGGED_MANA) {
+                // Get the price of 1 MANA in USD.
+                (, int256 manaUsdRate,,,) = manaUsdAggregator.latestRoundData();
+
+                // Update the asset contract address to be MANA.
+                _assets[i].contractAddress = manaAddress;
+                // Update the asset value to be the amount of MANA to be transferred, based on the rate.
+                _assets[i].value = (_assets[i].value * uint256(manaUsdRate * 1e10)) / 1e18;
+
+                // Decode the extra data to obtain the maximum value allowed to be transferred.
+                // This is used to prevent a lot more MANA than the expected from being transferred when the price changes suddenly.
+                uint256 maxValue = abi.decode(_assets[i].extra, (uint256));
+
+                if (maxValue < _assets[i].value) {
+                    revert PayableAmountExceedsMaximumValue();
+                }
+            }
+
+            if (_assets[i].assetType == ASSET_TYPE_ERC20 || _assets[i].assetType == ASSET_TYPE_USD_PEGGED_MANA) {
                 _assets[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
                 _assets[i].extra = _encodedFeeAndRoyaltyData;
             }
