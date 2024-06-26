@@ -341,7 +341,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
         vm.prank(other);
         marketplace.accept(trades);
     }
-    
+
     function test_RevertsIfEthUsdAggregatorIsAddressZero() public {
         vm.startPrank(dao);
         marketplace.updateEthUsdAggregator(address(0), marketplace.ethUsdAggregatorTolerance());
