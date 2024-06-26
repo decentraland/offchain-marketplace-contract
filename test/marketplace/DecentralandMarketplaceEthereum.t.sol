@@ -17,8 +17,22 @@ contract DecentralandMarketplaceEthereumHarness is DecentralandMarketplaceEthere
         uint256 _feeRate,
         address _manaAddress,
         address _manaEthAggregator,
-        address _ethUsdAggregator
-    ) DecentralandMarketplaceEthereum(_owner, _couponManager, _feeCollector, _feeRate, _manaAddress, _manaEthAggregator, _ethUsdAggregator) {}
+        uint256 _manaEthAggregatorTolerance,
+        address _ethUsdAggregator,
+        uint256 _ethUsdAggregatorTolerance
+    )
+        DecentralandMarketplaceEthereum(
+            _owner,
+            _couponManager,
+            _feeCollector,
+            _feeRate,
+            _manaAddress,
+            _manaEthAggregator,
+            _manaEthAggregatorTolerance,
+            _ethUsdAggregator,
+            _ethUsdAggregatorTolerance
+        )
+    {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();
@@ -55,7 +69,8 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
         manaEthAggregator = 0x82A44D92D6c329826dc557c5E1Be6ebeC5D5FeB9;
         ethUsdAggregator = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
 
-        marketplace = new DecentralandMarketplaceEthereumHarness(dao, address(0), dao, 25_000, manaAddress, manaEthAggregator, ethUsdAggregator);
+        marketplace =
+            new DecentralandMarketplaceEthereumHarness(dao, address(0), dao, 25_000, manaAddress, manaEthAggregator, 86400, ethUsdAggregator, 3600);
     }
 
     function signTrade(DecentralandMarketplaceEthereumHarness.Trade memory _trade) internal view returns (bytes memory) {
@@ -223,7 +238,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 
-    error PayableAmountExceedsMaximumValue();
+    error AggregatorAnswerIsStale();
 
     function setUp() public override {
         super.setUp();
@@ -245,7 +260,6 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
         trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
         trades[0].received[0].value = 100 ether;
-        trades[0].received[0].extra = abi.encode(erc20.balanceOf(other));
         trades[0].signature = signTrade(trades[0]);
 
         // The amount of MANA to be transferred is 45825737193731408700
@@ -278,7 +292,6 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
         // The contract address is ignored as it is replaced by the mana contract address
         trades[0].received[0].contractAddress = other;
         trades[0].received[0].value = 100 ether;
-        trades[0].received[0].extra = abi.encode(erc20.balanceOf(other));
         trades[0].signature = signTrade(trades[0]);
 
         vm.expectEmit(address(erc20));
@@ -291,25 +304,77 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
         marketplace.accept(trades);
     }
 
-    function test_RevertsIfTheAmountOfPayableManaExceedsMaxValue() public {
-        vm.prank(erc20OriginalHolder);
-        erc20.transfer(other, 1000 ether);
-
-        vm.prank(other);
-        erc20.approve(address(marketplace), 1000 ether);
+    function test_RevertsIfManaEthAggregatorIsAddressZero() public {
+        vm.startPrank(dao);
+        marketplace.updateManaEthAggregator(address(0), marketplace.manaEthAggregatorTolerance());
+        vm.stopPrank();
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
-        trades[0].received[0].contractAddress = other;
         trades[0].received[0].value = 100 ether;
-        // The Trade end up requiring the user to pay a little bit more than 45 so it should revert
-        trades[0].received[0].extra = abi.encode(45 ether);
         trades[0].signature = signTrade(trades[0]);
 
-        vm.expectRevert(PayableAmountExceedsMaximumValue.selector);
+        vm.expectRevert();
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfManaEthAggregatorToleranceIsZero() public {
+        vm.startPrank(dao);
+        marketplace.updateManaEthAggregator(address(marketplace.manaEthAggregator()), 0);
+        vm.stopPrank();
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.expectRevert(AggregatorAnswerIsStale.selector);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+    
+    function test_RevertsIfEthUsdAggregatorIsAddressZero() public {
+        vm.startPrank(dao);
+        marketplace.updateEthUsdAggregator(address(0), marketplace.ethUsdAggregatorTolerance());
+        vm.stopPrank();
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.expectRevert();
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfEthUsdAggregatorToleranceIsZero() public {
+        vm.startPrank(dao);
+        marketplace.updateEthUsdAggregator(address(marketplace.ethUsdAggregator()), 0);
+        vm.stopPrank();
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.expectRevert(AggregatorAnswerIsStale.selector);
 
         vm.prank(other);
         marketplace.accept(trades);
@@ -599,6 +664,54 @@ contract UpdateFeeRateTests is DecentralandMarketplaceEthereumTests {
         emit FeeRateUpdated(dao, 100);
         marketplace.updateFeeRate(100);
         assertEq(marketplace.feeRate(), 100);
+    }
+}
+
+contract UpdateManaEthAggregatorTests is DecentralandMarketplaceEthereumTests {
+    event ManaEthAggregatorUpdated(address indexed _aggregator, uint256 _tolerance);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateManaEthAggregator(address(0), 0 seconds);
+    }
+
+    function test_UpdatesManaEthAggregator() public {
+        assertEq(address(marketplace.manaEthAggregator()), manaEthAggregator);
+        assertEq(marketplace.manaEthAggregatorTolerance(), 86400);
+
+        vm.expectEmit(address(marketplace));
+        emit ManaEthAggregatorUpdated(other, 100);
+
+        vm.prank(dao);
+        marketplace.updateManaEthAggregator(other, 100);
+
+        assertEq(address(marketplace.manaEthAggregator()), other);
+        assertEq(marketplace.manaEthAggregatorTolerance(), 100);
+    }
+}
+
+contract UpdateEthUsdAggregatorTests is DecentralandMarketplaceEthereumTests {
+    event EthUsdAggregatorUpdated(address indexed _aggregator, uint256 _tolerance);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateEthUsdAggregator(address(0), 0 seconds);
+    }
+
+    function test_UpdatesEthUsdAggregator() public {
+        assertEq(address(marketplace.ethUsdAggregator()), ethUsdAggregator);
+        assertEq(marketplace.ethUsdAggregatorTolerance(), 3600);
+
+        vm.expectEmit(address(marketplace));
+        emit EthUsdAggregatorUpdated(other, 100);
+
+        vm.prank(dao);
+        marketplace.updateEthUsdAggregator(other, 100);
+
+        assertEq(address(marketplace.ethUsdAggregator()), other);
+        assertEq(marketplace.ethUsdAggregatorTolerance(), 100);
     }
 }
 

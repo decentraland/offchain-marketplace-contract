@@ -14,13 +14,15 @@ import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/Decentra
 import {IRoyaltiesManager} from "src/marketplace/interfaces/IRoyaltiesManager.sol";
 import {FeeCollector} from "src/marketplace/FeeCollector.sol";
 import {IAggregator} from "src/marketplace/interfaces/IAggregator.sol";
+import {AggregatorHelper} from "src/marketplace/AggregatorHelper.sol";
 
 /// @notice Decentraland Marketplace contract for the Polygon network assets. MANA, Wearables, Emotes, etc.
 contract DecentralandMarketplacePolygon is
     DecentralandMarketplacePolygonAssetTypes,
     MarketplaceWithCouponManager,
     NativeMetaTransaction,
-    FeeCollector
+    FeeCollector,
+    AggregatorHelper
 {
     /// @notice The MANA token address.
     /// @dev Used to transfer MANA tokens on for assets of type ASSET_TYPE_USD_PEGGED_MANA.
@@ -28,7 +30,10 @@ contract DecentralandMarketplacePolygon is
 
     /// @notice The MANA/USD price aggregator.
     /// @dev Used to obtain the price of MANA in USD.
-    IAggregator public immutable manaUsdAggregator;
+    IAggregator public manaUsdAggregator;
+
+    /// @notice The tolerance that indicates if the result provided by the aggregator is old.
+    uint256 public manaUsdAggregatorTolerance;
 
     /// @notice The royalties manager contract. Used to get the royalties receiver for collection nft trades.
     IRoyaltiesManager public royaltiesManager;
@@ -38,9 +43,9 @@ contract DecentralandMarketplacePolygon is
 
     event RoyaltiesManagerUpdated(address indexed _caller, address indexed _royaltiesManager);
     event RoyaltiesRateUpdated(address indexed _caller, uint256 _royaltiesRate);
+    event ManaUsdAggregatorUpdated(address indexed _aggregator, uint256 _tolerance);
 
     error NotCreator();
-    error PayableAmountExceedsMaximumValue();
 
     /// @param _owner The owner of the contract.
     /// @param _couponManager The address of the coupon manager contract.
@@ -50,6 +55,7 @@ contract DecentralandMarketplacePolygon is
     /// @param _royaltiesRate The rate of the royalties. 25_000 is 2.5%
     /// @param _manaAddress The address of the MANA token.
     /// @param _manaUsdAggregator The address of the MANA/USD price aggregator.
+    /// @param _manaUsdAggregatorTolerance The tolerance that indicates if the result provided by the aggregator is old.
     constructor(
         address _owner,
         address _couponManager,
@@ -58,7 +64,8 @@ contract DecentralandMarketplacePolygon is
         address _royaltiesManager,
         uint256 _royaltiesRate,
         address _manaAddress,
-        address _manaUsdAggregator
+        address _manaUsdAggregator,
+        uint256 _manaUsdAggregatorTolerance
     )
         Ownable(_owner)
         MarketplaceWithCouponManager(_couponManager)
@@ -69,7 +76,8 @@ contract DecentralandMarketplacePolygon is
         _updateRoyaltiesRate(_royaltiesRate);
 
         manaAddress = _manaAddress;
-        manaUsdAggregator = IAggregator(_manaUsdAggregator);
+
+        _updateManaUsdAggregator(_manaUsdAggregator, _manaUsdAggregatorTolerance);
     }
 
     /// @notice Updates the fee collector address.
@@ -94,6 +102,13 @@ contract DecentralandMarketplacePolygon is
     /// @param _royaltiesRate The new royalties rate.
     function updateRoyaltiesRate(uint256 _royaltiesRate) external onlyOwner {
         _updateRoyaltiesRate(_royaltiesRate);
+    }
+
+    /// @notice Updates the MANA/USD price aggregator and tolerance.
+    /// @param _aggregator The new MANA/USD price aggregator.
+    /// @param _tolerance The new tolerance that indicates if the result provided by the aggregator is old.
+    function updateManaUsdAggregator(address _aggregator, uint256 _tolerance) external onlyOwner {
+        _updateManaUsdAggregator(_aggregator, _tolerance);
     }
 
     /// @dev Overriden Marketplace function which modifies the Trade before being accepted.
@@ -163,21 +178,11 @@ contract DecentralandMarketplacePolygon is
         for (uint256 i = 0; i < _assets.length; i++) {
             // These assets have the value in USD, and have to be converted to MANA.
             if (_assets[i].assetType == ASSET_TYPE_USD_PEGGED_MANA) {
-                // Get the price of 1 MANA in USD.
-                (, int256 manaUsdRate,,,) = manaUsdAggregator.latestRoundData();
+                // Obtains the price of MANA in USD.
+                int256 manaUsdRate = _getRateFromAggregator(manaUsdAggregator, manaUsdAggregatorTolerance);
 
-                // Update the asset contract address to be MANA.
-                _assets[i].contractAddress = manaAddress;
-                // Update the asset value to be the amount of MANA to be transferred, based on the rate.
-                _assets[i].value = (_assets[i].value * uint256(manaUsdRate * 1e10)) / 1e18;
-
-                // Decode the extra data to obtain the maximum value allowed to be transferred.
-                // This is used to prevent a lot more MANA than the expected from being transferred when the price changes suddenly.
-                uint256 maxValue = abi.decode(_assets[i].extra, (uint256));
-
-                if (maxValue < _assets[i].value) {
-                    revert PayableAmountExceedsMaximumValue();
-                }
+                // Updates the asset with the new values.
+                _assets[i] = _updateAssetWithConvertedMANAPrice(_assets[i], manaAddress, manaUsdRate);
             }
 
             if (_assets[i].assetType == ASSET_TYPE_ERC20 || _assets[i].assetType == ASSET_TYPE_USD_PEGGED_MANA) {
@@ -284,6 +289,14 @@ contract DecentralandMarketplacePolygon is
         royaltiesRate = _royaltiesRate;
 
         emit RoyaltiesRateUpdated(_msgSender(), _royaltiesRate);
+    }
+
+    /// @dev Updates the MANA/USD price aggregator and tolerance.
+    function _updateManaUsdAggregator(address _aggregator, uint256 _tolerance) private {
+        manaUsdAggregator = IAggregator(_aggregator);
+        manaUsdAggregatorTolerance = _tolerance;
+
+        emit ManaUsdAggregatorUpdated(_aggregator, _tolerance);
     }
 
     /// @dev Overriden function to obtain the caller of the transaction.

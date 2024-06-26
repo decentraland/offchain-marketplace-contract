@@ -20,7 +20,8 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
         address _royaltiesManager,
         uint256 _royaltiesRate,
         address _manaAddress,
-        address _manaUsdAggregator
+        address _manaUsdAggregator,
+        uint256 _manaUsdAggregatorTolerance
     )
         DecentralandMarketplacePolygon(
             _owner,
@@ -30,7 +31,8 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
             _royaltiesManager,
             _royaltiesRate,
             _manaAddress,
-            _manaUsdAggregator
+            _manaUsdAggregator,
+            _manaUsdAggregatorTolerance
         )
     {}
 
@@ -106,7 +108,7 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
         couponManager = new CouponManagerHarness(address(0), owner, allowedCoupons);
 
         marketplace = new DecentralandMarketplacePolygonHarness(
-            owner, address(couponManager), dao, 25_000, royaltiesManager, 25_000, manaAddress, manaUsdAggregator
+            owner, address(couponManager), dao, 25_000, royaltiesManager, 25_000, manaAddress, manaUsdAggregator, 27 seconds
         );
 
         vm.prank(owner);
@@ -329,7 +331,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 
-    error PayableAmountExceedsMaximumValue();
+    error AggregatorAnswerIsStale();
 
     function setUp() public override {
         super.setUp();
@@ -362,7 +364,6 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
         trades[0].received[0].value = 100 ether;
-        trades[0].received[0].extra = abi.encode(43052746000000000000);
         trades[0].signature = signTrade(trades[0]);
 
         // The amount of MANA to be transferred is 43052746000000000000
@@ -397,7 +398,6 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
         trades[0].received[0].value = 100 ether;
-        trades[0].received[0].extra = abi.encode(erc20.balanceOf(other));
 
         trades[0].sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].sent[0].contractAddress = address(erc721);
@@ -438,13 +438,12 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
         trades[0].received[0].value = 100 ether;
-        trades[0].received[0].extra = abi.encode(erc20.balanceOf(other));
 
         trades[0].sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].sent[0].contractAddress = address(collectionErc721);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].value = collectionErc721TokenId;
-        
+
         trades[0].signature = signTrade(trades[0]);
 
         // Given that the royalty fee for decentraland assets is 2.5%, the royalty collector will receive a part
@@ -483,7 +482,6 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
         trades[0].received[0].value = 100 ether;
-        trades[0].received[0].extra = abi.encode(erc20.balanceOf(other));
 
         trades[0].sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].sent[0].contractAddress = address(collection);
@@ -504,12 +502,10 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         marketplace.accept(trades);
     }
 
-    function test_RevertsIfMaxValueIsNotEncodedInExtra() public {
-        vm.prank(erc20OriginalHolder);
-        erc20.transfer(other, 1000 ether);
-
-        vm.prank(other);
-        erc20.approve(address(marketplace), 1000 ether);
+    function test_RevertsIfManaUsdAggregatorIsAddressZero() public {
+        vm.startPrank(owner);
+        marketplace.updateManaUsdAggregator(address(0), marketplace.manaUsdAggregatorTolerance());
+        vm.stopPrank();
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
@@ -517,8 +513,6 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
         trades[0].received[0].value = 100 ether;
-        // The max expected value is required for this kind of asset
-        // trades[0].received[0].extra = abi.encode(erc20.balanceOf(other));
         trades[0].signature = signTrade(trades[0]);
 
         vm.expectRevert();
@@ -527,12 +521,10 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         marketplace.accept(trades);
     }
 
-    function test_RevertsIfMaxValueIsLowerThanTheAmountThatWillBeTransferred() public {
-        vm.prank(erc20OriginalHolder);
-        erc20.transfer(other, 1000 ether);
-
-        vm.prank(other);
-        erc20.approve(address(marketplace), 1000 ether);
+    function test_RevertsIfManaUsdAggregatorToleranceIsZero() public {
+        vm.startPrank(owner);
+        marketplace.updateManaUsdAggregator(address(marketplace.manaUsdAggregator()), 0);
+        vm.stopPrank();
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
@@ -540,12 +532,9 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
         trades[0].received[0].value = 100 ether;
-        // Definig a max value lower than the amount that will be transferred
-        // This will cause the trade to revert
-        trades[0].received[0].extra = abi.encode(43052746000000000000 - 1);
         trades[0].signature = signTrade(trades[0]);
 
-        vm.expectRevert(PayableAmountExceedsMaximumValue.selector);
+        vm.expectRevert(AggregatorAnswerIsStale.selector);
 
         vm.prank(other);
         marketplace.accept(trades);
@@ -1023,6 +1012,30 @@ contract UpdateRoyaltiesRateTests is DecentralandMarketplacePolygonTests {
         emit RoyaltiesRateUpdated(owner, 100);
         marketplace.updateRoyaltiesRate(100);
         assertEq(marketplace.royaltiesRate(), 100);
+    }
+}
+
+contract UpdateManaUsdAggregatorTests is DecentralandMarketplacePolygonTests {
+    event ManaUsdAggregatorUpdated(address indexed _aggregator, uint256 _tolerance);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateManaUsdAggregator(address(0), 0 seconds);
+    }
+
+    function test_UpdatesManaUsdAggregator() public {
+        assertEq(address(marketplace.manaUsdAggregator()), manaUsdAggregator);
+        assertEq(marketplace.manaUsdAggregatorTolerance(), 27);
+
+        vm.expectEmit(address(marketplace));
+        emit ManaUsdAggregatorUpdated(other, 100);
+
+        vm.prank(owner);
+        marketplace.updateManaUsdAggregator(other, 100);
+
+        assertEq(address(marketplace.manaUsdAggregator()), other);
+        assertEq(marketplace.manaUsdAggregatorTolerance(), 100);
     }
 }
 
