@@ -129,22 +129,6 @@ contract DecentralandMarketplaceEthereum is
         SafeERC20.safeTransferFrom(erc20, _from, feeCollector, fee);
     }
 
-    /// @dev Transfers ERC721 assets to the beneficiary.
-    /// Takes into account Composable ERC721 contracts like Estates.
-    function _transferERC721(Asset memory _asset, address _from) private {
-        IComposable erc721 = IComposable(_asset.contractAddress);
-
-        if (erc721.supportsInterface(erc721.verifyFingerprint.selector)) {
-            bytes32 fingerprint = abi.decode(_asset.extra, (bytes32));
-
-            if (!erc721.verifyFingerprint(_asset.value, abi.encode(fingerprint))) {
-                revert InvalidFingerprint();
-            }
-        }
-
-        erc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value);
-    }
-
     /// @dev Transfers MANA to the beneficiary depending to the provided value in USD defined in the asset.
     function _transferUsdPeggedMana(Asset memory _asset, address _from) private {
         // Obtains the price of MANA in ETH.
@@ -161,6 +145,22 @@ contract DecentralandMarketplaceEthereum is
 
         // With the updated asset, we can perform a normal ERC20 transfer.
         _transferERC20(_asset, _from);
+    }
+
+    /// @dev Transfers ERC721 assets to the beneficiary.
+    /// Takes into account Composable ERC721 contracts like Estates.
+    function _transferERC721(Asset memory _asset, address _from) private {
+        IComposable erc721 = IComposable(_asset.contractAddress);
+
+        if (erc721.supportsInterface(erc721.verifyFingerprint.selector)) {
+            bytes32 fingerprint = abi.decode(_asset.extra, (bytes32));
+
+            if (!erc721.verifyFingerprint(_asset.value, abi.encode(fingerprint))) {
+                revert InvalidFingerprint();
+            }
+        }
+
+        erc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value);
     }
 
     /// @dev Updates the MANA/ETH price aggregator and tolerance.
