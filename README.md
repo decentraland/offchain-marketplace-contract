@@ -56,7 +56,53 @@ TODO:
 
 ## Development
 
-Run tests with `forge test` and build contracts with `forge build`
+This repository was built using foundry.
+
+To be able to do anything more than just look at it you will need to install foundry.
+
+The instructions on how to do so can be found [here](https://book.getfoundry.sh/).
+
+Once foundry has been installed,
+
+- Build contracts with `forge build`
+- Run tests with `forge test`
+
+Make sure to read the framework docs to understand everything it offers.
+
+## Deployment
+
+Before deploying,
+
+- Run `forge clean` to reset the workspace.
+- Run `forge build` to prepare the contracts.
+- Run `forge test` to make sure all tests pass.
+
+Just running `forge test` should be enough, but I find it a good practice to run the other commands as well first to make sure.
+
+It would be a good idea to check the foundry deployment [docs](https://book.getfoundry.sh/forge/deploying).
+
+The contracts are to be deployed in the following order,
+
+Ethereum: 
+
+- DecentralandMarketplaceEthereum.sol
+- CouponManager.sol (Optional as there are no Coupons for the Ethereum Marketplace right now)
+
+Polygon:
+
+- DecentralandMarketplacePolygon.sol
+- CollectionDiscountCoupon.sol
+- CouponManager.sol
+
+The step by step of how to deploy them using foundry is,
+
+Ethereum:
+
+**DecentralandMarketplaceEthereum.sol**
+
+```bash
+$ forge create --rpc-url {rpcUrl} --private-key {privateKey} --constructor-args 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce 0x0000000000000000000000000000000000000000 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce 25000 0x0f5d2fb29fb7d3cfee444a200298f468908cc942 0x82A44D92D6c329826dc557c5E1Be6ebeC5D5FeB9 86400 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 3600 --etherscan-api-key {etherscanApiKey} --verify src/marketplace/DecentralandMarketplaceEthereum.sol:DecentralandMarketplaceEthereum
+```
 
 ## Notes For Auditors
 
