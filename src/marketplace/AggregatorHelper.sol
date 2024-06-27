@@ -4,15 +4,15 @@ pragma solidity ^0.8.20;
 import {IAggregator} from "src/marketplace/interfaces/IAggregator.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 
-/// @notice Contract that provides helper functions to handle data feed aggregator results and related operations.
+/// @notice Contract that provides helper functions to handle Chainlink Aggregator results and related operations.
 contract AggregatorHelper {
     error AggregatorAnswerIsNegative();
     error AggregatorAnswerIsStale();
 
-    /// @dev Returns the rate from the aggregator.
-    /// @param _aggregator The aggregator contract.
-    /// @param _staleTolerance The amount of time that has to have passed before the last update to be considered old.
-    /// @return The rate from the aggregator with 18 decimals.
+    /// @dev Used to obtain the rate from an aggregator.
+    /// @param _aggregator The aggregator used to obtain the rate.
+    /// @param _staleTolerance The tolerated amount of seconds since the last update of the rate.
+    /// @return The rate obtained from the aggregator, normalized to 18 decimals.
     function _getRateFromAggregator(IAggregator _aggregator, uint256 _staleTolerance) internal view returns (int256) {
         // Obtains rate values from the aggregator.
         (, int256 rate,, uint256 updatedAt,) = _aggregator.latestRoundData();
@@ -37,7 +37,8 @@ contract AggregatorHelper {
         return rate;
     }
 
-    /// @dev Updates the asset with the converted MANA price.
+    /// @dev Uses the original value in USD of the asset and updates it to MANA using the provided rate.
+    /// Also updates the contract address to the MANA address given that it is the asset that will be transferred.
     function _updateAssetWithConvertedMANAPrice(MarketplaceTypes.Asset memory _asset, address _manaAddress, int256 _manaUsdRate)
         internal
         pure
