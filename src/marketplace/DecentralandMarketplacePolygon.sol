@@ -24,15 +24,15 @@ contract DecentralandMarketplacePolygon is
     FeeCollector,
     AggregatorHelper
 {
-    /// @notice The MANA token address.
-    /// @dev Used to transfer MANA tokens on for assets of type ASSET_TYPE_USD_PEGGED_MANA.
+    /// @notice The address of the MANA ERC20 contract.
+    /// @dev This will be used when transferring USD pegged MANA by enforcing this address as the Asset's contract address.
     address public immutable manaAddress;
 
-    /// @notice The MANA/USD price aggregator.
-    /// @dev Used to obtain the price of MANA in USD.
+    /// @notice The MANA/USD Chainlink aggregator.
+    /// @dev Used to obtain the rate of MANA expressed in USD.
     IAggregator public manaUsdAggregator;
 
-    /// @notice The tolerance that indicates if the result provided by the aggregator is old.
+    /// @notice Maximum time (in seconds) since the MANA/USD aggregator result was last updated before it is considered outdated.
     uint256 public manaUsdAggregatorTolerance;
 
     /// @notice The royalties manager contract. Used to get the royalties receiver for collection nft trades.
@@ -55,7 +55,7 @@ contract DecentralandMarketplacePolygon is
     /// @param _royaltiesRate The rate of the royalties. 25_000 is 2.5%
     /// @param _manaAddress The address of the MANA token.
     /// @param _manaUsdAggregator The address of the MANA/USD price aggregator.
-    /// @param _manaUsdAggregatorTolerance The tolerance that indicates if the result provided by the aggregator is old.
+    /// @param _manaUsdAggregatorTolerance The tolerance (in seconds) that indicates if the result provided by the aggregator is old.
     constructor(
         address _owner,
         address _couponManager,
@@ -174,6 +174,7 @@ contract DecentralandMarketplacePolygon is
     }
 
     /// @dev Iterate through the provided assets and update the ERC20 assets to include the fees and royalties data.
+    /// Also handles USD pegged MANA by updating the asset values to the proper amount of MANA.
     function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _encodedFeeAndRoyaltyData) private view returns (Asset[] memory) {
         for (uint256 i = 0; i < _assets.length; i++) {
             // These assets have the value in USD, and have to be converted to MANA.
