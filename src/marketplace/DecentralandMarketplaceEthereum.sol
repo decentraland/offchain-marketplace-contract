@@ -20,23 +20,23 @@ contract DecentralandMarketplaceEthereum is
     FeeCollector,
     AggregatorHelper
 {
-    /// @notice The MANA token address.
-    /// @dev Used to transfer MANA tokens on for assets of type ASSET_TYPE_USD_PEGGED_MANA.
+    /// @notice The address of the MANA ERC20 contract.
+    /// @dev This will be used when transferring USD pegged MANA by enforcing this address as the Asset's contract address.
     address public immutable manaAddress;
 
-    /// @notice The MANA/ETH price aggregator.
-    /// @dev Used to obtain the price of MANA in ETH.
+    /// @notice The MANA/ETH Chainlink aggregator.
+    /// @dev Used to obtain the rate of MANA expressed in ETH.
+    /// Used along the ethUsdAggregator to calculate the MANA/USD rate for determining the MANA amount of USD pegged MANA assets.
     IAggregator public manaEthAggregator;
-    
-    /// @notice The tolerance that indicates if the result provided by the aggregator is old.
+
+    /// @notice Maximum time (in seconds) since the MANA/ETH aggregator result was last updated before it is considered outdated.
     uint256 public manaEthAggregatorTolerance;
 
-    /// @notice The ETH/USD price aggregator.
-    /// @dev Used to obtain the price of ETH in USD.
-    /// Along the manaEthAggregator result, we can calculate the price of MANA in USD.
+    /// @notice The ETH/USD Chainlink aggregator.
+    /// @dev Used to obtain the rate of ETH expressed in USD.
     IAggregator public ethUsdAggregator;
 
-    /// @notice The tolerance that indicates if the result provided by the aggregator is old.
+    /// @notice Maximum time (in seconds) since the ETH/USD aggregator result was last updated before it is considered outdated.
     uint256 public ethUsdAggregatorTolerance;
 
     event ManaEthAggregatorUpdated(address indexed _aggregator, uint256 _tolerance);
@@ -48,11 +48,11 @@ contract DecentralandMarketplaceEthereum is
     /// @param _couponManager The address of the coupon manager contract.
     /// @param _feeCollector The address that will receive erc20 fees.
     /// @param _feeRate The rate of the fee. 25_000 is 2.5%
-    /// @param _manaAddress The address of the MANA token.
+    /// @param _manaAddress The address of the MANA ERC20 contract.
     /// @param _manaEthAggregator The address of the MANA/ETH price aggregator.
-    /// @param _manaEthAggregatorTolerance The tolerance that indicates if the result provided by the aggregator is old.
+    /// @param _manaEthAggregatorTolerance The tolerance (in seconds) that indicates if the result provided by the aggregator is old.
     /// @param _ethUsdAggregator The address of the ETH/USD price aggregator.
-    /// @param _ethUsdAggregatorTolerance The tolerance that indicates if the result provided by the aggregator is old.
+    /// @param _ethUsdAggregatorTolerance The tolerance (in seconds) that indicates if the result provided by the aggregator is old.
     constructor(
         address _owner,
         address _couponManager,
