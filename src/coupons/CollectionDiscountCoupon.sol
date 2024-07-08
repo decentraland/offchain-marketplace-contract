@@ -71,11 +71,13 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
             }
         }
 
-        // Every received asset must be an ERC20 token.
+        // Every received asset must be an ERC20 or USD_PEGGED_MANA.
         // The discount will be applied to each one of them.
         // Keep in mind that if you provide a flat discount, the discount will be applied to each one.
         for (uint256 i = 0; i < _trade.received.length; i++) {
-            if (_trade.received[i].assetType != ASSET_TYPE_ERC20) {
+            uint256 assetType = _trade.received[i].assetType;
+
+            if (assetType != ASSET_TYPE_ERC20 && assetType != ASSET_TYPE_USD_PEGGED_MANA) {
                 revert UnsupportedReceivedAssetType(i);
             }
 
