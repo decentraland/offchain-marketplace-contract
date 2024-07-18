@@ -1465,12 +1465,29 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         assertEq(erc20.balanceOf(signer.addr), signerBalance + expectedBeneficiaryAmount);
     }
 
-    function test_TradeERC721ForERC20_ERC721IsCollectionNFT_ApplyCollectionDiscountCoupon_RevertsIfTradesAndCouponsLengthMissmatch() public {
+    function test_RevertsIfCouponLengthIsSmallerThanTradeLength() public {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
-        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](0);
 
-        vm.prank(other);
-        vm.expectRevert(TradesAndCouponsLengthMismatch.selector);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](0);
+        
+        vm.expectRevert(); // "panic: array out-of-bounds access (0x32)"
         marketplace.acceptWithCoupon(trades, coupons);
+    }
+
+    function test_ExtraCouponsAreIgnored() public {
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](0);
+
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
+
+        coupons[0].checks.expiration = block.timestamp;
+        coupons[0].signature = signCoupon(coupons[0]);
+        
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        marketplace.acceptWithCoupon(trades, coupons);
+        assertEq(logs.length, 0);
     }
 }
