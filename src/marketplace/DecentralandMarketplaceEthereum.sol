@@ -153,9 +153,8 @@ contract DecentralandMarketplaceEthereum is
         IComposable erc721 = IComposable(_asset.contractAddress);
 
         if (erc721.supportsInterface(erc721.verifyFingerprint.selector)) {
-            bytes32 fingerprint = abi.decode(_asset.extra, (bytes32));
-
-            if (!erc721.verifyFingerprint(_asset.value, abi.encode(fingerprint))) {
+            // Uses the extra data provided in the asset as the fingerprint to be verified.
+            if (!erc721.verifyFingerprint(_asset.value, _asset.extra)) {
                 revert InvalidFingerprint();
             }
         }
