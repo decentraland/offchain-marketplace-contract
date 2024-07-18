@@ -225,7 +225,9 @@ contract DecentralandMarketplacePolygon is
         IERC20 erc20 = IERC20(_asset.contractAddress);
 
         // If the fee collector has to be paid, calculate the fee and transfer it.
-        if (payFeeCollector) {
+        // Checking for 0 royalty beneficiaries is to pay the fee collector on cases in which the Trade only swaps ERC20s.
+        // This is to have the same behavior on both the Ethereum and Polygon Marketplace contracts.
+        if (payFeeCollector || royaltyBeneficiariesCount == 0) {
             fees = originalValue * feeRate / 1_000_000;
 
             SafeERC20.safeTransferFrom(erc20, _from, feeCollector, fees);

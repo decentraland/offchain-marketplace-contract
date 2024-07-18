@@ -242,13 +242,18 @@ contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForSent();
 
+        uint256 daoBalance = erc20.balanceOf(dao);
+
         vm.prank(other);
         vm.expectEmit(address(erc20));
-        emit Transfer(signer.addr, other, erc20Sent);
+        emit Transfer(signer.addr, dao, 0.025 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(signer.addr, other, 0.975 ether);
         marketplace.accept(trades);
 
         assertEq(erc20.balanceOf(signer.addr), 0);
-        assertEq(erc20.balanceOf(other), erc20Sent);
+        assertEq(erc20.balanceOf(other), 0.975 ether);
+        assertEq(erc20.balanceOf(dao), daoBalance + 0.025 ether);
     }
 
     function test_TransfersERC20FromCallerToSigner() public {
@@ -260,13 +265,18 @@ contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForReceived();
 
+        uint256 daoBalance = erc20.balanceOf(dao);
+
         vm.prank(other);
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, erc20Sent);
+        emit Transfer(other, dao, 0.025 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 0.975 ether);
         marketplace.accept(trades);
 
         assertEq(erc20.balanceOf(other), 0);
-        assertEq(erc20.balanceOf(signer.addr), erc20Sent);
+        assertEq(erc20.balanceOf(signer.addr), 0.975 ether);
+        assertEq(erc20.balanceOf(dao), daoBalance + 0.025 ether);
     }
 
     function test_TradeWithSentAndReceivedERC20() public {
@@ -300,16 +310,25 @@ contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
 
         uint256 signerBalance = erc20.balanceOf(signer.addr);
         uint256 otherBalance = erc20.balanceOf(other);
+        uint256 daoBalance = erc20.balanceOf(dao);
 
         vm.prank(other);
+
         vm.expectEmit(address(erc20));
-        emit Transfer(signer.addr, other, 2 ether);
+        emit Transfer(signer.addr, dao, 0.05 ether);
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 1 ether);
+        emit Transfer(signer.addr, other, 1.95 ether);
+
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 0.025 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 0.975 ether);
+
         marketplace.accept(trades);
 
-        assertEq(erc20.balanceOf(signer.addr), signerBalance - 1 ether);
-        assertEq(erc20.balanceOf(other), otherBalance + 1 ether);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance - 2 ether + 0.975 ether);
+        assertEq(erc20.balanceOf(other), otherBalance - 1 ether + 1.95 ether);
+        assertEq(erc20.balanceOf(dao), daoBalance + 0.05 ether + 0.025 ether);
     }
 }
 
@@ -351,7 +370,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         collectionItemOriginalCreator = 0x3cf368FaeCdb4a4E542c0efD17850ae133688C2a;
     }
 
-    function test_TransfersTheCorrectAmountOfMana() public {
+    function test_TransfersTheCorrectAmountOfMana_foo() public {
         vm.prank(erc20OriginalHolder);
         erc20.transfer(other, 1000 ether);
 
@@ -370,9 +389,13 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         // Which is the equivalent to 43,052746 MANA
         // That is because the price of MANA is 0.43 USD at the moment of the Trade
         // As the value defined is 100 USD, the amount of MANA to be transferred is 100 * 0.43 = ~43
+        // As the trade only contains an ERC20, the fee collector will receive 2.5% of the amount
+        // The fee collector will receive 2.5% of 43,052746 MANA = 1,07631865 MANA
 
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 43052746000000000000);
+        emit Transfer(other, dao, 1076318650000000000);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 41976427350000000000);
 
         vm.prank(other);
         marketplace.accept(trades);
@@ -453,6 +476,61 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
         // The rest will be received by the signer
         vm.expectEmit(address(erc20));
         emit Transfer(other, signer.addr, 41976427350000000000);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_TransfersTheCorrectAmountOfMana_WithFeeCollectorFees_WithRoyaltiyFees() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, 1000 ether);
+
+        vm.prank(erc721OriginalHolder);
+        erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
+
+        vm.prank(collectionErc721OriginalHolder);
+        collectionErc721.transferFrom(collectionErc721OriginalHolder, signer.addr, collectionErc721TokenId);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), 1000 ether);
+
+        vm.prank(signer.addr);
+        erc721.setApprovalForAll(address(marketplace), true);
+
+        vm.prank(signer.addr);
+        collectionErc721.setApprovalForAll(address(marketplace), true);
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].signer = signer.addr;
+
+        trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+
+        trades[0].sent = new DecentralandMarketplacePolygonHarness.Asset[](2);
+        trades[0].sent[0].contractAddress = address(erc721);
+        trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        trades[0].sent[0].value = erc721TokenId;
+
+        trades[0].sent[1].contractAddress = address(collectionErc721);
+        trades[0].sent[1].assetType = marketplace.ASSET_TYPE_ERC721();
+        trades[0].sent[1].value = collectionErc721TokenId;
+
+        trades[0].signature = signTrade(trades[0]);
+
+        // Given that the fee for non decentraland assets is 2.5%, the fee collector will receive a part
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 1076318650000000000);
+
+        // Given that the royalty fee for decentraland assets is 2.5%, the royalty collector will receive a part
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, collectionItemOriginalCreator, 1076318650000000000);
+
+        // The rest will be received by the signer
+        // The rest consists of the remaining 95% of the value
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 40900108700000000000);
 
         vm.prank(other);
         marketplace.accept(trades);
