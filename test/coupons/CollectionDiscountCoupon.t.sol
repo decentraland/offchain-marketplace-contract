@@ -259,8 +259,7 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         trade.received[0].value = 1 ether;
         trade.received[1].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
         trade.received[1].value = 2 ether;
-        trade.received[2].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20_WITH_FEES();
-        trade.received[2].value = 3 ether;
+        trade.received[2].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC721();
 
         mockCollection1.transferCreatorship(signer);
 

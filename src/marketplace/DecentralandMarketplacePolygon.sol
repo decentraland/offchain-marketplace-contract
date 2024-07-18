@@ -148,11 +148,6 @@ contract DecentralandMarketplacePolygon is
         Asset[] memory _assets
     ) private view returns (bool, uint256, address[] memory) {
         for (uint256 i = 0; i < _assets.length; i++) {
-            // Users cannot use this asset type directly in the trade, it is only used internally.
-            if (_assets[i].assetType == ASSET_TYPE_ERC20_WITH_FEES) {
-                revert UnsupportedAssetType(ASSET_TYPE_ERC20_WITH_FEES);
-            }
-
             if (_assets[i].assetType == ASSET_TYPE_ERC721) {
                 // If the NFT is of a Decentraland Collection, the royalty beneficiary will be the item beneficiary or its creator.
                 // If not, the royalty beneficiary will return address(0)
@@ -177,8 +172,10 @@ contract DecentralandMarketplacePolygon is
     /// Also handles USD pegged MANA by updating the asset values to the proper amount of MANA.
     function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _encodedFeeAndRoyaltyData) private view returns (Asset[] memory) {
         for (uint256 i = 0; i < _assets.length; i++) {
+            uint256 assetType = _assets[i].assetType;
+
             // These assets have the value in USD, and have to be converted to MANA.
-            if (_assets[i].assetType == ASSET_TYPE_USD_PEGGED_MANA) {
+            if (assetType == ASSET_TYPE_USD_PEGGED_MANA) {
                 // Obtains the price of MANA in USD.
                 int256 manaUsdRate = _getRateFromAggregator(manaUsdAggregator, manaUsdAggregatorTolerance);
 
@@ -186,8 +183,8 @@ contract DecentralandMarketplacePolygon is
                 _assets[i] = _updateAssetWithConvertedMANAPrice(_assets[i], manaAddress, manaUsdRate);
             }
 
-            if (_assets[i].assetType == ASSET_TYPE_ERC20 || _assets[i].assetType == ASSET_TYPE_USD_PEGGED_MANA) {
-                _assets[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
+            // Add the fees and royalties data to the erc20 asset.
+            if (assetType == ASSET_TYPE_ERC20 || assetType == ASSET_TYPE_USD_PEGGED_MANA) {
                 _assets[i].extra = _encodedFeeAndRoyaltyData;
             }
         }
@@ -200,7 +197,7 @@ contract DecentralandMarketplacePolygon is
     function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal override {
         uint256 assetType = _asset.assetType;
 
-        if (assetType == ASSET_TYPE_ERC20_WITH_FEES) {
+        if (assetType == ASSET_TYPE_ERC20 || assetType == ASSET_TYPE_USD_PEGGED_MANA) {
             _transferERC20WithFees(_asset, _from);
         } else if (assetType == ASSET_TYPE_ERC721) {
             _transferERC721(_asset, _from);
