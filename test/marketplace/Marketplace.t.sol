@@ -24,6 +24,14 @@ contract MarketplaceHarness is Marketplace {
     function eip712TradeHash(Trade memory _trade) external view returns (bytes32) {
         return _hashTypedDataV4(_hashTrade(_trade));
     }
+
+    function _modifyTrade(Trade memory _trade) internal pure override returns (Trade memory) {
+        return _trade;
+    }
+
+    function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal pure override {
+        // do nothing
+    }
 }
 
 abstract contract MarketplaceTests is Test {

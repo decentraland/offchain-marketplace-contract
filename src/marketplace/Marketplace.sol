@@ -130,12 +130,8 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     }
 
     /// @dev Allows the child contract to update the Trade before accepting it.
-    function _modifyTrade(Trade memory _trade) internal view virtual returns (Trade memory) {
-        return _trade; // Override
-    }
+    function _modifyTrade(Trade memory _trade) internal view virtual returns (Trade memory);
 
     /// @dev Allows the child contract to handle the transfer of assets.
-    function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal virtual {
-        // Override
-    }
+    function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal virtual;
 }
