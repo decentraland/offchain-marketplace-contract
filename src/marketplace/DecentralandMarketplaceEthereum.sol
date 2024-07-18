@@ -64,10 +64,10 @@ contract DecentralandMarketplaceEthereum is
         address _ethUsdAggregator,
         uint256 _ethUsdAggregatorTolerance
     )
+        FeeCollector(_feeCollector, _feeRate)
         EIP712("DecentralandMarketplaceEthereum", "1.0.0")
         Ownable(_owner)
         MarketplaceWithCouponManager(_couponManager)
-        FeeCollector(_feeCollector, _feeRate)
     {
         manaAddress = _manaAddress;
 

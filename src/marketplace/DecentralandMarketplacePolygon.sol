@@ -67,10 +67,10 @@ contract DecentralandMarketplacePolygon is
         address _manaUsdAggregator,
         uint256 _manaUsdAggregatorTolerance
     )
-        Ownable(_owner)
-        MarketplaceWithCouponManager(_couponManager)
         FeeCollector(_feeCollector, _feeRate)
         EIP712("DecentralandMarketplacePolygon", "1.0.0")
+        Ownable(_owner)
+        MarketplaceWithCouponManager(_couponManager)
     {
         _updateRoyaltiesManager(_royaltiesManager);
         _updateRoyaltiesRate(_royaltiesRate);
