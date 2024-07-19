@@ -277,7 +277,7 @@ contract DecentralandMarketplacePolygon is
 
     /// @dev Updates the royalties manager address.
     /// @param _royaltiesManager The new royalties manager address.
-    function _updateRoyaltiesManager(address _royaltiesManager) internal {
+    function _updateRoyaltiesManager(address _royaltiesManager) private {
         royaltiesManager = IRoyaltiesManager(_royaltiesManager);
 
         emit RoyaltiesManagerUpdated(_msgSender(), _royaltiesManager);
@@ -285,7 +285,7 @@ contract DecentralandMarketplacePolygon is
 
     /// @dev Updates the royalties rate.
     /// @param _royaltiesRate The new royalties rate.
-    function _updateRoyaltiesRate(uint256 _royaltiesRate) internal {
+    function _updateRoyaltiesRate(uint256 _royaltiesRate) private {
         royaltiesRate = _royaltiesRate;
 
         emit RoyaltiesRateUpdated(_msgSender(), _royaltiesRate);

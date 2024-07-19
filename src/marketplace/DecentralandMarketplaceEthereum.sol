@@ -125,7 +125,7 @@ contract DecentralandMarketplaceEthereum is
 
     /// @dev Transfers ERC20 assets to the beneficiary.
     /// A part of the value is taken as a fee and transferred to the fee collector.
-    function _transferERC20(Asset memory _asset, address _from) internal {
+    function _transferERC20(Asset memory _asset, address _from) private {
         uint256 originalValue = _asset.value;
         uint256 fee = (originalValue * feeRate) / 1_000_000;
 
