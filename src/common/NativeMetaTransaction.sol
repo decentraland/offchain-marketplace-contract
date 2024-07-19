@@ -35,6 +35,7 @@ abstract contract NativeMetaTransaction is EIP712 {
 
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
 
+    error SignerAndSignatureDoNotMatch();
     error MetaTransactionFailedWithoutReason();
 
     /// @notice Get the current nonce of a given signer.
@@ -58,7 +59,9 @@ abstract contract NativeMetaTransaction is EIP712 {
     ) external payable returns (bytes memory) {
         MetaTransaction memory metaTx = MetaTransaction({nonce: nonces[_userAddress], from: _userAddress, functionData: _functionData});
 
-        require(_verify(_userAddress, metaTx, _signature), "NativeMetaTransaction#executeMetaTransaction: SIGNER_AND_SIGNATURE_DO_NOT_MATCH");
+        if (!_verify(_userAddress, metaTx, _signature)) {
+            revert SignerAndSignatureDoNotMatch();
+        }
 
         nonces[_userAddress]++;
 

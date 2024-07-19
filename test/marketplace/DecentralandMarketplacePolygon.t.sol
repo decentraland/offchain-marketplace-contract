@@ -915,6 +915,7 @@ contract TransferCollectionItemTests is DecentralandMarketplacePolygonTests {
 
 contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
     error Expired();
+    error SignerAndSignatureDoNotMatch();
     error MetaTransactionFailedWithoutReason();
 
     function test_RevertsIfNonceIsInvalid() public {
@@ -929,7 +930,7 @@ contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
         bytes memory metaTxSignature = signMetaTx(metaTx);
 
         vm.prank(other);
-        vm.expectRevert("NativeMetaTransaction#executeMetaTransaction: SIGNER_AND_SIGNATURE_DO_NOT_MATCH");
+        vm.expectRevert(SignerAndSignatureDoNotMatch.selector);
         marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
     }
 
@@ -945,7 +946,7 @@ contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
         bytes memory metaTxSignature = signMetaTx(metaTx);
 
         vm.prank(other);
-        vm.expectRevert("NativeMetaTransaction#executeMetaTransaction: SIGNER_AND_SIGNATURE_DO_NOT_MATCH");
+        vm.expectRevert(SignerAndSignatureDoNotMatch.selector);
         marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
     }
 
