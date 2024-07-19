@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 import {Marketplace} from "src/marketplace/Marketplace.sol";
 import {ICouponManager} from "src/coupons/interfaces/ICouponManager.sol";

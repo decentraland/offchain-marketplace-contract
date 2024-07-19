@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 /// @notice Asset types for the Decentraland Marketplace on Ethereum.
 abstract contract DecentralandMarketplaceEthereumAssetTypes {

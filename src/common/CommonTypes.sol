@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 /// @notice Types used by many contracts in this project.
 abstract contract CommonTypes {

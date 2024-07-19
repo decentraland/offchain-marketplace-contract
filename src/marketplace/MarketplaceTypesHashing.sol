@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 import {CommonTypes} from "src/common/CommonTypes.sol";
 import {CommonTypesHashing} from "src/common/CommonTypesHashing.sol";
