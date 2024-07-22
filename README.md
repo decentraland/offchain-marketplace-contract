@@ -54,6 +54,38 @@ TODO:
 
 TODO: 
 
+## Trade Id
+
+The Trade ID is a value primarily used to reference trades involved in the same operation. The Trade ID is composed of:
+
+- A salt, provided in the checks, mainly used to differentiate trades that have the same parameters from each other.
+
+- The user executing the trade.
+
+- The assets being received by the trade signer.
+
+One of the main uses of the Trade ID is for auctions.
+
+An auction is a sale process where assets are sold to the highest bidder. Although the marketplace does not handle auctions directly, dApps can create an auction system by leveraging the Trade ID.
+
+On the frontend, the owner of an asset will indicate they want to auction it for a certain starting price and specify the auction duration. This data is stored on the backend, which users can later access to start bidding. Along with the auction data, a random salt will be created and stored.
+
+When the auction is created on the backend, users will be able to see that an auction is taking place. Bidders can now start bidding. To do so, they will create and sign trades using the salt and auction data stored in the backend. These trades, also stored in the backend, will be viewable by the auctioneer.
+
+The auctioneer can accept the highest bidder's offer when ready and execute the swap on the blockchain using the marketplace contract.
+
+Once the bid is accepted, the signature for that trade will no longer be usable. All other trades bidding on the auction will be rendered unusable as well, thanks to the Trade ID.
+
+This mechanism prevents users from having active trades that are no longer necessary, eliminating the need to manually revoke them.
+
+As mentioned before, this works because all bids will have the same Trade ID, composed by:
+
+- The same salt that was created along with the auction.
+
+- The caller, which is the owner of the asset, accepting the bid.
+
+- The received assets of the bid, which is in this case the asset owned by the caller.
+
 ## Development
 
 Run tests with `forge test` and build contracts with `forge build`
