@@ -262,16 +262,18 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
         trades[0].received[0].value = 100 ether;
         trades[0].signature = signTrade(trades[0]);
 
-        // The amount of MANA to be transferred is 45825737193731408700
-        // Which is the equivalent to 45,8257371937314087 MANA
+        // The amount of MANA to be transferred is 218217984311399563430
+        // Which is the equivalent to 218,21 MANA
         // That is because the price of MANA is 0.45 USD at the moment of the Trade
-        // As the value defined is 100 USD, the amount of MANA to be transferred is 100 * 0.45 = ~45
+        // As the value defined is 100 USD, the amount of MANA to be transferred is 100 / 0.43 = ~218
+        // As the trade only contains an ERC20, the fee collector will receive 2.5% of the amount
+        // The fee collector will receive 2.5% of 218,21 MANA = 5.45 MANA
 
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 44680093763888123483);
+        emit Transfer(other, signer.addr, 212762534703614574345);
 
         vm.expectEmit(address(erc20));
-        emit Transfer(other, dao, 1145643429843285217);
+        emit Transfer(other, dao, 5455449607784989085);
 
         vm.prank(other);
         marketplace.accept(trades);
@@ -295,10 +297,10 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
         trades[0].signature = signTrade(trades[0]);
 
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 44680093763888123483);
+        emit Transfer(other, signer.addr, 212762534703614574345);
 
         vm.expectEmit(address(erc20));
-        emit Transfer(other, dao, 1145643429843285217);
+        emit Transfer(other, dao, 5455449607784989085);
 
         vm.prank(other);
         marketplace.accept(trades);

@@ -47,7 +47,7 @@ contract AggregatorHelper {
         // Update the asset contract address to be MANA.
         _asset.contractAddress = _manaAddress;
         // Update the asset value to be the amount of MANA to be transferred.
-        _asset.value = (_asset.value * uint256(_manaUsdRate)) / 1e18;
+        _asset.value = _asset.value * 1e18 / uint256(_manaUsdRate);
 
         return _asset;
     }
