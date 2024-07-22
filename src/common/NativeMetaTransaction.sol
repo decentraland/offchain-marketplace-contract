@@ -21,7 +21,8 @@ import {EIP712} from "src/common/EIP712.sol";
  */
 abstract contract NativeMetaTransaction is EIP712 {
     /// @dev EIP712 type hash for recovering the signer from the signature.
-    bytes32 private constant META_TRANSACTION_TYPEHASH = keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)"));
+    /// keccak256("MetaTransaction(uint256 nonce,address from,bytes functionData)")
+    bytes32 private constant META_TRANSACTION_TYPEHASH = 0x01ecdc01065da9f72bf56a9def24a074b7ef512994beb776867cfbc664b5b959;
 
     /// @notice Track signer nonces so the same signature cannot be used more than once.
     mapping(address => uint256) private nonces;

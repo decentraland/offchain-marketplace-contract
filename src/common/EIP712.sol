@@ -48,8 +48,8 @@ import {ShortStrings, ShortString} from "@openzeppelin/contracts/utils/ShortStri
 abstract contract EIP712 {
     using ShortStrings for *;
 
-    bytes32 private constant TYPE_HASH =
-        keccak256("EIP712Domain(string name,string version,address verifyingContract,bytes32 salt)");
+    /// keccak256("EIP712Domain(string name,string version,address verifyingContract,bytes32 salt)")
+    bytes32 private constant TYPE_HASH = 0x36c25de3e541d5d970f66e4210d728721220fff5c077cc6cd008b3a0c62adab7;
 
     // Cache the domain separator as an immutable value, but also store the chain id that it corresponds to, in order to
     // invalidate the cached domain separator if the chain id changes.
