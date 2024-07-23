@@ -180,7 +180,7 @@ contract DecentralandMarketplacePolygon is
                 int256 manaUsdRate = _getRateFromAggregator(manaUsdAggregator, manaUsdAggregatorTolerance);
 
                 // Updates the asset with the new values.
-                _assets[i] = _updateAssetWithConvertedMANAPrice(_assets[i], manaAddress, manaUsdRate);
+                _updateAssetWithConvertedMANAPrice(_assets[i], manaAddress, manaUsdRate);
             }
 
             // Add the fees and royalties data to the erc20 asset.

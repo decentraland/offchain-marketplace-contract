@@ -147,7 +147,7 @@ contract DecentralandMarketplaceEthereum is
         int256 manaUsdRate = (manaEthRate * ethUsdRate) / 1e18;
 
         // Updates the asset with the new values.
-        _asset = _updateAssetWithConvertedMANAPrice(_asset, manaAddress, manaUsdRate);
+        _updateAssetWithConvertedMANAPrice(_asset, manaAddress, manaUsdRate);
 
         // With the updated asset, we can perform a normal ERC20 transfer.
         _transferERC20(_asset, _from);
