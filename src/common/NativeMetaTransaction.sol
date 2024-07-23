@@ -108,7 +108,5 @@ abstract contract NativeMetaTransaction is EIP712 {
         } else {
             sender = msg.sender;
         }
-
-        return sender;
     }
 }
