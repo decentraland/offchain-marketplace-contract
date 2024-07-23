@@ -29,7 +29,7 @@ abstract contract Verifications is Signatures, CommonTypes {
     /// @param _currentSignatureUses The number of times the signature has been used.
     /// @param _signer The address that created the signature.
     /// @param _caller The address that sent the transaction.
-    function _verifyChecks(Checks memory _checks, bytes32 _hashedSignature, uint256 _currentSignatureUses, address _signer, address _caller)
+    function _verifyChecks(Checks calldata _checks, bytes32 _hashedSignature, uint256 _currentSignatureUses, address _signer, address _caller)
         internal
         view
     {
@@ -70,7 +70,7 @@ abstract contract Verifications is Signatures, CommonTypes {
     /// @param _allowedRoot The Merkle Root of the allowed addresses.
     /// @param _allowedProof The Merkle Proof that validates that the caller is allowed.
     /// @param _caller The address that sent the transaction.
-    function _verifyAllowed(bytes32 _allowedRoot, bytes32[] memory _allowedProof, address _caller) private pure {
+    function _verifyAllowed(bytes32 _allowedRoot, bytes32[] calldata _allowedProof, address _caller) private pure {
         if (!MerkleProof.verify(_allowedProof, _allowedRoot, keccak256(bytes.concat(keccak256(abi.encode(address(_caller))))))) {
             revert NotAllowed();
         }
@@ -89,12 +89,12 @@ abstract contract Verifications is Signatures, CommonTypes {
     /// If the selector is `balanceOf`, it will be checked that the balance is greater than or equal to the `value`.
     /// If the selector is `ownerOf`, it will be checked that the owner of `value` is the caller.
     /// Otherwise, the function will call the selector with the caller and expect it returns true.
-    function _verifyExternalChecks(ExternalCheck[] memory _externalChecks, address _caller) private view {
+    function _verifyExternalChecks(ExternalCheck[] calldata _externalChecks, address _caller) private view {
         bool hasOptionalChecks = false;
         bool hasPassingOptionalCheck = false;
 
         for (uint256 i = 0; i < _externalChecks.length; i++) {
-            ExternalCheck memory externalCheck = _externalChecks[i];
+            ExternalCheck calldata externalCheck = _externalChecks[i];
 
             bool isRequiredCheck = externalCheck.required;
 

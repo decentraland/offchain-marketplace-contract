@@ -36,7 +36,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         address caller = _msgSender();
 
         for (uint256 i = 0; i < _trades.length; i++) {
-            Trade memory trade = _trades[i];
+            Trade calldata trade = _trades[i];
 
             _verifyTradeSignature(trade, caller);
 
@@ -62,11 +62,11 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     ///
     /// @dev The trade id is composed of hashing the following values:
     /// Salt + Caller + Received Assets (Contract Address + Value)
-    function getTradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
+    function getTradeId(Trade calldata _trade, address _caller) public pure returns (bytes32) {
         bytes32 tradeId = keccak256(abi.encodePacked(_trade.checks.salt, _caller));
 
         for (uint256 i = 0; i < _trade.received.length; i++) {
-            Asset memory asset = _trade.received[i];
+            Asset calldata asset = _trade.received[i];
 
             tradeId = keccak256(abi.encodePacked(tradeId, asset.contractAddress, asset.value));
         }
@@ -90,7 +90,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     }
 
     /// @dev Verifies that the Trade passes all checks and the signature is valid.
-    function _verifyTrade(Trade memory _trade, address _caller) internal {
+    function _verifyTrade(Trade calldata _trade, address _caller) internal {
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
         bytes32 tradeId = getTradeId(_trade, _caller);
@@ -111,7 +111,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     }
 
     /// @dev Verifies that the Trade signature is valid.
-    function _verifyTradeSignature(Trade memory _trade, address _signer) private view {
+    function _verifyTradeSignature(Trade calldata _trade, address _signer) private view {
         _verifySignature(_hashTrade(_trade), _trade.signature, _signer);
     }
 

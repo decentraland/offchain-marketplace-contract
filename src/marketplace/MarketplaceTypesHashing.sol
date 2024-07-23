@@ -16,11 +16,11 @@ abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashin
     // keccak256("Trade(Checks checks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,bytes32 allowedRoot,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
     bytes32 private constant TRADE_TYPE_HASH = 0x2e3161a9b077618858f908c6d4f2da795186a6f319091c9a75f49dcdeaab8841;
 
-    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32) {
+    function _hashAssetsWithoutBeneficiary(Asset[] calldata _assets) private pure returns (bytes32) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
-            Asset memory asset = _assets[i];
+            Asset calldata asset = _assets[i];
 
             hashes[i] = keccak256(
                 abi.encode(
@@ -36,11 +36,11 @@ abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashin
         return keccak256(abi.encodePacked(hashes));
     }
 
-    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32) {
+    function _hashAssets(Asset[] calldata _assets) private pure returns (bytes32) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
-            Asset memory asset = _assets[i];
+            Asset calldata asset = _assets[i];
 
             hashes[i] = keccak256(
                 abi.encode(
@@ -57,7 +57,7 @@ abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashin
         return keccak256(abi.encodePacked(hashes));
     }
 
-    function _hashTrade(Trade memory _trade) internal pure returns (bytes32) {
+    function _hashTrade(Trade calldata _trade) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
                 TRADE_TYPE_HASH,

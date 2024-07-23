@@ -21,7 +21,7 @@ contract MarketplaceHarness is Marketplace {
         return _EIP712Version();
     }
 
-    function eip712TradeHash(Trade memory _trade) external view returns (bytes32) {
+    function eip712TradeHash(Trade calldata _trade) external view returns (bytes32) {
         return _hashTypedDataV4(_hashTrade(_trade));
     }
 

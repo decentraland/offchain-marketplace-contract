@@ -62,7 +62,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         address caller = _msgSender();
 
         for (uint256 i = 0; i < _coupons.length; i++) {
-            Coupon memory coupon = _coupons[i];
+            Coupon calldata coupon = _coupons[i];
 
             _verifyCouponSignature(coupon, caller);
 
@@ -108,7 +108,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         return ICoupon(couponAddress).applyCoupon(_trade, _coupon);
     }
 
-    function _verifyCouponSignature(Coupon memory _coupon, address _signer) private view {
+    function _verifyCouponSignature(Coupon calldata _coupon, address _signer) private view {
         _verifySignature(_hashCoupon(_coupon), _coupon.signature, _signer);
     }
 

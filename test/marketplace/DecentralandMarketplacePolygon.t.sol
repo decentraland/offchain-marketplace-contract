@@ -44,7 +44,7 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
         return _EIP712Version();
     }
 
-    function eip712TradeHash(Trade memory _trade) external view returns (bytes32) {
+    function eip712TradeHash(Trade calldata _trade) external view returns (bytes32) {
         return _hashTypedDataV4(_hashTrade(_trade));
     }
 
@@ -65,7 +65,7 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
 contract CouponManagerHarness is CouponManager {
     constructor(address _marketplace, address _owner, address[] memory _allowedCoupons) CouponManager(_marketplace, _owner, _allowedCoupons) {}
 
-    function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {
+    function eip712CouponHash(Coupon calldata _coupon) external view returns (bytes32) {
         return _hashTypedDataV4(_hashCoupon(_coupon));
     }
 }
