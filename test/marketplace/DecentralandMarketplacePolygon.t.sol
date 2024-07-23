@@ -48,14 +48,14 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
         return _hashTypedDataV4(_hashTrade(_trade));
     }
 
-    function eip712MetaTransactionHash(MetaTransaction memory _metaTx) external view returns (bytes32) {
+    function eip712MetaTransactionHash(uint256 _nonce, address _from, bytes calldata _functionData) external view returns (bytes32) {
         return _hashTypedDataV4(
             keccak256(
                 abi.encode(
                     keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)")),
-                    _metaTx.nonce,
-                    _metaTx.from,
-                    keccak256(_metaTx.functionData)
+                    _nonce,
+                    _from,
+                    keccak256(_functionData)
                 )
             )
         );
@@ -120,8 +120,8 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function signMetaTx(DecentralandMarketplacePolygonHarness.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_metaTx));
+    function signMetaTx(uint256 _nonce, address _from, bytes memory _functionData) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_nonce,_from,_functionData));
         return abi.encodePacked(r, s, v);
     }
 
@@ -841,20 +841,19 @@ contract TransferCollectionItemTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForSent();
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
+        emit MetaTransactionExecuted(metaTxFrom, other, metaTxFunctionData);
         vm.expectEmit(address(collection));
         uint256 expectedTokenId = 1053122916685571866979180276836704323188950954005491112543109775772;
         emit Transfer(address(0), metaTxSigner.addr, expectedTokenId);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
 
         assertEq(collection.ownerOf(expectedTokenId), metaTxSigner.addr);
     }
@@ -894,20 +893,19 @@ contract TransferCollectionItemTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForReceived();
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
+        emit MetaTransactionExecuted(metaTxFrom, other, metaTxFunctionData);
         vm.expectEmit(address(collection));
         uint256 expectedTokenId = 1053122916685571866979180276836704323188950954005491112543109775772;
         emit Transfer(address(0), signer.addr, expectedTokenId);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
 
         assertEq(collection.ownerOf(expectedTokenId), signer.addr);
     }
@@ -922,49 +920,46 @@ contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 1;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 1;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectRevert(SignerAndSignatureDoNotMatch.selector);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 
     function test_RevertsIfFromIsInvalid() public {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = other;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = other;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectRevert(SignerAndSignatureDoNotMatch.selector);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 
     function test_EmitMetaTransactionExecutedEvent() public {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        emit MetaTransactionExecuted(metaTxFrom, other, metaTxFunctionData);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 
     function test_RevertsIfTradeIsExpiredWithBubbledUpError() public {
@@ -972,16 +967,15 @@ contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
         trades[0].checks.expiration = block.timestamp - 1;
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectRevert(Expired.selector);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 
     function test_RevertsIfERC721AssetHasContractAddressZeroWithWithoutReasonError() public {
@@ -992,16 +986,15 @@ contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
         trades[0].sent[0].value = 1;
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectRevert(MetaTransactionFailedWithoutReason.selector);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 }
 

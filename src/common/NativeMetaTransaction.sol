@@ -27,13 +27,6 @@ abstract contract NativeMetaTransaction is EIP712 {
     /// @notice Track signer nonces so the same signature cannot be used more than once.
     mapping(address => uint256) private nonces;
 
-    /// @notice Struct with the data required to verify that the signature signer is the same as `from`.
-    struct MetaTransaction {
-        uint256 nonce;
-        address from;
-        bytes functionData;
-    }
-
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
 
     error SignerAndSignatureDoNotMatch();
@@ -58,13 +51,13 @@ abstract contract NativeMetaTransaction is EIP712 {
         bytes calldata _functionData,
         bytes calldata _signature
     ) external payable returns (bytes memory) {
-        MetaTransaction memory metaTx = MetaTransaction({nonce: nonces[_userAddress], from: _userAddress, functionData: _functionData});
+        bytes32 metaTxStructHash = keccak256(abi.encode(META_TRANSACTION_TYPEHASH, nonces[_userAddress], _userAddress, keccak256(_functionData)));
 
-        if (!_verify(_userAddress, metaTx, _signature)) {
+        if (_userAddress != ECDSA.recover(_hashTypedDataV4(metaTxStructHash), _signature)) {
             revert SignerAndSignatureDoNotMatch();
         }
 
-        nonces[_userAddress]++;
+        ++nonces[_userAddress];
 
         emit MetaTransactionExecuted(_userAddress, msg.sender, _functionData);
 
@@ -85,17 +78,6 @@ abstract contract NativeMetaTransaction is EIP712 {
         }
 
         return returnData;
-    }
-
-    function _verify(
-        address _signer,
-        MetaTransaction memory _metaTx,
-        bytes calldata _signature
-    ) private view returns (bool) {
-        bytes32 structHash = keccak256(abi.encode(META_TRANSACTION_TYPEHASH, _metaTx.nonce, _metaTx.from, keccak256(_metaTx.functionData)));
-        bytes32 typedDataHash = _hashTypedDataV4(structHash);
-
-        return _signer == ECDSA.recover(typedDataHash, _signature);
     }
 
     /// @dev Extract the address of the sender from the msg.data if available. If not, fallback to returning the msg.sender.
