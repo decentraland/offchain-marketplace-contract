@@ -111,7 +111,7 @@ contract DecentralandMarketplacePolygon is
         _updateManaUsdAggregator(_aggregator, _tolerance);
     }
 
-    /// @dev Overriden Marketplace function which modifies the Trade before being accepted.
+    /// @dev Overridden Marketplace function which modifies the Trade before being accepted.
     /// In this case, the Trade is modified to handle fees and royalties.
     function _modifyTrade(Trade memory _trade) internal view override returns (Trade memory) {
         uint256 sentLength = _trade.sent.length;
@@ -192,7 +192,7 @@ contract DecentralandMarketplacePolygon is
         return _assets;
     }
 
-    /// @dev Overriden Marketplace function to transfer assets.
+    /// @dev Overridden Marketplace function to transfer assets.
     /// Handles the transfer of ERC721s and the minting of Collection Items. Also handles the transfer of ERC20s with fees.
     function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal override {
         uint256 assetType = _asset.assetType;
@@ -299,7 +299,7 @@ contract DecentralandMarketplacePolygon is
         emit ManaUsdAggregatorUpdated(_aggregator, _tolerance);
     }
 
-    /// @dev Overriden function to obtain the caller of the transaction.
+    /// @dev Overridden function to obtain the caller of the transaction.
     /// The contract accepts meta transactions, so the caller could be the signer of the meta transaction or the real caller depending on the situation.
     function _msgSender() internal view override returns (address) {
         return _getMsgSender();

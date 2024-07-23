@@ -101,13 +101,13 @@ contract DecentralandMarketplaceEthereum is
         _updateEthUsdAggregator(_aggregator, _tolerance);
     }
 
-    /// @dev Overriden Marketplace function to modify the trade before accepting it.
+    /// @dev Overridden Marketplace function to modify the trade before accepting it.
     /// The Ethereum marketplace does not require any modifications, so the trade is returned as is.
     function _modifyTrade(Trade memory _trade) internal pure override returns (Trade memory) {
         return _trade;
     }
 
-    /// @dev Overriden Marketplace function to transfer assets.
+    /// @dev Overridden Marketplace function to transfer assets.
     /// Handles the transfer of ERC20 and ERC721 assets.
     function _transferAsset(Asset memory _asset, address _from, address, address) internal override {
         uint256 assetType = _asset.assetType;
