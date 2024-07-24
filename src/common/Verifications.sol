@@ -88,7 +88,7 @@ abstract contract Verifications is Signatures, CommonTypes {
     ///
     /// If the selector is `balanceOf`, it will be checked that the balance is greater than or equal to the `value`.
     /// If the selector is `ownerOf`, it will be checked that the owner of `value` is the caller.
-    /// Otherwise, the function will call the selector with the caller and expect it returns true.
+    /// Otherwise, the function will call the selector with the caller and value, and expect it to return true.
     function _verifyExternalChecks(ExternalCheck[] calldata _externalChecks, address _caller) private view {
         bool hasOptionalChecks = false;
         bool hasPassingOptionalCheck = false;
