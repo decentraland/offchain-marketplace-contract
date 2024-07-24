@@ -15,7 +15,7 @@ abstract contract Verifications is Signatures, CommonTypes {
     bytes4 private constant OWNER_OF_SELECTOR = 0x6352211e;
 
     error UsingCancelledSignature();
-    error SignatureReuse();
+    error SignatureOveruse();
     error NotEffective();
     error InvalidContractSignatureIndex();
     error InvalidSignerSignatureIndex();
@@ -38,7 +38,7 @@ abstract contract Verifications is Signatures, CommonTypes {
         }
 
         if (_checks.uses > 0 && _currentSignatureUses >= _checks.uses) {
-            revert SignatureReuse();
+            revert SignatureOveruse();
         }
 
         if (_checks.effective > block.timestamp) {

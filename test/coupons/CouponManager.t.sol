@@ -128,7 +128,7 @@ contract ApplyCouponTests is CouponsTests {
     error UnauthorizedCaller(address _caller);
     error CouponNotAllowed(address _coupon);
     error Expired();
-    error SignatureReuse();
+    error SignatureOveruse();
 
     function test_RevertsIfCallerIsNotTheMarketplace() public {
         CouponManagerHarness.Trade memory trade;
@@ -186,7 +186,7 @@ contract ApplyCouponTests is CouponsTests {
         couponManager.applyCoupon(trade, coupon);
 
         vm.prank(marketplace);
-        vm.expectRevert(SignatureReuse.selector);
+        vm.expectRevert(SignatureOveruse.selector);
         couponManager.applyCoupon(trade, coupon);
     }
 

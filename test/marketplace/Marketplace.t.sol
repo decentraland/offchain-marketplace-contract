@@ -320,7 +320,6 @@ contract CancelSignatureTests is MarketplaceTests {
 contract AcceptTests is MarketplaceTests {
     event Traded(address indexed _caller, bytes32 indexed _signature);
 
-    error SignatureReuse();
     error UsedTradeId();
     error NotEffective();
     error InvalidContractSignatureIndex();
