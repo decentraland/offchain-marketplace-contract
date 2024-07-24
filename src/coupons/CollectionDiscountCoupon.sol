@@ -29,7 +29,8 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
         bytes32[][] proofs;
     }
 
-    error InvalidSentOrProofsLength();
+    error InvalidReceivedLength();
+    error InvalidSentLength();
     error InvalidProof(uint256 _index);
     error SignerIsNotTheCreator(uint256 _index);
     error InvalidDiscountType();
@@ -48,8 +49,14 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
         CollectionDiscountCouponData memory data = abi.decode(_coupon.data, (CollectionDiscountCouponData));
         CollectionDiscountCouponCallerData memory callerData = abi.decode(_coupon.callerData, (CollectionDiscountCouponCallerData));
 
-        if (_trade.sent.length == 0 || _trade.sent.length != callerData.proofs.length) {
-            revert InvalidSentOrProofsLength();
+        // The coupon should not be applicable of there are no received ERC20 assets to be applied on.
+        if (_trade.received.length == 0) {
+            revert InvalidReceivedLength();
+        }
+
+        // The coupon should not be applicable of there are no sent Collection items.
+        if (_trade.sent.length == 0) {
+            revert InvalidSentLength();
         }
 
         // For each collection item being traded, a proof in the same index will be used to validate that the collection of that item is valid for the discount.

@@ -24,7 +24,8 @@ contract CollectionDiscountCouponTests is Test {
 }
 
 contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
-    error InvalidSentOrProofsLength();
+    error InvalidSentLength();
+    error InvalidReceivedLength();
     error InvalidProof(uint256 _index);
     error SignerIsNotTheCreator(uint256 _index);
     error InvalidDiscountType();
@@ -56,7 +57,7 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         collectionDiscountCoupon.applyCoupon(trade, coupon);
     }
 
-    function test_RevertsIfInvalidSentOrProofsLength() public {
+    function test_RevertsIfReceivedAssetListIsEmpty() public {
         CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
@@ -65,9 +66,23 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
         CollectionDiscountCouponHarness.Trade memory trade;
-        trade.sent = new CollectionDiscountCouponHarness.Asset[](1);
 
-        vm.expectRevert(InvalidSentOrProofsLength.selector);
+        vm.expectRevert(InvalidReceivedLength.selector);
+        collectionDiscountCoupon.applyCoupon(trade, coupon);
+    }
+
+    function test_RevertsIfSentAssetListIsEmpty() public {
+        CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
+        CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
+
+        CollectionDiscountCouponHarness.Coupon memory coupon;
+        coupon.data = abi.encode(collectionDiscountCouponData);
+        coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
+
+        CollectionDiscountCouponHarness.Trade memory trade;
+        trade.received = new CollectionDiscountCouponHarness.Asset[](1);
+
+        vm.expectRevert(InvalidSentLength.selector);
         collectionDiscountCoupon.applyCoupon(trade, coupon);
     }
 
@@ -100,6 +115,8 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         trade.sent = new CollectionDiscountCouponHarness.Asset[](1);
         trade.sent[0].assetType = collectionDiscountCoupon.ASSET_TYPE_COLLECTION_ITEM();
         trade.sent[0].contractAddress = address(mockCollection1);
+        trade.received = new CollectionDiscountCouponHarness.Asset[](1);
+        trade.received[0].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
 
         vm.expectRevert(abi.encodeWithSelector(SignerIsNotTheCreator.selector, 0));
         collectionDiscountCoupon.applyCoupon(trade, coupon);
@@ -123,10 +140,37 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         trade.sent[0].contractAddress = address(mockCollection1);
         trade.sent[1].assetType = collectionDiscountCoupon.ASSET_TYPE_COLLECTION_ITEM();
         trade.sent[1].contractAddress = address(mockCollection2);
+        trade.received = new CollectionDiscountCouponHarness.Asset[](1);
+        trade.received[0].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
 
         mockCollection1.transferCreatorship(signer);
 
         vm.expectRevert(abi.encodeWithSelector(SignerIsNotTheCreator.selector, 1));
+        collectionDiscountCoupon.applyCoupon(trade, coupon);
+    }
+
+    function test_RevertsIfProofsLengthIsLowerThanSentAssetsLength() public {
+        CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
+        collectionDiscountCouponData.root = 0x56980103ca6f02663aeaa6b3895be0e41e507731e5a2655d3da8c9c8618ccc92;
+
+        CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
+        collectionDiscountCouponCallerData.proofs = new bytes32[][](0);
+
+        CollectionDiscountCouponHarness.Coupon memory coupon;
+        coupon.data = abi.encode(collectionDiscountCouponData);
+        coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
+
+        CollectionDiscountCouponHarness.Trade memory trade;
+        trade.signer = signer;
+        trade.sent = new CollectionDiscountCouponHarness.Asset[](1);
+        trade.sent[0].assetType = collectionDiscountCoupon.ASSET_TYPE_COLLECTION_ITEM();
+        trade.sent[0].contractAddress = address(mockCollection1);
+        trade.received = new CollectionDiscountCouponHarness.Asset[](1);
+        trade.received[0].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
+
+        mockCollection1.transferCreatorship(signer);
+
+        vm.expectRevert(); // [FAIL. Reason: panic: array out-of-bounds access (0x32)]
         collectionDiscountCoupon.applyCoupon(trade, coupon);
     }
 
@@ -150,6 +194,8 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         trade.sent = new CollectionDiscountCouponHarness.Asset[](1);
         trade.sent[0].assetType = collectionDiscountCoupon.ASSET_TYPE_COLLECTION_ITEM();
         trade.sent[0].contractAddress = address(mockCollection1);
+        trade.received = new CollectionDiscountCouponHarness.Asset[](1);
+        trade.received[0].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
 
         mockCollection1.transferCreatorship(signer);
 
@@ -173,6 +219,8 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         trade.sent = new CollectionDiscountCouponHarness.Asset[](1);
         trade.sent[0].assetType = collectionDiscountCoupon.ASSET_TYPE_COLLECTION_ITEM();
         trade.sent[0].contractAddress = address(mockCollection1);
+        trade.received = new CollectionDiscountCouponHarness.Asset[](1);
+        trade.received[0].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
 
         mockCollection1.transferCreatorship(signer);
 
@@ -198,6 +246,8 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         trade.sent[0].contractAddress = address(mockCollection1);
         trade.sent[1].assetType = collectionDiscountCoupon.ASSET_TYPE_COLLECTION_ITEM();
         trade.sent[1].contractAddress = address(mockCollection2);
+        trade.received = new CollectionDiscountCouponHarness.Asset[](1);
+        trade.received[0].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
 
         mockCollection1.transferCreatorship(signer);
         mockCollection2.transferCreatorship(signer);
@@ -275,6 +325,50 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
 
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
         collectionDiscountCouponCallerData.proofs = new bytes32[][](1);
+        collectionDiscountCouponCallerData.proofs[0] = new bytes32[](3);
+        collectionDiscountCouponCallerData.proofs[0][0] = 0xa7c46294ffa3fad92dc8422b2e38b688ccf1b86172f5beaf864af9368d2844e5;
+        collectionDiscountCouponCallerData.proofs[0][1] = 0xb8e277bcec6ddfe5a414b2200b3abcb1d3ee435c66531e8f21898f36a7ed122f;
+        collectionDiscountCouponCallerData.proofs[0][2] = 0x7747f5b3dcece1341b1470c482b95e4b5565365e4169abeb52162734e62147cf;
+
+        CollectionDiscountCouponHarness.Coupon memory coupon;
+        coupon.data = abi.encode(collectionDiscountCouponData);
+        coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
+
+        CollectionDiscountCouponHarness.Trade memory trade;
+        trade.signer = signer;
+        trade.sent = new CollectionDiscountCouponHarness.Asset[](1);
+        trade.sent[0].assetType = collectionDiscountCoupon.ASSET_TYPE_COLLECTION_ITEM();
+        trade.sent[0].contractAddress = address(mockCollection1);
+        trade.received = new CollectionDiscountCouponHarness.Asset[](3);
+        trade.received[0].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
+        trade.received[0].value = 1 ether;
+        trade.received[1].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
+        trade.received[1].value = 2 ether;
+        trade.received[2].assetType = collectionDiscountCoupon.ASSET_TYPE_ERC20();
+        trade.received[2].value = 3 ether;
+
+        mockCollection1.transferCreatorship(signer);
+
+        CollectionDiscountCouponHarness.Trade memory updatedTrade = collectionDiscountCoupon.applyCoupon(trade, coupon);
+
+        assertEq(updatedTrade.received[0].value, 0.5 ether);
+        assertEq(updatedTrade.received[1].value, 1 ether);
+        assertEq(updatedTrade.received[2].value, 1.5 ether);
+    }
+
+    function test_AppliesTheDiscountToAllReceivedAssetValues_WithMoreProofsThanSentAssets() public {
+        CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
+        collectionDiscountCouponData.discountType = collectionDiscountCoupon.DISCOUNT_TYPE_RATE();
+        collectionDiscountCouponData.discount = 500_000;
+        collectionDiscountCouponData.root = 0x56980103ca6f02663aeaa6b3895be0e41e507731e5a2655d3da8c9c8618ccc92;
+
+        CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
+
+        // Has 10 proofs and only 1 sent asset.
+        // Only the first proof will be used to validate the sent asset.
+        // The rest will be ignored.
+        collectionDiscountCouponCallerData.proofs = new bytes32[][](10);
+
         collectionDiscountCouponCallerData.proofs[0] = new bytes32[](3);
         collectionDiscountCouponCallerData.proofs[0][0] = 0xa7c46294ffa3fad92dc8422b2e38b688ccf1b86172f5beaf864af9368d2844e5;
         collectionDiscountCouponCallerData.proofs[0][1] = 0xb8e277bcec6ddfe5a414b2200b3abcb1d3ee435c66531e8f21898f36a7ed122f;
