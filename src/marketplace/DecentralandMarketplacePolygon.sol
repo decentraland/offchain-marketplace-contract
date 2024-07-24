@@ -121,6 +121,7 @@ contract DecentralandMarketplacePolygon is
         // Tracks the addresses that have to be paid royalties.
         address[] memory royaltyBeneficiaries = new address[](_trade.sent.length + _trade.received.length);
 
+        // Obtain if the fee collector has to be paid, the amount of royalty beneficiaries to be paid, and the addresses of the royalty beneficiaries.
         (payFeeCollector, royaltyBeneficiariesCount) = _getFeesAndRoyalties(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.sent);
         (payFeeCollector, royaltyBeneficiariesCount) = _getFeesAndRoyalties(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.received);
 
@@ -128,11 +129,12 @@ contract DecentralandMarketplacePolygon is
         bytes memory encodedFeeAndRoyaltyData = abi.encode(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries);
 
         // Update erc20 assets to include fee and royalties data.
-        _trade.sent = _updateERC20sWithFees(_trade.sent, encodedFeeAndRoyaltyData);
-        _trade.received = _updateERC20sWithFees(_trade.received, encodedFeeAndRoyaltyData);
+        _updateERC20sWithFees(_trade.sent, encodedFeeAndRoyaltyData);
+        _updateERC20sWithFees(_trade.received, encodedFeeAndRoyaltyData);
     }
 
     /// @dev From the provided assets, returns if the fee collector should be paid and the respective royalties beneficiaries.
+    /// Updates the provided royalty beneficiaries array with the new values.
     function _getFeesAndRoyalties(
         bool _payFeeCollector,
         uint256 _royaltyBeneficiariesCount,
@@ -162,7 +164,7 @@ contract DecentralandMarketplacePolygon is
 
     /// @dev Iterate through the provided assets and update the ERC20 assets to include the fees and royalties data.
     /// Also handles USD pegged MANA by updating the asset values to the proper amount of MANA.
-    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _encodedFeeAndRoyaltyData) private view returns (Asset[] memory) {
+    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _encodedFeeAndRoyaltyData) private view {
         for (uint256 i = 0; i < _assets.length; i++) {
             uint256 assetType = _assets[i].assetType;
 
@@ -180,8 +182,6 @@ contract DecentralandMarketplacePolygon is
                 _assets[i].extra = _encodedFeeAndRoyaltyData;
             }
         }
-
-        return _assets;
     }
 
     /// @dev Overridden Marketplace function to transfer assets.
