@@ -113,7 +113,7 @@ contract DecentralandMarketplacePolygon is
 
     /// @dev Overridden Marketplace function which modifies the Trade before being accepted.
     /// In this case, the Trade is modified to handle fees and royalties.
-    function _modifyTrade(Trade memory _trade) internal view override returns (Trade memory) {
+    function _modifyTrade(Trade memory _trade) internal view override {
         uint256 sentLength = _trade.sent.length;
         uint256 receivedLength = _trade.received.length;
 
@@ -136,8 +136,6 @@ contract DecentralandMarketplacePolygon is
         // Update erc20 assets to include fee and royalties data.
         _trade.sent = _updateERC20sWithFees(_trade.sent, encodedFeeAndRoyaltyData);
         _trade.received = _updateERC20sWithFees(_trade.received, encodedFeeAndRoyaltyData);
-
-        return _trade;
     }
 
     /// @dev From the provided assets, returns if the fee collector should be paid and the respective royalties beneficiaries.

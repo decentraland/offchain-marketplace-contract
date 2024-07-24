@@ -78,15 +78,15 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     /// This function is internal to allow child contracts to use it in their own accept function.
     /// Does not perform any checks, only transfers the assets and emits the Traded event.
     function _accept(Trade memory _trade, address _caller) internal {
-        Trade memory modifiedTrade = _modifyTrade(_trade);
+        _modifyTrade(_trade);
 
-        bytes32 hashedSignature = keccak256(modifiedTrade.signature);
-        address signer = modifiedTrade.signer;
+        bytes32 hashedSignature = keccak256(_trade.signature);
+        address signer = _trade.signer;
 
         emit Traded(_caller, hashedSignature);
 
-        _transferAssets(modifiedTrade.sent, signer, _caller, signer, _caller);
-        _transferAssets(modifiedTrade.received, _caller, signer, signer, _caller);
+        _transferAssets(_trade.sent, signer, _caller, signer, _caller);
+        _transferAssets(_trade.received, _caller, signer, signer, _caller);
     }
 
     /// @dev Verifies that the Trade passes all checks and the signature is valid.
@@ -130,7 +130,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     }
 
     /// @dev Allows the child contract to update the Trade before accepting it.
-    function _modifyTrade(Trade memory _trade) internal view virtual returns (Trade memory);
+    function _modifyTrade(Trade memory _trade) internal view virtual;
 
     /// @dev Allows the child contract to handle the transfer of assets.
     function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal virtual;

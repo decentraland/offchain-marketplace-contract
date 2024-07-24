@@ -102,9 +102,8 @@ contract DecentralandMarketplaceEthereum is
     }
 
     /// @dev Overridden Marketplace function to modify the trade before accepting it.
-    /// The Ethereum marketplace does not require any modifications, so the trade is returned as is.
-    function _modifyTrade(Trade memory _trade) internal pure override returns (Trade memory) {
-        return _trade;
+    function _modifyTrade(Trade memory _trade) internal pure override {
+        /// This marketplace contract does not require to make any modifications to the Trade, so it remains empty.
     }
 
     /// @dev Overridden Marketplace function to transfer assets.

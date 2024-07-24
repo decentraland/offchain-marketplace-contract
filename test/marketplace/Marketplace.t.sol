@@ -25,9 +25,7 @@ contract MarketplaceHarness is Marketplace {
         return _hashTypedDataV4(_hashTrade(_trade));
     }
 
-    function _modifyTrade(Trade memory _trade) internal pure override returns (Trade memory) {
-        return _trade;
-    }
+    function _modifyTrade(Trade memory _trade) internal pure override {}
 
     function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal pure override {
         // do nothing
