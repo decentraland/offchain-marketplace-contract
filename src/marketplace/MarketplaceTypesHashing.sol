@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {CommonTypes} from "src/common/CommonTypes.sol";
 import {CommonTypesHashing} from "src/common/CommonTypesHashing.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 
