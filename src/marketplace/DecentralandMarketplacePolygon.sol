@@ -142,10 +142,12 @@ contract DecentralandMarketplacePolygon is
         Asset[] memory _assets
     ) private view returns (bool, uint256) {
         for (uint256 i = 0; i < _assets.length; i++) {
-            if (_assets[i].assetType == ASSET_TYPE_ERC721) {
+            Asset memory asset = _assets[i];
+
+            if (asset.assetType == ASSET_TYPE_ERC721) {
                 // If the NFT is of a Decentraland Collection, the royalty beneficiary will be the item beneficiary or its creator.
                 // If not, the royalty beneficiary will return address(0)
-                address royaltyBeneficiary = royaltiesManager.getRoyaltiesReceiver(_assets[i].contractAddress, _assets[i].value);
+                address royaltyBeneficiary = royaltiesManager.getRoyaltiesReceiver(asset.contractAddress, asset.value);
 
                 if (royaltyBeneficiary != address(0)) {
                     _royaltyBeneficiaries[_royaltyBeneficiariesCount++] = royaltyBeneficiary;
@@ -153,7 +155,7 @@ contract DecentralandMarketplacePolygon is
                     // If the NFT is not a Decentraland Collection, the fee collector should be paid.
                     _payFeeCollector = true;
                 }
-            } else if (_assets[i].assetType == ASSET_TYPE_COLLECTION_ITEM) {
+            } else if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM) {
                 // Minting Collection Items pay fees to the collector.
                 _payFeeCollector = true;
             }
