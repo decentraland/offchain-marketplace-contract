@@ -56,8 +56,9 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         }
     }
 
-    /// @notice Allows a user to cancel a signature.
-    /// The caller must be the signer of the Coupon signature.
+    /// @notice Revokes the signatures of all provided coupons.
+    /// The caller must be the signer of those coupons.
+    /// @param _coupons The list of coupon signatures to be canceled.
     function cancelSignature(Coupon[] calldata _coupons) external {
         address caller = _msgSender();
 
