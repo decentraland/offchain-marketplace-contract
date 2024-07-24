@@ -40,7 +40,7 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
     /// @param _trade The Trade to apply the discount to.
     /// @param _coupon The Coupon to apply.
     /// @return - The Trade with the discount applied.
-    function applyCoupon(MarketplaceTypes.Trade memory _trade, CouponTypes.Coupon memory _coupon)
+    function applyCoupon(MarketplaceTypes.Trade memory _trade, CouponTypes.Coupon calldata _coupon)
         external
         view
         returns (MarketplaceTypes.Trade memory)
