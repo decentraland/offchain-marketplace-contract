@@ -114,15 +114,12 @@ contract DecentralandMarketplacePolygon is
     /// @dev Overridden Marketplace function which modifies the Trade before being accepted.
     /// In this case, the Trade is modified to handle fees and royalties.
     function _modifyTrade(Trade memory _trade) internal view override {
-        uint256 sentLength = _trade.sent.length;
-        uint256 receivedLength = _trade.received.length;
-
         // Tracks if the fee collector should be paid.
         bool payFeeCollector = false;
         // Tracks the number of addresses that have to be paid royalties.
         uint256 royaltyBeneficiariesCount = 0;
         // Tracks the addresses that have to be paid royalties.
-        address[] memory royaltyBeneficiaries = new address[](sentLength + receivedLength);
+        address[] memory royaltyBeneficiaries = new address[](_trade.sent.length + _trade.received.length);
 
         (payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries) =
             _getFeesAndRoyalties(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.sent);
@@ -245,9 +242,7 @@ contract DecentralandMarketplacePolygon is
 
     /// @dev Transfers ERC721 assets.
     function _transferERC721(Asset memory _asset, address _from) private {
-        IERC721 erc721 = IERC721(_asset.contractAddress);
-
-        erc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value);
+        IERC721(_asset.contractAddress).safeTransferFrom(_from, _asset.beneficiary, _asset.value);
     }
 
     /// @dev Mints collection items.
