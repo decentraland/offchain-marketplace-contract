@@ -46,7 +46,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
     }
 
     /// @notice Updates the list of allowed Coupons.
-    function updateAllowedCoupons(address[] memory _coupons, bool[] memory _values) external onlyOwner {
+    function updateAllowedCoupons(address[] calldata _coupons, bool[] calldata _values) external onlyOwner {
         if (_coupons.length != _values.length) {
             revert LengthMissmatch();
         }
