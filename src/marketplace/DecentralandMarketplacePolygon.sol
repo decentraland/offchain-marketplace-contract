@@ -121,11 +121,8 @@ contract DecentralandMarketplacePolygon is
         // Tracks the addresses that have to be paid royalties.
         address[] memory royaltyBeneficiaries = new address[](_trade.sent.length + _trade.received.length);
 
-        (payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries) =
-            _getFeesAndRoyalties(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.sent);
-
-        (payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries) =
-            _getFeesAndRoyalties(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.received);
+        (payFeeCollector, royaltyBeneficiariesCount) = _getFeesAndRoyalties(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.sent);
+        (payFeeCollector, royaltyBeneficiariesCount) = _getFeesAndRoyalties(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.received);
 
         // Encodes the fees and royalties data to be stored in the assets.
         bytes memory encodedFeeAndRoyaltyData = abi.encode(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries);
@@ -141,7 +138,7 @@ contract DecentralandMarketplacePolygon is
         uint256 _royaltyBeneficiariesCount,
         address[] memory _royaltyBeneficiaries,
         Asset[] memory _assets
-    ) private view returns (bool, uint256, address[] memory) {
+    ) private view returns (bool, uint256) {
         for (uint256 i = 0; i < _assets.length; i++) {
             if (_assets[i].assetType == ASSET_TYPE_ERC721) {
                 // If the NFT is of a Decentraland Collection, the royalty beneficiary will be the item beneficiary or its creator.
@@ -160,7 +157,7 @@ contract DecentralandMarketplacePolygon is
             }
         }
 
-        return (_payFeeCollector, _royaltyBeneficiariesCount, _royaltyBeneficiaries);
+        return (_payFeeCollector, _royaltyBeneficiariesCount);
     }
 
     /// @dev Iterate through the provided assets and update the ERC20 assets to include the fees and royalties data.
