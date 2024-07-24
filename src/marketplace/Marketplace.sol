@@ -29,9 +29,9 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         _unpause();
     }
 
-    /// @notice Revokes a signature so it cannot be used anymore.
-    /// The caller must be the signer of the signature.
-    /// @param _trades The list of Trade signatures to cancel.
+    /// @notice Revokes the signatures of all provided trades.
+    /// The caller must be the signer of those trades.
+    /// @param _trades The list of trade signatures to be canceled.
     function cancelSignature(Trade[] calldata _trades) external {
         address caller = _msgSender();
 
