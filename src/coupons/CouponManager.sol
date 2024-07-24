@@ -74,7 +74,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
     /// @param _trade The Trade to apply the Coupon to.
     /// @param _coupon The Coupon to apply.
     /// @return The Trade with the Coupon applied.
-    function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external virtual returns (Trade memory) {
+    function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external returns (Trade memory) {
         address caller = _msgSender();
 
         // Only the marketplace is allowed to apply Coupons.
