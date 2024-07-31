@@ -61,6 +61,7 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/mainnet", 19755898); // Apr-28-2024 07:27:59 PM +UTC
         vm.selectFork(forkId);
+        vm.chainId(31337);
 
         signer = vm.createWallet("signer");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
@@ -800,11 +801,13 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
         vm.prank(manaOriginalHolder);
         mana.transfer(other, manaOriginalHolderBalance);
 
+        uint256 externalCheckValue = 1;
+
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
         trades[0].checks.externalChecks = new DecentralandMarketplaceEthereumHarness.ExternalCheck[](1);
         trades[0].checks.externalChecks[0].contractAddress = address(names);
-        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[0].selector = names.balanceOf.selector;
         trades[0].checks.externalChecks[0].required = true;
         trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](1);

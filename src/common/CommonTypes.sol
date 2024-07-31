@@ -12,7 +12,7 @@ abstract contract CommonTypes {
     struct ExternalCheck {
         address contractAddress;
         bytes4 selector;
-        uint256 value;
+        bytes value;
         bool required;
     }
 

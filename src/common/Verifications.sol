@@ -112,9 +112,9 @@ abstract contract Verifications is Signatures, CommonTypes {
                 functionData = abi.encodeWithSelector(selector, _caller);
             } else if (selector == OWNER_OF_SELECTOR) {
                 // ownerOf(uint256 _tokenId)
-                functionData = abi.encodeWithSelector(selector, externalCheck.value);
+                functionData = abi.encodeWithSelector(selector, abi.decode(externalCheck.value, (uint256)));
             } else {
-                // custom(address _user, uint256 _value)
+                // custom(address _user, bytes _value)
                 functionData = abi.encodeWithSelector(selector, _caller, externalCheck.value);
             }
 
@@ -125,7 +125,7 @@ abstract contract Verifications is Signatures, CommonTypes {
                 // Do nothing here, an unsuccessful call will be treated as a failed check later.
             } else if (selector == BALANCE_OF_SELECTOR) {
                 // Check that the returned balance is >= the provided value.
-                success = abi.decode(data, (uint256)) >= externalCheck.value;
+                success = abi.decode(data, (uint256)) >= abi.decode(externalCheck.value, (uint256));
             } else if (selector == OWNER_OF_SELECTOR) {
                 // Check that the owner of the nft is the caller.
                 success = abi.decode(data, (address)) == _caller;

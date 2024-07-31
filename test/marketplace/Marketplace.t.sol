@@ -541,9 +541,11 @@ contract AcceptTests is MarketplaceTests {
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
+        uint256 externalCheckValue = 1;
+
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[0].required = true;
 
         mockExternalChecks.setBalanceOfResult(0);
@@ -562,12 +564,34 @@ contract AcceptTests is MarketplaceTests {
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
+        uint256 externalCheckValue = 1;
+
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[0].required = true;
 
         mockExternalChecks.setOwnerOfResult(signer.addr);
+
+        vm.prank(other);
+        vm.expectRevert(ExternalChecksFailed.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfCustomSelectorDoesNotExistOnCalledContract() public {
+        MockExternalChecks mockExternalChecks = new MockExternalChecks();
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = 0x215eea7f; // Random bytes4 selector.
+        trades[0].checks.externalChecks[0].required = true;
+
+        mockExternalChecks.setCustomCheckFunctionResult(true);
 
         vm.prank(other);
         vm.expectRevert(ExternalChecksFailed.selector);
@@ -584,10 +608,131 @@ contract AcceptTests is MarketplaceTests {
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
-        trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunction.selector;
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunctionBytes.selector;
         trades[0].checks.externalChecks[0].required = true;
 
         mockExternalChecks.setCustomCheckFunctionResult(false);
+
+        vm.prank(other);
+        vm.expectRevert(ExternalChecksFailed.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_TradesWhenCustomExternalCheckPasses() public {
+        MockExternalChecks mockExternalChecks = new MockExternalChecks();
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunctionBytes.selector;
+        trades[0].checks.externalChecks[0].required = true;
+
+        mockExternalChecks.setCustomCheckFunctionResult(true);
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_TradesWhenCustomExternalToFunctionThatAcceptsUint256InsteadOfBytesSucceeds() public {
+        MockExternalChecks mockExternalChecks = new MockExternalChecks();
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunctionUint256.selector;
+        trades[0].checks.externalChecks[0].required = true;
+
+        mockExternalChecks.setCustomCheckFunctionResult(true);
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfProvidedBytesValueIsInvalidForTheExternalCheckCall() public {
+        MockExternalChecks mockExternalChecks = new MockExternalChecks();
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+
+        uint256 eternalCheckValue = 99;
+
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunctionBytesExpects100.selector;
+        trades[0].checks.externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].value = abi.encode(eternalCheckValue);
+
+        mockExternalChecks.setCustomCheckFunctionResult(true);
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        vm.expectRevert(ExternalChecksFailed.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_TradesIfProvidedBytesValueIsValidForTheExternalCheckCall() public {
+        MockExternalChecks mockExternalChecks = new MockExternalChecks();
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+
+        uint256 eternalCheckValue = 100;
+
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunctionBytesExpects100.selector;
+        trades[0].checks.externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].value = abi.encode(eternalCheckValue);
+
+        mockExternalChecks.setCustomCheckFunctionResult(true);
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfCalledFunctionIsNotView() public {
+        MockExternalChecks mockExternalChecks = new MockExternalChecks();
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+
+        uint256 eternalCheckValue = 100;
+
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunctionNotView.selector;
+        trades[0].checks.externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].value = abi.encode(eternalCheckValue);
+
+        mockExternalChecks.setCustomCheckFunctionResult(true);
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
 
         vm.prank(other);
         vm.expectRevert(ExternalChecksFailed.selector);
@@ -603,14 +748,16 @@ contract AcceptTests is MarketplaceTests {
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
+        uint256 externalCheckValue = 1;
+
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[0].required = true;
 
         trades[0].checks.externalChecks[1].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].checks.externalChecks[1].value = 1;
+        trades[0].checks.externalChecks[1].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[1].required = true;
 
         mockExternalChecks.setBalanceOfResult(1); // pass
@@ -630,14 +777,16 @@ contract AcceptTests is MarketplaceTests {
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
+        uint256 externalCheckValue = 1;
+
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[0].required = true;
 
         trades[0].checks.externalChecks[1].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].checks.externalChecks[1].value = 1;
+        trades[0].checks.externalChecks[1].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[1].required = false;
 
         mockExternalChecks.setBalanceOfResult(1); // pass
@@ -657,14 +806,16 @@ contract AcceptTests is MarketplaceTests {
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
+        uint256 externalCheckValue = 1;
+
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[0].required = false;
 
         trades[0].checks.externalChecks[1].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].checks.externalChecks[1].value = 1;
+        trades[0].checks.externalChecks[1].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[1].required = false;
 
         trades[0].signer = signer.addr;
@@ -686,14 +837,16 @@ contract AcceptTests is MarketplaceTests {
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
+        uint256 externalCheckValue = 1;
+
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[0].required = true;
 
         trades[0].checks.externalChecks[1].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].checks.externalChecks[1].value = 1;
+        trades[0].checks.externalChecks[1].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[1].required = true;
 
         mockExternalChecks.setBalanceOfResult(1); // pass
