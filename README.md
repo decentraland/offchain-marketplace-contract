@@ -309,19 +309,19 @@ Any amount of assets can be defined on the sent and received properties of the T
     },
     sent: [
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale);
+            assetType: 4, // Decentraland Collection Item (Primary Sale);
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 0, // Item id
             extra: 0x // Empty extra data
         },
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale);
+            assetType: 4, // Decentraland Collection Item (Primary Sale);
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 1, // Item id
             extra: 0x // Empty extra data
         },
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale);
+            assetType: 4, // Decentraland Collection Item (Primary Sale);
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 2, // Item id
             extra: 0x // Empty extra data
@@ -363,21 +363,21 @@ This time the bidder will sign a Trade determining that they want to purchase 3 
     ],
     received: [
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            assetType: 4, // Decentraland Collection Item (Primary Sale)
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 0, // Item id
             extra: 0x, // Empty extra data
             beneficiary: 0x0000000000000000000000000000000000000000
         },
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            assetType: 4, // Decentraland Collection Item (Primary Sale)
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 1, // Item id
             extra: 0x // Empty extra data
             beneficiary: 0x0000000000000000000000000000000000000000
         },
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            assetType: 4, // Decentraland Collection Item (Primary Sale)
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Wearable Collection
             value: 2, // Item id
             extra: 0x // Empty extra data
@@ -433,7 +433,7 @@ The original Trade, asking for 100 MANA would look like:
     },
     sent: [
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            assetType: 4, // Decentraland Collection Item (Primary Sale)
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection
             value: 0, // Item id
             extra: 0x // Empty extra data
@@ -461,7 +461,7 @@ The same user can then sign a new Trade with an expiration of 12 hours and a low
     },
     sent: [
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            assetType: 4, // Decentraland Collection Item (Primary Sale)
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection
             value: 0, // Item id
             extra: 0x // Empty extra data
@@ -501,7 +501,7 @@ First the user must create the Trade:
     },
     sent: [
         {
-            assetType: 3, // Decentraland Collection Item (Primary Sale)
+            assetType: 4, // Decentraland Collection Item (Primary Sale)
             contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection
             value: 0, // Item id
             extra: 0x // Empty extra data
