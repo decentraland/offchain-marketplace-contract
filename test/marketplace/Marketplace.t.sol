@@ -328,6 +328,7 @@ contract AcceptTests is MarketplaceTests {
     error NotAllowed();
     error ExternalChecksFailed();
     error UsingCancelledSignature();
+    error SignatureOveruse();
 
     function test_CanSendAnEmptyArrayOfTrades() public {
         MarketplaceHarness.Trade[] memory trades;
@@ -353,8 +354,8 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].checks.uses = 1;
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signature = signTrade(trades[0]);
 
         vm.prank(other);
@@ -365,26 +366,12 @@ contract AcceptTests is MarketplaceTests {
         marketplace.accept(trades);
     }
 
-    function test_SignatureWithZeroUsesCanBeUsedManyTimes() public {
-        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
-
-        trades[0].signer = signer.addr;
-        trades[0].checks.uses = 0;
-        trades[0].checks.expiration = block.timestamp;
-        trades[0].signature = signTrade(trades[0]);
-
-        for (uint256 i = 0; i < 1000; i++) {
-            vm.prank(other);
-            marketplace.accept(trades);
-        }
-    }
-
     function test_SignatureWithTenUsesCanBeUsedTenTimes() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].checks.uses = 10;
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 10;
         trades[0].signature = signTrade(trades[0]);
 
         for (uint256 i = 0; i < trades[0].checks.uses; i++) {
@@ -401,8 +388,8 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].checks.uses = 3;
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 3;
         trades[0].signature = signTrade(trades[0]);
 
         for (uint256 i = 0; i < trades[0].checks.uses; i++) {
@@ -419,8 +406,8 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].checks.uses = 1;
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signature = signTrade(trades[0]);
 
         vm.prank(other);
@@ -438,6 +425,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.effective = block.timestamp + 1;
+        trades[0].checks.uses = 1;
 
         vm.prank(other);
         vm.expectRevert(NotEffective.selector);
@@ -448,6 +436,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.contractSignatureIndex = 1;
+        trades[0].checks.uses = 1;
 
         vm.prank(other);
         vm.expectRevert(InvalidContractSignatureIndex.selector);
@@ -458,6 +447,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.signerSignatureIndex = 1;
+        trades[0].checks.uses = 1;
 
         vm.prank(other);
         vm.expectRevert(InvalidSignerSignatureIndex.selector);
@@ -468,9 +458,20 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp - 1;
+        trades[0].checks.uses = 1;
 
         vm.prank(other);
         vm.expectRevert(Expired.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfUsesIsZero() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.uses = 0;
+
+        vm.prank(other);
+        vm.expectRevert(SignatureOveruse.selector);
         marketplace.accept(trades);
     }
 
@@ -478,6 +479,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].checks.allowedRoot = 0x3760ed777a92c3c15784377c1323a9f14e6b22527504861052eae84c523e6940;
 
         vm.prank(0x0000000000000000000000000000000000000001);
@@ -489,6 +491,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].checks.allowedRoot = 0x3760ed777a92c3c15784377c1323a9f14e6b22527504861052eae84c523e6940;
         trades[0].checks.allowedProof = new bytes32[](3);
         trades[0].checks.allowedProof[0] = 0xb868bdfa8727775661e4ccf117824a175a33f8703d728c04488fbfffcafda9f9;
@@ -504,6 +507,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].checks.allowedRoot = 0x3760ed777a92c3c15784377c1323a9f14e6b22527504861052eae84c523e6940;
         trades[0].checks.allowedProof = new bytes32[](3);
         trades[0].checks.allowedProof[0] = 0xb868bdfa8727775661e4ccf117824a175a33f8703d728c04488fbfffcafda9f9;
@@ -520,6 +524,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].checks.allowedRoot = 0xb5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22;
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
@@ -538,6 +543,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -561,6 +567,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -584,6 +591,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -604,6 +612,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -624,6 +633,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -646,6 +656,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -668,6 +679,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -694,6 +706,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -719,6 +732,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
@@ -745,6 +759,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
@@ -774,6 +789,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
@@ -803,6 +819,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
@@ -834,6 +851,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
 
         trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
@@ -863,6 +881,7 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 

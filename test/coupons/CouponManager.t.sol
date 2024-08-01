@@ -155,7 +155,7 @@ contract ApplyCouponTests is CouponsTests {
         coupon.couponAddress = allowedCoupon;
 
         vm.prank(marketplace);
-        vm.expectRevert(Expired.selector);
+        vm.expectRevert(SignatureOveruse.selector);
         couponManager.applyCoupon(trade, coupon);
     }
 
@@ -165,6 +165,7 @@ contract ApplyCouponTests is CouponsTests {
         CouponManagerHarness.Coupon memory coupon;
         coupon.couponAddress = allowedCoupon;
         coupon.checks.expiration = block.timestamp;
+        coupon.checks.uses = 1;
         coupon.signature = signCoupon(coupon);
 
         vm.prank(marketplace);
@@ -196,6 +197,7 @@ contract ApplyCouponTests is CouponsTests {
         CouponManagerHarness.Coupon memory coupon;
         coupon.couponAddress = allowedCoupon;
         coupon.checks.expiration = block.timestamp;
+        coupon.checks.uses = 1;
         coupon.signature = signCoupon(coupon);
 
         assertEq(couponManager.signatureUses(keccak256(coupon.signature)), 0);

@@ -133,6 +133,7 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
     function _getBaseTrades() internal view virtual returns (DecentralandMarketplacePolygonHarness.Trade[] memory) {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         return trades;
     }
@@ -305,6 +306,7 @@ contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
         trades[0].sent[0].value = 2 ether;
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 
@@ -379,6 +381,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -416,6 +419,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
 
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
@@ -456,6 +460,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
 
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
@@ -502,6 +507,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
 
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
@@ -555,6 +561,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
 
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
@@ -587,6 +594,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -606,6 +614,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -1177,6 +1186,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1226,6 +1236,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1284,6 +1295,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1343,6 +1355,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1362,6 +1375,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
         coupons[0].checks.expiration = block.timestamp;
+        coupons[0].checks.uses = 1;
         coupons[0].couponAddress = address(collectionDiscountCoupon);
         coupons[0].data = abi.encode(collectionDiscountCouponData);
         coupons[0].callerData = abi.encode(collectionDiscountCouponCallerData);
@@ -1414,6 +1428,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1433,6 +1448,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
         coupons[0].checks.expiration = block.timestamp;
+        coupons[0].checks.uses = 1;
         coupons[0].couponAddress = address(collectionDiscountCoupon);
         coupons[0].data = abi.encode(collectionDiscountCouponData);
         coupons[0].callerData = abi.encode(collectionDiscountCouponCallerData);
@@ -1464,6 +1480,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 
@@ -1479,6 +1496,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
 
         coupons[0].checks.expiration = block.timestamp;
+        coupons[0].checks.uses = 1;
         coupons[0].signature = signCoupon(coupons[0]);
         
         VmSafe.Log[] memory logs = vm.getRecordedLogs();

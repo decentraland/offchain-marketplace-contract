@@ -37,7 +37,7 @@ abstract contract Verifications is Signatures, CommonTypes {
             revert UsingCancelledSignature();
         }
 
-        if (_checks.uses > 0 && _currentSignatureUses >= _checks.uses) {
+        if (_currentSignatureUses >= _checks.uses) {
             revert SignatureOveruse();
         }
 

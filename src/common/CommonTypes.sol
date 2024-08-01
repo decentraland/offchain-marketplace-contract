@@ -18,7 +18,7 @@ abstract contract CommonTypes {
 
     /// @notice Schema of a check.
     /// This is used to verify that certain requirements are met.
-    /// @param uses The number of times the signature can be used. 0 means unlimited.
+    /// @param uses The number of times the signature can be used.
     /// @param expiration The expiration date of the signature.
     /// @param effective The effective date of the signature.
     /// @param salt A value used to make the signature unique.

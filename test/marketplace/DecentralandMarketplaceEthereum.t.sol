@@ -82,6 +82,7 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     function _getBaseTrades() internal view virtual returns (DecentralandMarketplaceEthereumHarness.Trade[] memory) {
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         return trades;
     }
@@ -257,6 +258,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -289,6 +291,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -314,6 +317,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -333,6 +337,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -352,6 +357,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -371,6 +377,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -763,6 +770,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(land);
@@ -805,6 +813,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].checks.externalChecks = new DecentralandMarketplaceEthereumHarness.ExternalCheck[](1);
         trades[0].checks.externalChecks[0].contractAddress = address(names);
         trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
@@ -868,6 +877,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](3);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(land);
@@ -923,6 +933,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(estate);
@@ -970,6 +981,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = 4878105366;
+        trades[0].checks.uses = 1;
         trades[0].checks.externalChecks = new DecentralandMarketplaceEthereumHarness.ExternalCheck[](1);
         trades[0].checks.externalChecks[0].contractAddress = address(land);
         trades[0].checks.externalChecks[0].value = abi.encode(landTokenId);
@@ -988,7 +1000,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
         trades[0].received[1].contractAddress = address(names);
         trades[0].received[1].value = nameTokenId;
         trades[0].signer = signer.addr;
-        trades[0].signature = hex"702c7fa764b719791f293d4f45cb8f3d417b4ca8ea7eebecc30467b036d445f925a0907ccdfa88f5410d9dfd1b1aeaf5222ad3644c366e1627755e00af7d8a761b";
+        trades[0].signature = hex"0665fcfd79cab23b62e420ca62020e82eaadb3e8b0cc9bd06da02830c0da9f1f41e0723e2765c5bfc011659f0dd544c0159be2f0a324895b70ed7960b81802a51c";
 
         assertEq(estate.ownerOf(estateTokenId), signer.addr);
         assertEq(land.ownerOf(landTokenId), other);
