@@ -7,9 +7,10 @@ import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
+import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 
 /// @notice Coupon that allows creators to apply discounts to Trades involving their Collections.
-contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, CouponTypes, MarketplaceTypes {
+contract CollectionDiscountCoupon is ICoupon, DecentralandMarketplacePolygonAssetTypes, CouponTypes, MarketplaceTypes {
     uint256 public constant DISCOUNT_TYPE_RATE = 1;
     uint256 public constant DISCOUNT_TYPE_FLAT = 2;
 
