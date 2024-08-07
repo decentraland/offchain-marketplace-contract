@@ -44,15 +44,7 @@ The Coupon entity comprises the same checks found in the trade, allowing it to b
 
 ## Signatures
 
-This section contains examples on how to create and sign trades off-chain to be used later in a transaction.
-
-**Signing Trades**
-
-TODO: 
-
-**Signing Coupons**
-
-TODO: 
+For how signatures compatible with these smart contracts can be created, please refer to the UI example found in ui/src/pages/index.tsx.
 
 ## Trade Id
 
