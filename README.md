@@ -829,7 +829,7 @@ Ethereum:
 **DecentralandMarketplaceEthereum.sol**
 
 ```bash
-$ forge create --rpc-url {rpcUrl} --constructor-args 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce 0x0000000000000000000000000000000000000000 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce 25000 0x0f5d2fb29fb7d3cfee444a200298f468908cc942 0x82A44D92D6c329826dc557c5E1Be6ebeC5D5FeB9 86400 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 3600 --private-key {privateKey} src/marketplace/DecentralandMarketplaceEthereum.sol:DecentralandMarketplaceEthereum
+$ forge create --rpc-url {rpcUrl} --constructor-args 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce 0x0000000000000000000000000000000000000000 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce 25000 0x0f5d2fb29fb7d3cfee444a200298f468908cc942 0x82A44D92D6c329826dc557c5E1Be6ebeC5D5FeB9 86400 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 3600 --private-key {privateKey} --etherscan-api-key {etherscanApiKey} --verify src/marketplace/DecentralandMarketplaceEthereum.sol:DecentralandMarketplaceEthereum
 ```
 
 Constructor Args:
@@ -847,7 +847,7 @@ Constructor Args:
 **CouponManager.sol**
 
 ```bash
-$ forge create --rpc-url {rpcUrl} --constructor-args {decentralandMarketplaceEthereum} 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce \[\] --private-key {privateKey} src/coupons/CouponManager.sol:CouponManager
+$ forge create --rpc-url {rpcUrl} --constructor-args {decentralandMarketplaceEthereum} 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce \[\] --private-key {privateKey} --etherscan-api-key {etherscanApiKey} --verify src/coupons/CouponManager.sol:CouponManager
 ```
 
 Constructor Args:
@@ -863,7 +863,7 @@ Polygon:
 **DecentralandMarketplacePolygon.sol**
 
 ```bash
-$ forge create --rpc-url {rpcUrl} --constructor-args 0x0E659A116e161d8e502F9036bAbDA51334F2667E 0x0000000000000000000000000000000000000000 0xB08E3e7cc815213304d884C88cA476ebC50EaAB2 25000 0x90958D4531258ca11D18396d4174a007edBc2b42 25000 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512 27 --private-key {privateKey} src/marketplace/DecentralandMarketplacePolygon.sol:DecentralandMarketplacePolygon
+$ forge create --rpc-url {rpcUrl} --constructor-args 0x0E659A116e161d8e502F9036bAbDA51334F2667E 0x0000000000000000000000000000000000000000 0xB08E3e7cc815213304d884C88cA476ebC50EaAB2 25000 0x90958D4531258ca11D18396d4174a007edBc2b42 25000 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512 27 --private-key {privateKey} --etherscan-api-key {polygonscanApiKey} --verify src/marketplace/DecentralandMarketplacePolygon.sol:DecentralandMarketplacePolygon
 ```
 
 Constructor Args:
@@ -881,13 +881,13 @@ Constructor Args:
 **CollectionDiscountCoupon.sol**
 
 ```bash
-$ forge create --rpc-url {rpcUrl} --private-key {privateKey} src/coupons/CollectionDiscountCoupon.sol:CollectionDiscountCoupon      
+$ forge create --rpc-url {rpcUrl} --private-key {privateKey} --etherscan-api-key {polygonscanApiKey} --verify src/coupons/CollectionDiscountCoupon.sol:CollectionDiscountCoupon      
 ```
 
 **CouponManager.sol**
 
 ```bash
-$ forge create --rpc-url {rpcUrl} --constructor-args {decentralandMarketplacePolygon} 0x0E659A116e161d8e502F9036bAbDA51334F2667E \[{collectionDiscountCoupon}\] --private-key {privateKey} src/coupons/CouponManager.sol:CouponManager
+$ forge create --rpc-url {rpcUrl} --constructor-args {decentralandMarketplacePolygon} 0x0E659A116e161d8e502F9036bAbDA51334F2667E \[{collectionDiscountCoupon}\] --private-key {privateKey} --etherscan-api-key {polygonscanApiKey} --verify src/coupons/CouponManager.sol:CouponManager
 ```
 
 Constructor Args:
