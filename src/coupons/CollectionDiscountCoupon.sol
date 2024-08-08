@@ -50,12 +50,12 @@ contract CollectionDiscountCoupon is ICoupon, DecentralandMarketplacePolygonAsse
         CollectionDiscountCouponData memory data = abi.decode(_coupon.data, (CollectionDiscountCouponData));
         CollectionDiscountCouponCallerData memory callerData = abi.decode(_coupon.callerData, (CollectionDiscountCouponCallerData));
 
-        // The coupon should not be applicable of there are no received ERC20 assets to be applied on.
+        // The coupon should not be applicable if there are no received ERC20 assets to be applied on.
         if (_trade.received.length == 0) {
             revert InvalidReceivedLength();
         }
 
-        // The coupon should not be applicable of there are no sent Collection items.
+        // The coupon should not be applicable if there are no sent Collection items.
         if (_trade.sent.length == 0) {
             revert InvalidSentLength();
         }
