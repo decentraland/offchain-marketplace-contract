@@ -24,6 +24,7 @@ This repository contains a Marketplace Smart Contract that allows users to perfo
   - [Shopping Cart](#shopping-cart)
   - [External Checks](#external-checks)
   - [USD Pegged MANA Trades](#usd-pegged-mana-trades)
+- [Canceling Trades and Coupons](#canceling-trades-and-coupons)
 - [Fees and Royalties](#fees-and-royalties)
 - [Development](#development)
 - [Deployment](#deployment)
@@ -816,6 +817,26 @@ The owner of the LAND will have to sign a Trade containing the following propert
 When the Trade is executed, the signer will receive 100 USD in MANA according to the current rate provided by Chainlink price feeds.
 
 If the price of MANA when the Trade is executed is 50 cents, ultimately, the amount received by the signer will be 200 MANA.
+
+## Canceling Trades and Coupons
+
+Creating a Trade refers to the act of defining the data of a Trade and then signing it. With this data and the signature available, the Trade can be executed. The same process applies to coupons.
+
+There are multiple ways in which a Trade becomes unusable, primarily through verifications that check properties such as the expiration timestamp, the effective timestamp when it becomes usable, how many times it can be executed, etc. More about these checks can be found in [CommonTypes.sol](src/common/CommonTypes.sol) and [Verifications.sol](src/common/Verifications.sol).
+
+However, there are many cases in which Trades have to be canceled manually. Such cases include:
+
+- Simply not wanting to trade something anymore. For example, you may regret putting something on sale and want to immediately unlist it.
+- Updating the price of something being sold. This is done by creating a new Trade with the updated price after canceling the Trade with the old price.
+
+Users can use the `cancelSignature(Trade[] calldata _trades)` function to cancel any Trade(s) they wish to.
+
+Users can only cancel Trades that have been signed by themselves, making it impossible to cancel a Trade created by someone else.
+
+The [CouponManager](src/coupons/CouponManager.sol) provides a similar `cancelSignature(Coupon[] calldata _coupons)` function to cancel Coupons.
+
+> Canceling signatures is something that users will probably do frequently due to the dynamics of the marketplace. To reduce gas costs, there is no check made to revert when trying to cancel an already canceled signature. This means that off-chain services have to handle possible double `SignatureCancelled` events being emitted for the same signature.
+
 
 ## Fees and Royalties
 
