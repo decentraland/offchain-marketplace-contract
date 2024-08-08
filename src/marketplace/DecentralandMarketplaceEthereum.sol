@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -64,10 +64,10 @@ contract DecentralandMarketplaceEthereum is
         address _ethUsdAggregator,
         uint256 _ethUsdAggregatorTolerance
     )
+        FeeCollector(_feeCollector, _feeRate)
         EIP712("DecentralandMarketplaceEthereum", "1.0.0")
         Ownable(_owner)
         MarketplaceWithCouponManager(_couponManager)
-        FeeCollector(_feeCollector, _feeRate)
     {
         manaAddress = _manaAddress;
 
@@ -101,7 +101,12 @@ contract DecentralandMarketplaceEthereum is
         _updateEthUsdAggregator(_aggregator, _tolerance);
     }
 
-    /// @dev Overriden Marketplace function to transfer assets.
+    /// @dev Overridden Marketplace function to modify the trade before accepting it.
+    function _modifyTrade(Trade memory _trade) internal pure override {
+        /// This marketplace contract does not require to make any modifications to the Trade, so it remains empty.
+    }
+
+    /// @dev Overridden Marketplace function to transfer assets.
     /// Handles the transfer of ERC20 and ERC721 assets.
     function _transferAsset(Asset memory _asset, address _from, address, address) internal override {
         uint256 assetType = _asset.assetType;
@@ -119,7 +124,7 @@ contract DecentralandMarketplaceEthereum is
 
     /// @dev Transfers ERC20 assets to the beneficiary.
     /// A part of the value is taken as a fee and transferred to the fee collector.
-    function _transferERC20(Asset memory _asset, address _from) internal {
+    function _transferERC20(Asset memory _asset, address _from) private {
         uint256 originalValue = _asset.value;
         uint256 fee = (originalValue * feeRate) / 1_000_000;
 
@@ -141,7 +146,7 @@ contract DecentralandMarketplaceEthereum is
         int256 manaUsdRate = (manaEthRate * ethUsdRate) / 1e18;
 
         // Updates the asset with the new values.
-        _asset = _updateAssetWithConvertedMANAPrice(_asset, manaAddress, manaUsdRate);
+        _updateAssetWithConvertedMANAPrice(_asset, manaAddress, manaUsdRate);
 
         // With the updated asset, we can perform a normal ERC20 transfer.
         _transferERC20(_asset, _from);
@@ -153,9 +158,8 @@ contract DecentralandMarketplaceEthereum is
         IComposable erc721 = IComposable(_asset.contractAddress);
 
         if (erc721.supportsInterface(erc721.verifyFingerprint.selector)) {
-            bytes32 fingerprint = abi.decode(_asset.extra, (bytes32));
-
-            if (!erc721.verifyFingerprint(_asset.value, abi.encode(fingerprint))) {
+            // Uses the extra data provided in the asset as the fingerprint to be verified.
+            if (!erc721.verifyFingerprint(_asset.value, _asset.extra)) {
                 revert InvalidFingerprint();
             }
         }

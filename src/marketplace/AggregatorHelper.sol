@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {IAggregator} from "src/marketplace/interfaces/IAggregator.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
@@ -42,13 +42,10 @@ contract AggregatorHelper {
     function _updateAssetWithConvertedMANAPrice(MarketplaceTypes.Asset memory _asset, address _manaAddress, int256 _manaUsdRate)
         internal
         pure
-        returns (MarketplaceTypes.Asset memory)
     {
         // Update the asset contract address to be MANA.
         _asset.contractAddress = _manaAddress;
         // Update the asset value to be the amount of MANA to be transferred.
-        _asset.value = (_asset.value * uint256(_manaUsdRate)) / 1e18;
-
-        return _asset;
+        _asset.value = _asset.value * 1e18 / uint256(_manaUsdRate);
     }
 }

@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 contract MockExternalChecks {
     address public ownerOfResult;
     uint256 public balanceOfResult;
     bool public customCheckFunctionResult;
+    uint256 private count;
 
     function setOwnerOfResult(address _ownerOfResult) external {
         ownerOfResult = _ownerOfResult;
@@ -26,7 +27,29 @@ contract MockExternalChecks {
         return balanceOfResult;
     }
 
-    function customCheckFunction(address, uint256) external view returns (bool) {
+    function customCheckFunctionBool(address, bool) external view returns (bool) {
+        return customCheckFunctionResult;
+    }
+
+    function customCheckFunctionUint256(address, uint256) external view returns (bool) {
+        return customCheckFunctionResult;
+    }
+
+    function customCheckFunctionBytes(address, bytes calldata) external view returns (bool) {
+        return customCheckFunctionResult;
+    }
+
+    function customCheckFunctionBytesExpects100(address, bytes calldata _data) external view returns (bool) {
+        if (100 != abi.decode(_data, (uint256))) {
+            revert("Not 100!");
+        }
+
+        return customCheckFunctionResult;
+    }
+
+    function customCheckFunctionNotView(address, bytes calldata) external returns (bool) {
+        count++;
+
         return customCheckFunctionResult;
     }
 }

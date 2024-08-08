@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
@@ -61,7 +61,7 @@ abstract contract Signatures is Ownable, EIP712 {
     /// @param _typeHash The type hash.
     /// @param _signature The signature.
     /// @param _signer The signer who is supposed to have signed the signature.
-    function _verifySignature(bytes32 _typeHash, bytes memory _signature, address _signer) internal view {
+    function _verifySignature(bytes32 _typeHash, bytes calldata _signature, address _signer) internal view {
         if (!SignatureChecker.isValidSignatureNow(_signer, _hashTypedDataV4(_typeHash), _signature)) {
             revert InvalidSignature();
         }

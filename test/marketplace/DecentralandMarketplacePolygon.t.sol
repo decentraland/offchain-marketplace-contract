@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
@@ -44,18 +44,18 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
         return _EIP712Version();
     }
 
-    function eip712TradeHash(Trade memory _trade) external view returns (bytes32) {
+    function eip712TradeHash(Trade calldata _trade) external view returns (bytes32) {
         return _hashTypedDataV4(_hashTrade(_trade));
     }
 
-    function eip712MetaTransactionHash(MetaTransaction memory _metaTx) external view returns (bytes32) {
+    function eip712MetaTransactionHash(uint256 _nonce, address _from, bytes calldata _functionData) external view returns (bytes32) {
         return _hashTypedDataV4(
             keccak256(
                 abi.encode(
                     keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)")),
-                    _metaTx.nonce,
-                    _metaTx.from,
-                    keccak256(_metaTx.functionData)
+                    _nonce,
+                    _from,
+                    keccak256(_functionData)
                 )
             )
         );
@@ -65,7 +65,7 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
 contract CouponManagerHarness is CouponManager {
     constructor(address _marketplace, address _owner, address[] memory _allowedCoupons) CouponManager(_marketplace, _owner, _allowedCoupons) {}
 
-    function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {
+    function eip712CouponHash(Coupon calldata _coupon) external view returns (bytes32) {
         return _hashTypedDataV4(_hashCoupon(_coupon));
     }
 }
@@ -120,8 +120,8 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function signMetaTx(DecentralandMarketplacePolygonHarness.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_metaTx));
+    function signMetaTx(uint256 _nonce, address _from, bytes memory _functionData) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_nonce,_from,_functionData));
         return abi.encodePacked(r, s, v);
     }
 
@@ -133,6 +133,7 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
     function _getBaseTrades() internal view virtual returns (DecentralandMarketplacePolygonHarness.Trade[] memory) {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         return trades;
     }
@@ -242,13 +243,18 @@ contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForSent();
 
+        uint256 daoBalance = erc20.balanceOf(dao);
+
         vm.prank(other);
         vm.expectEmit(address(erc20));
-        emit Transfer(signer.addr, other, erc20Sent);
+        emit Transfer(signer.addr, dao, 0.025 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(signer.addr, other, 0.975 ether);
         marketplace.accept(trades);
 
         assertEq(erc20.balanceOf(signer.addr), 0);
-        assertEq(erc20.balanceOf(other), erc20Sent);
+        assertEq(erc20.balanceOf(other), 0.975 ether);
+        assertEq(erc20.balanceOf(dao), daoBalance + 0.025 ether);
     }
 
     function test_TransfersERC20FromCallerToSigner() public {
@@ -260,13 +266,18 @@ contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForReceived();
 
+        uint256 daoBalance = erc20.balanceOf(dao);
+
         vm.prank(other);
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, erc20Sent);
+        emit Transfer(other, dao, 0.025 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 0.975 ether);
         marketplace.accept(trades);
 
         assertEq(erc20.balanceOf(other), 0);
-        assertEq(erc20.balanceOf(signer.addr), erc20Sent);
+        assertEq(erc20.balanceOf(signer.addr), 0.975 ether);
+        assertEq(erc20.balanceOf(dao), daoBalance + 0.025 ether);
     }
 
     function test_TradeWithSentAndReceivedERC20() public {
@@ -295,21 +306,31 @@ contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
         trades[0].sent[0].value = 2 ether;
 
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 
         uint256 signerBalance = erc20.balanceOf(signer.addr);
         uint256 otherBalance = erc20.balanceOf(other);
+        uint256 daoBalance = erc20.balanceOf(dao);
 
         vm.prank(other);
+
         vm.expectEmit(address(erc20));
-        emit Transfer(signer.addr, other, 2 ether);
+        emit Transfer(signer.addr, dao, 0.05 ether);
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 1 ether);
+        emit Transfer(signer.addr, other, 1.95 ether);
+
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 0.025 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 0.975 ether);
+
         marketplace.accept(trades);
 
-        assertEq(erc20.balanceOf(signer.addr), signerBalance - 1 ether);
-        assertEq(erc20.balanceOf(other), otherBalance + 1 ether);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance - 2 ether + 0.975 ether);
+        assertEq(erc20.balanceOf(other), otherBalance - 1 ether + 1.95 ether);
+        assertEq(erc20.balanceOf(dao), daoBalance + 0.05 ether + 0.025 ether);
     }
 }
 
@@ -360,19 +381,24 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
         trades[0].received[0].value = 100 ether;
         trades[0].signature = signTrade(trades[0]);
 
-        // The amount of MANA to be transferred is 43052746000000000000
-        // Which is the equivalent to 43,052746 MANA
+        // The amount of MANA to be transferred is 232273221317869015834
+        // Which is the equivalent to 232,27 MANA
         // That is because the price of MANA is 0.43 USD at the moment of the Trade
-        // As the value defined is 100 USD, the amount of MANA to be transferred is 100 * 0.43 = ~43
+        // As the value defined is 100 USD, the amount of MANA to be transferred is 100 / 0.43 = ~232
+        // As the trade only contains an ERC20, the fee collector will receive 2.5% of the amount
+        // The fee collector will receive 2.5% of 232,27 MANA = 5.8 MANA
 
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 43052746000000000000);
+        emit Transfer(other, dao, 5806830532946725395);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 226466390784922290439);
 
         vm.prank(other);
         marketplace.accept(trades);
@@ -393,6 +419,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
 
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
@@ -408,11 +435,11 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         // Given that the fee for non decentraland assets is 2.5%, the fee collector will receive a part
         vm.expectEmit(address(erc20));
-        emit Transfer(other, dao, 1076318650000000000);
+        emit Transfer(other, dao, 5806830532946725395);
 
         // The rest will be received by the signer
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 41976427350000000000);
+        emit Transfer(other, signer.addr, 226466390784922290439);
 
         vm.prank(other);
         marketplace.accept(trades);
@@ -433,6 +460,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
 
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
@@ -448,11 +476,67 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         // Given that the royalty fee for decentraland assets is 2.5%, the royalty collector will receive a part
         vm.expectEmit(address(erc20));
-        emit Transfer(other, collectionItemOriginalCreator, 1076318650000000000);
+        emit Transfer(other, collectionItemOriginalCreator, 5806830532946725395);
 
         // The rest will be received by the signer
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 41976427350000000000);
+        emit Transfer(other, signer.addr, 226466390784922290439);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_TransfersTheCorrectAmountOfMana_WithFeeCollectorFees_WithRoyaltiyFees() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, 1000 ether);
+
+        vm.prank(erc721OriginalHolder);
+        erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
+
+        vm.prank(collectionErc721OriginalHolder);
+        collectionErc721.transferFrom(collectionErc721OriginalHolder, signer.addr, collectionErc721TokenId);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), 1000 ether);
+
+        vm.prank(signer.addr);
+        erc721.setApprovalForAll(address(marketplace), true);
+
+        vm.prank(signer.addr);
+        collectionErc721.setApprovalForAll(address(marketplace), true);
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].signer = signer.addr;
+
+        trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+
+        trades[0].sent = new DecentralandMarketplacePolygonHarness.Asset[](2);
+        trades[0].sent[0].contractAddress = address(erc721);
+        trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        trades[0].sent[0].value = erc721TokenId;
+
+        trades[0].sent[1].contractAddress = address(collectionErc721);
+        trades[0].sent[1].assetType = marketplace.ASSET_TYPE_ERC721();
+        trades[0].sent[1].value = collectionErc721TokenId;
+
+        trades[0].signature = signTrade(trades[0]);
+
+        // Given that the fee for non decentraland assets is 2.5%, the fee collector will receive a part
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 5806830532946725395);
+
+        // Given that the royalty fee for decentraland assets is 2.5%, the royalty collector will receive a part
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, collectionItemOriginalCreator, 5806830532946725395);
+
+        // The rest will be received by the signer
+        // The rest consists of the remaining 95% of the value
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 220659560251975565044);
 
         vm.prank(other);
         marketplace.accept(trades);
@@ -477,6 +561,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
 
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
@@ -492,11 +577,11 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         // Given that the fee for minting decentraland items is 2.5%, the fee collector will receive a part
         vm.expectEmit(address(erc20));
-        emit Transfer(other, dao, 1076318650000000000);
+        emit Transfer(other, dao, 5806830532946725395);
 
         // The rest will be received by the signer
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, 41976427350000000000);
+        emit Transfer(other, signer.addr, 226466390784922290439);
 
         vm.prank(other);
         marketplace.accept(trades);
@@ -509,6 +594,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -528,6 +614,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
@@ -763,20 +850,19 @@ contract TransferCollectionItemTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForSent();
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
+        emit MetaTransactionExecuted(metaTxFrom, other, metaTxFunctionData);
         vm.expectEmit(address(collection));
         uint256 expectedTokenId = 1053122916685571866979180276836704323188950954005491112543109775772;
         emit Transfer(address(0), metaTxSigner.addr, expectedTokenId);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
 
         assertEq(collection.ownerOf(expectedTokenId), metaTxSigner.addr);
     }
@@ -816,20 +902,19 @@ contract TransferCollectionItemTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForReceived();
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
+        emit MetaTransactionExecuted(metaTxFrom, other, metaTxFunctionData);
         vm.expectEmit(address(collection));
         uint256 expectedTokenId = 1053122916685571866979180276836704323188950954005491112543109775772;
         emit Transfer(address(0), signer.addr, expectedTokenId);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
 
         assertEq(collection.ownerOf(expectedTokenId), signer.addr);
     }
@@ -837,55 +922,53 @@ contract TransferCollectionItemTests is DecentralandMarketplacePolygonTests {
 
 contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
     error Expired();
+    error SignerAndSignatureDoNotMatch();
     error MetaTransactionFailedWithoutReason();
 
     function test_RevertsIfNonceIsInvalid() public {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 1;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 1;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
-        vm.expectRevert("NativeMetaTransaction#executeMetaTransaction: SIGNER_AND_SIGNATURE_DO_NOT_MATCH");
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        vm.expectRevert(SignerAndSignatureDoNotMatch.selector);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 
     function test_RevertsIfFromIsInvalid() public {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = other;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = other;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
-        vm.expectRevert("NativeMetaTransaction#executeMetaTransaction: SIGNER_AND_SIGNATURE_DO_NOT_MATCH");
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        vm.expectRevert(SignerAndSignatureDoNotMatch.selector);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 
     function test_EmitMetaTransactionExecutedEvent() public {
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        emit MetaTransactionExecuted(metaTxFrom, other, metaTxFunctionData);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 
     function test_RevertsIfTradeIsExpiredWithBubbledUpError() public {
@@ -893,16 +976,15 @@ contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
         trades[0].checks.expiration = block.timestamp - 1;
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectRevert(Expired.selector);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 
     function test_RevertsIfERC721AssetHasContractAddressZeroWithWithoutReasonError() public {
@@ -913,16 +995,15 @@ contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
         trades[0].sent[0].value = 1;
         trades[0].signature = signTrade(trades[0]);
 
-        DecentralandMarketplacePolygonHarness.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+        uint256 metaTxNonce = 0;
+        address metaTxFrom = metaTxSigner.addr;
+        bytes memory metaTxFunctionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
 
-        bytes memory metaTxSignature = signMetaTx(metaTx);
+        bytes memory metaTxSignature = signMetaTx(metaTxNonce, metaTxFrom, metaTxFunctionData);
 
         vm.prank(other);
         vm.expectRevert(MetaTransactionFailedWithoutReason.selector);
-        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+        marketplace.executeMetaTransaction(metaTxFrom, metaTxFunctionData, metaTxSignature);
     }
 }
 
@@ -1105,6 +1186,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1154,6 +1236,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1212,6 +1295,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1271,6 +1355,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = sent;
         trades[0].received = received;
         trades[0].signer = signer.addr;
@@ -1290,6 +1375,7 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
         DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
         coupons[0].checks.expiration = block.timestamp;
+        coupons[0].checks.uses = 1;
         coupons[0].couponAddress = address(collectionDiscountCoupon);
         coupons[0].data = abi.encode(collectionDiscountCouponData);
         coupons[0].callerData = abi.encode(collectionDiscountCouponCallerData);
@@ -1313,82 +1399,108 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         assertEq(erc20.balanceOf(signer.addr), signerBalance + 48.75 ether);
     }
 
-    function test_TradeERC721ForERC20_ERC721IsCollectionNFT_ApplyCollectionDiscountCoupon_RevertsIfTradesAndCouponsLengthMissmatch() public {
-        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
-        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](0);
+    function test_TradeERC721ForUsdPeggedMana_ERC721IsCollectionNFT_ApplyCollectionDiscountCoupon() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, 1000 ether);
+
+        vm.prank(collectionItemOriginalCreator);
+        collection.transferCreatorship(signer.addr);
 
         vm.prank(other);
-        vm.expectRevert(TradesAndCouponsLengthMismatch.selector);
+        erc20.approve(address(marketplace), 1000 ether);
+
+        vm.prank(signer.addr);
+        address[] memory setMintersMinters = new address[](1);
+        setMintersMinters[0] = address(marketplace);
+        bool[] memory setMintersValues = new bool[](1);
+        setMintersValues[0] = true;
+        collection.setMinters(setMintersMinters, setMintersValues);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_COLLECTION_ITEM();
+        sent[0].contractAddress = address(collection);
+        sent[0].value = collectionItemId;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA(); // Rate 1 MANA = 0,43052746 USD
+        received[0].contractAddress = address(erc20);
+        received[0].value = erc20Sent; // 100 USD = 232,27 MANA = 232273221317869015834 wei
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        CollectionDiscountCoupon.CollectionDiscountCouponData memory collectionDiscountCouponData;
+        collectionDiscountCouponData.discount = 500_000; // 50% discount. New value would be 50 USD = 116,13 MANA = 116136610658934507917 wei
+        collectionDiscountCouponData.discountType = collectionDiscountCoupon.DISCOUNT_TYPE_RATE();
+        collectionDiscountCouponData.root = 0x68ad9c0c778776109596c0568ba9c69ca861338e902dfb8aa5be05be190c65ae;
+
+        CollectionDiscountCoupon.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
+        collectionDiscountCouponCallerData.proofs = new bytes32[][](1);
+        collectionDiscountCouponCallerData.proofs[0] = new bytes32[](3);
+        collectionDiscountCouponCallerData.proofs[0][0] = 0x161691c7185a37ff918e70bebef716ddd87844ac47f419ea23eaf4fe983fbf2c;
+        collectionDiscountCouponCallerData.proofs[0][1] = 0xf1bd988d50408c15a0d017a73ff63ab5c30cc78771b609d99142fa4052c02baa;
+        collectionDiscountCouponCallerData.proofs[0][2] = 0xd50d464af1a64cdd6868c42456bc58cfc561fac83e19d742b6397ae5eb44660f;
+
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
+        coupons[0].checks.expiration = block.timestamp;
+        coupons[0].checks.uses = 1;
+        coupons[0].couponAddress = address(collectionDiscountCoupon);
+        coupons[0].data = abi.encode(collectionDiscountCouponData);
+        coupons[0].callerData = abi.encode(collectionDiscountCouponCallerData);
+        coupons[0].signature = signCoupon(coupons[0]);
+
+        uint256 daoBalance = erc20.balanceOf(dao);
+        uint256 signerBalance = erc20.balanceOf(signer.addr);
+
+        // The expected amounts are half of what they would be without the coupon.
+        uint256 expectedDaoFee = 2903415266473362697; // 2.5% fee
+        uint256 expectedBeneficiaryAmount = 113233195392461145220;
+
+        vm.prank(other);
+        // // TODO: Find a way to expect events with the same name but different arguments
+        // // vm.expectEmit(address(collectionErc721));
+        // // emit Transfer(signer.addr, other, collectionErc721TokenId);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, expectedDaoFee);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, expectedBeneficiaryAmount);
+        marketplace.acceptWithCoupon(trades, coupons);
+
+        assertEq(collection.ownerOf(1053122916685571866979180276836704323188950954005491112543109775772), other);
+        assertEq(erc20.balanceOf(dao), daoBalance + expectedDaoFee);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance + expectedBeneficiaryAmount);
+    }
+
+    function test_RevertsIfCouponLengthIsSmallerThanTradeLength() public {
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](0);
+        
+        vm.expectRevert(); // "panic: array out-of-bounds access (0x32)"
         marketplace.acceptWithCoupon(trades, coupons);
     }
 
-    function test_RevertsIfReceivedAssetTypeIsErc20WithFees() public {
-        vm.prank(erc20OriginalHolder);
-        erc20.transfer(other, erc20Sent);
+    function test_ExtraCouponsAreIgnored() public {
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](0);
 
-        vm.prank(collectionErc721OriginalHolder);
-        collectionErc721.transferFrom(collectionErc721OriginalHolder, signer.addr, collectionErc721TokenId);
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
 
-        vm.prank(other);
-        erc20.approve(address(marketplace), erc20Sent);
-
-        vm.prank(signer.addr);
-        collectionErc721.setApprovalForAll(address(marketplace), true);
-
-        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
-        sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
-        sent[0].contractAddress = address(collectionErc721);
-        sent[0].value = collectionErc721TokenId;
-
-        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
-        received[0].assetType = marketplace.ASSET_TYPE_ERC20_WITH_FEES();
-        received[0].contractAddress = address(erc20);
-        received[0].value = erc20Sent;
-
-        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
-        trades[0].checks.expiration = block.timestamp;
-        trades[0].sent = sent;
-        trades[0].received = received;
-        trades[0].signer = signer.addr;
-        trades[0].signature = signTrade(trades[0]);
-
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(UnsupportedAssetType.selector, marketplace.ASSET_TYPE_ERC20_WITH_FEES()));
-        marketplace.accept(trades);
-    }
-
-    function test_RevertsIfSentAssetTypeIsErc20WithFees() public {
-        vm.prank(erc20OriginalHolder);
-        erc20.transfer(other, erc20Sent);
-
-        vm.prank(collectionErc721OriginalHolder);
-        collectionErc721.transferFrom(collectionErc721OriginalHolder, signer.addr, collectionErc721TokenId);
-
-        vm.prank(other);
-        erc20.approve(address(marketplace), erc20Sent);
-
-        vm.prank(signer.addr);
-        collectionErc721.setApprovalForAll(address(marketplace), true);
-
-        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
-        sent[0].assetType = marketplace.ASSET_TYPE_ERC20_WITH_FEES();
-        sent[0].contractAddress = address(erc20);
-        sent[0].value = erc20Sent;
-
-        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
-        received[0].assetType = marketplace.ASSET_TYPE_ERC721();
-        received[0].contractAddress = address(collectionErc721);
-        received[0].value = collectionErc721TokenId;
-
-        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
-        trades[0].checks.expiration = block.timestamp;
-        trades[0].sent = sent;
-        trades[0].received = received;
-        trades[0].signer = signer.addr;
-        trades[0].signature = signTrade(trades[0]);
-
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(UnsupportedAssetType.selector, marketplace.ASSET_TYPE_ERC20_WITH_FEES()));
-        marketplace.accept(trades);
+        coupons[0].checks.expiration = block.timestamp;
+        coupons[0].checks.uses = 1;
+        coupons[0].signature = signCoupon(coupons[0]);
+        
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        marketplace.acceptWithCoupon(trades, coupons);
+        assertEq(logs.length, 0);
     }
 }

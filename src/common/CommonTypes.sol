@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 /// @notice Types used by many contracts in this project.
 abstract contract CommonTypes {
@@ -12,13 +12,13 @@ abstract contract CommonTypes {
     struct ExternalCheck {
         address contractAddress;
         bytes4 selector;
-        uint256 value;
+        bytes value;
         bool required;
     }
 
     /// @notice Schema of a check.
     /// This is used to verify that certain requirements are met.
-    /// @param uses The number of times the signature can be used. 0 means unlimited.
+    /// @param uses The number of times the signature can be used.
     /// @param expiration The expiration date of the signature.
     /// @param effective The effective date of the signature.
     /// @param salt A value used to make the signature unique.

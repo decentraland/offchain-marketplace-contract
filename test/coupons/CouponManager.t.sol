@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
@@ -11,7 +11,7 @@ import {MockCoupon} from "src/mocks/MockCoupon.sol";
 contract CouponManagerHarness is CouponManager {
     constructor(address _marketplace, address _owner, address[] memory _allowedCoupons) CouponManager(_marketplace, _owner, _allowedCoupons) {}
 
-    function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {
+    function eip712CouponHash(Coupon calldata _coupon) external view returns (bytes32) {
         return _hashTypedDataV4(_hashCoupon(_coupon));
     }
 }
@@ -128,7 +128,7 @@ contract ApplyCouponTests is CouponsTests {
     error UnauthorizedCaller(address _caller);
     error CouponNotAllowed(address _coupon);
     error Expired();
-    error SignatureReuse();
+    error SignatureOveruse();
 
     function test_RevertsIfCallerIsNotTheMarketplace() public {
         CouponManagerHarness.Trade memory trade;
@@ -155,7 +155,7 @@ contract ApplyCouponTests is CouponsTests {
         coupon.couponAddress = allowedCoupon;
 
         vm.prank(marketplace);
-        vm.expectRevert(Expired.selector);
+        vm.expectRevert(SignatureOveruse.selector);
         couponManager.applyCoupon(trade, coupon);
     }
 
@@ -165,6 +165,7 @@ contract ApplyCouponTests is CouponsTests {
         CouponManagerHarness.Coupon memory coupon;
         coupon.couponAddress = allowedCoupon;
         coupon.checks.expiration = block.timestamp;
+        coupon.checks.uses = 1;
         coupon.signature = signCoupon(coupon);
 
         vm.prank(marketplace);
@@ -186,7 +187,7 @@ contract ApplyCouponTests is CouponsTests {
         couponManager.applyCoupon(trade, coupon);
 
         vm.prank(marketplace);
-        vm.expectRevert(SignatureReuse.selector);
+        vm.expectRevert(SignatureOveruse.selector);
         couponManager.applyCoupon(trade, coupon);
     }
 
@@ -196,6 +197,7 @@ contract ApplyCouponTests is CouponsTests {
         CouponManagerHarness.Coupon memory coupon;
         coupon.couponAddress = allowedCoupon;
         coupon.checks.expiration = block.timestamp;
+        coupon.checks.uses = 1;
         coupon.signature = signCoupon(coupon);
 
         assertEq(couponManager.signatureUses(keccak256(coupon.signature)), 0);
