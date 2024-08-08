@@ -774,6 +774,54 @@ When the Trade is executed, the signer will receive 100 USD in MANA according to
 
 If the price of MANA when the Trade is executed is 50 cents, ultimately, the amount received by the signer will be 200 MANA.
 
+## Fees and Royalties
+
+When trading ERC20s using the Marketplace contracts found in this repo, fees and royalties might be deducted depending on the kind of assets being traded, as well as the network they are being traded on.
+
+On the **DecentralandMarketplaceEthereum**, when an ERC20 is defined as a received and/or sent asset in the Trade, a percentage of the defined value will be transferred to the **fee collector**, such as [The Decentraland DAO](https://etherscan.io/address/0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce).
+
+If the Trade consists of swapping LAND for 100 MANA, given a fee of 2.5%, the beneficiary of the MANA will receive 97.5 MANA, while the fee collector will receive 2.5 MANA.
+
+Fees are subtracted from **ALL** ERC20s traded.
+
+If the Trade consists of swapping 100 MANA for 100 USDT, the fee collector will receive 2.5 MANA and 2.5 USDT.
+
+The **DecentralandMarketplacePolygon** has a more complex fee system given that Polygon also has Primary Sales (minting Decentraland Collection Items) and Decentraland Wearables/Emotes pay royalties to their creators when traded.
+
+In this case, ERC20s will pay fees and/or royalties depending on the assets being traded:
+
+- Primary Sales (minting Decentraland Collection Items) pay fees to the fee collector.
+- Secondary Sales (trading Decentraland ERC721s) pay royalties to the creators of those items.
+- Trading Non-Decentraland ERC721s pays fees to the fee collector.
+
+If the Trade consists of minting a red hat from a collection created by Nacho for the price of 100 MANA, the fee collector will receive 2.5 MANA while Nacho (or the beneficiary) will receive 97.5 MANA.
+
+After minting the red hat, if I trade the NFT for 100 MANA, Nacho will receive 2.5 MANA as royalties, while I will receive the remaining 97.5 MANA.
+
+In the case of a Trade consisting of trading a Bored Ape for 100 USDT, since it is not a Decentraland ERC721, the fee collector will receive 2.5 USDT and no royalties are paid.
+
+If the Trade consists of swapping the red hat created by Nacho and some blue sandals created by Lautaro for 100 MANA, 2.5% will be paid as royalties, but it will be distributed equally between Nacho and Lautaro, with each receiving 1.25 MANA.
+
+A more complex case would involve creating a Trade that includes all the different types of assets.
+
+For example, I receive:
+
+- Mint Nacho's red hat Decentraland ERC721 (Primary Sale)
+- Bored Ape ERC721
+- 100 MANA
+
+I send:
+
+- Lautaro's blue sandals Decentraland ERC721 (Secondary Sale)
+- Kevin's green trousers Decentraland ERC721 (Secondary Sale)
+- 100 USDT
+
+Given that there is a Primary Sale and a Non-Decentraland ERC721 being swapped, 2.5% of the MANA and the USDT will be sent to the fee collector.
+
+Additionally, as Lautaro's and Kevin's NFTs are Decentraland ERC721s, another 2.5% of the MANA and USDT will be distributed equally to them.
+
+When a situation like this occurs, in which there are both fees and royalties, 5% (fee rate + royalty rate) is deducted from the amount of ERC20s each beneficiary will receive. So keep this in mind when creating more complex Trades.
+
 ## Development
 
 This repository was built using foundry.
