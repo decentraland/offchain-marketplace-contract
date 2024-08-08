@@ -735,7 +735,7 @@ To do so, they must add an external check to the coupon:
             {
                 contractAddress: 0xf8a87150ca602dbeb2e748ad7c9c790d55d10528, // Collection
                 selector: 0x70a08231, // balanceOf(address,uint256) selector, will check the balance the caller has for that collection
-                value: 1, // Will check that the balance is 1 or more
+                value: abi.encode(1), // Will check that the balance is 1 or more
                 required: true // This check has to pass. For cases in which there is only 1 check, true or false is the same
             }
         ]
@@ -759,13 +759,13 @@ They can do so by adding more external checks like:
             {
                 contractAddress: collectionA, // First collection to check
                 selector: 0x70a08231,
-                value: 1
+                value: abi.encode(1),
                 required: false // This means optional
             },
             {
                 contractAddress: collectionB, // Second collection to check
                 selector: 0x70a08231,
-                value: 1,
+                value: abi.encode(1),
                 required: false // At least one optional check has to pass in order to be valid
             },
         ]
@@ -776,7 +776,9 @@ They can do so by adding more external checks like:
 }
 ```
 
-The contract supports checking `balanceOf` and `ownerOf` natively. But if the selector provided does not match any of those, it will fallback to using the provided selector with the caller and provided value, and expect that the function returns `true`. The user could provide a selector that is `myCustomCheck(address,uint256)`, and it should return true.
+The contract supports checking `balanceOf` and `ownerOf` natively. But if the selector provided does not match any of those, it will fallback to using the provided selector with the caller and provided value, and expect that the function returns `true`. The user could provide a selector that is `myCustomCheck(address,bytes)`, and it should return true.
+
+> Keep in mind that external checks, despite being called using static calls, can still consume lots of gas.
 
 ### USD Pegged MANA Trades
 
