@@ -2,6 +2,32 @@
 
 This repository contains a Marketplace Smart Contract that allows users to perform trades using EIP712 signatures. Users can sign trades indicating the terms of what will be traded, and other interested parties can accept and settle those trades on the blockchain.
 
+- [Trades](#trades)
+- [Assets](#assets)
+- [Checks](#checks)
+- [Implementations](#implementations)
+- [Coupons](#coupons)
+- [Signatures](#signatures)
+- [Trade Id](#trade-id)
+- [Trade Examples](#trade-examples)
+  - [Creating a Public Order](#creating-a-public-order)
+  - [Creating a Bid](#creating-a-bid)
+  - [Create a Private Order](#create-a-private-order)
+  - [Auction](#auction)
+  - [Creating a Public Order for Multiple Items](#creating-a-public-order-for-multiple-items)
+  - [Bidding for Multiple Items](#bidding-for-multiple-items)
+  - [Asset Swaps](#asset-swaps)
+  - [Hot Sale](#hot-sale)
+  - [Discounts](#discounts)
+  - [Revenue Share](#revenue-share)
+  - [Shopping Cart](#shopping-cart)
+  - [External Checks](#external-checks)
+  - [USD Pegged MANA Trades](#usd-pegged-mana-trades)
+- [Fees and Royalties](#fees-and-royalties)
+- [Development](#development)
+- [Deployment](#deployment)
+- [Notes For Auditors](#notes-for-auditors)
+
 ## Trades
 
 Trades are the main entity the Marketplace contract works with.
@@ -78,7 +104,7 @@ As mentioned before, this works because all bids will have the same Trade ID, co
 
 - The received assets of the bid, which is in this case the asset owned by the caller.
 
-## Examples
+## Trade Examples
 
 The examples found on this section will describe some of the many Trade types that the Marketplace smart contracts in this repository can enable.
 
@@ -97,7 +123,7 @@ For simplicity, the checks on all Trades and Coupons will default to the followi
 }
 ```
 
-**1. Creating a Public Order**
+### Creating a Public Order
 
 In this example, the owner of a LAND on coords 100,100, wants to list it for sale at a price of 100 MANA.
 
@@ -128,7 +154,7 @@ The owner of the LAND will have to sign a Trade containing the following propert
 }
 ```
 
-**2. Creating a Bid**
+### Creating a Bid
 
 Bids are similar to Orders with the difference that it is the buyer the one signing the Trade instead of the seller.
 
@@ -161,7 +187,7 @@ For this example, the buyer wants to offer 100 MANA for an Estate.
 
 As you can see from the Trade, the only real difference with an Order is that the sent and received assets are swapped. This simple abstraction is what differentiates a Bid from an Order.
 
-**3. Create a Private Order**
+### Create a Private Order
 
 There might be some cases in which the owner of an asset wants to put it on sale, but only for a handful of users to be able to buy it. Maybe because of an event, or maybe as a special discount for some winners.
 
@@ -206,7 +232,7 @@ One of the allowed callers must then execute the Trade by providing a merkle pro
 
 In this case, `0x2e234DAe75C793f67A35089C9d99245E1C58470b` provides a valid proof, succefuly executing the Trade.
 
-**4. Auction**
+### Auction
 
 Auctions using this marketplace are basically multiple bids for a certain asset (or assets).
 
@@ -288,7 +314,7 @@ Given that bid #2 has a better offer, the owner of the asset will probably accep
 
 The `allowedRoot` check, explained in the **Private Order** example, should be used as well so only the auctioner can accept the bids. This combined with the trade id, gives the best auctioning experience with this contract.
 
-**5. Creating a Public Order for Multiple Items**
+### Creating a Public Order for Multiple Items
 
 Any user might want to be able to sell items in batch. For example, as a promotion, a Decentraland wearable creator might want to sell 3 items in batch for 100 MANA.
 
@@ -334,7 +360,7 @@ Any amount of assets can be defined on the sent and received properties of the T
 
 For this particular case, when the Trade is accepted, the items will be bough for 100 MANA total.
 
-**6. Bidding for Multiple Items** (Bid 100 MANA to buy 3 different collection items)
+### Bidding for Multiple Items
 
 Similar to mutiple item orders, but with the sent and received assets swapped.
 
@@ -379,7 +405,7 @@ This time the bidder will sign a Trade determining that they want to purchase 3 
 }
 ```
 
-**6. Asset Swaps**
+### Asset Swaps
 
 Trades could be made between any kind of assets, not necessarily between an ERC721 and ERC20. 
 
@@ -412,7 +438,7 @@ For this example, a user is willing to trade their LAND for a Decentraland NAME
 
 As long as the assets are supported by the marketplace implementations of the network being used, the combinations are plenty.
 
-**7. Hot Sale**
+### Hot Sale
 
 Imagine that you already have a Decentraland wearable on sale for 100 MANA. You now want, as some sort of promotion, sell the item for 50 MANA instead but for the next 12 hours only. After the 12 hours, the sell price returns to 100.
 
@@ -474,7 +500,7 @@ The same user can then sign a new Trade with an expiration of 12 hours and a low
 
 Whatever is shown to the user is to be handled off chain. In this case, as long as the discounted Trade is valid, the frontend could show that one instead of the original.
 
-**8. Discounts**
+### Discounts
 
 For single elements, discounts can be applied similarly to Hot Sales.
 
@@ -571,7 +597,7 @@ For example
 
 This coupon only works for Decentraland Collection Items, trying to apply it on different assets will fail.
 
-**9. Revenue Share**
+### Revenue Share
 
 When trading, maybe the seller want to share the tokens earned between different addresses.
 
@@ -613,7 +639,7 @@ The Trade for this would be:
 }
 ```
 
-**10. Shopping Cart**
+### Shopping Cart
 
 The marketplace accepts multiple trades to be executed. This allows dapps to implement a shopping cart by providing the user with all the trades and signatures of the assets they want to purchase and execute them with a single transaction.
 
@@ -675,7 +701,7 @@ For example, there are 2 different Trades,
 
 Any user can add those LANDs to the shopping cart, and when ready, execute both trades in a single transaction by calling the `accept(Trade[] _trades)` function with both LAND trades.
 
-**11. External Checks**
+### External Checks
 
 Users are able to indicate who can accept a trade not only using the `allowedRoot` (explained in the "Create a Private Order" example). Users can limit who is allowed by defining external checks.
 
@@ -737,7 +763,7 @@ They can do so by adding more external checks like:
 
 The contract supports checking `balanceOf` and `ownerOf` natively. But if the selector provided does not match any of those, it will fallback to using the provided selector with the caller and provided value, and expect that the function returns `true`. The user could provide a selector that is `myCustomCheck(address,uint256)`, and it should return true.
 
-**12. USD Pegged MANA Trades**
+### USD Pegged MANA Trades
 
 Users are able to create Trades that will involve trading an Asset for MANA, but at a determined USD price.
 
