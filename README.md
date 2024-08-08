@@ -4,6 +4,7 @@ This repository contains a Marketplace Smart Contract that allows users to perfo
 
 - [Trades](#trades)
 - [Assets](#assets)
+  - [Extra Property](#extra-property)
 - [Checks](#checks)
 - [Implementations](#implementations)
 - [Coupons](#coupons)
@@ -43,6 +44,20 @@ Assets in the "sent" property of the trade are those that the signer is willing 
 They are composed of an asset type, which indicates the kind of asset it is (ERC20, ERC721, Decentraland Collection Items, etc.). This asset type allows implementations to handle the transfer of those assets as needed.
 
 Assets contain the contract address of the asset, a value indicating amounts or token IDs, some arbitrary extra data used by implementations to handle custom information such as Decentraland Estate fingerprints, and the beneficiary, which is the address that will ultimately receive the asset.
+
+### Extra Property
+
+Assets contain an extra property that allows for custom handling of the asset, which might not be achievable with the rest of the asset properties.
+
+In the DecentralandMarketplaceEthereum, users can trade composable ERC721s like Decentraland Estates by defining the expected fingerprint the estate should have at the moment of execution in the extra field.
+
+For example, if the fingerprint of the estate with token ID 1234 is 0xb681783bc91f758322a1277878d8edb9a6e307263f2f48d76493dc87b3db27d1 and a user wants to trade it, they should create the trade with the bytes32 fingerprint encoded into the extra field.
+
+Other asset transfer handlers, like ERC20s in the Ethereum Marketplace, will simply ignore the extra field as it is not used in this context.
+
+In the DecentralandMarketplacePolygon, users do not need to use the extra field for any kind of asset. This means the extra field should be empty (0x) on all trades. However, the extra field in this contract is used internally to define how the fees and royalties will be distributed for ERC20s. Any extra value defined by the user will be ignored by the contract in this case.
+
+Other marketplace implementations can use the extra field to handle different assets as they wish.
 
 ## Checks
 
