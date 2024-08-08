@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -46,7 +46,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
     }
 
     /// @notice Updates the list of allowed Coupons.
-    function updateAllowedCoupons(address[] memory _coupons, bool[] memory _values) external onlyOwner {
+    function updateAllowedCoupons(address[] calldata _coupons, bool[] calldata _values) external onlyOwner {
         if (_coupons.length != _values.length) {
             revert LengthMissmatch();
         }
@@ -56,13 +56,14 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         }
     }
 
-    /// @notice Allows a user to cancel a signature.
-    /// The caller must be the signer of the Coupon signature.
+    /// @notice Revokes the signatures of all provided coupons.
+    /// The caller must be the signer of those coupons.
+    /// @param _coupons The list of coupon signatures to be canceled.
     function cancelSignature(Coupon[] calldata _coupons) external {
         address caller = _msgSender();
 
         for (uint256 i = 0; i < _coupons.length; i++) {
-            Coupon memory coupon = _coupons[i];
+            Coupon calldata coupon = _coupons[i];
 
             _verifyCouponSignature(coupon, caller);
 
@@ -74,7 +75,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
     /// @param _trade The Trade to apply the Coupon to.
     /// @param _coupon The Coupon to apply.
     /// @return The Trade with the Coupon applied.
-    function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external virtual returns (Trade memory) {
+    function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external returns (Trade memory) {
         address caller = _msgSender();
 
         // Only the marketplace is allowed to apply Coupons.
@@ -108,7 +109,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         return ICoupon(couponAddress).applyCoupon(_trade, _coupon);
     }
 
-    function _verifyCouponSignature(Coupon memory _coupon, address _signer) private view {
+    function _verifyCouponSignature(Coupon calldata _coupon, address _signer) private view {
         _verifySignature(_hashCoupon(_coupon), _coupon.signature, _signer);
     }
 

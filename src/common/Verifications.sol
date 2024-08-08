@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
@@ -15,7 +15,7 @@ abstract contract Verifications is Signatures, CommonTypes {
     bytes4 private constant OWNER_OF_SELECTOR = 0x6352211e;
 
     error UsingCancelledSignature();
-    error SignatureReuse();
+    error SignatureOveruse();
     error NotEffective();
     error InvalidContractSignatureIndex();
     error InvalidSignerSignatureIndex();
@@ -29,7 +29,7 @@ abstract contract Verifications is Signatures, CommonTypes {
     /// @param _currentSignatureUses The number of times the signature has been used.
     /// @param _signer The address that created the signature.
     /// @param _caller The address that sent the transaction.
-    function _verifyChecks(Checks memory _checks, bytes32 _hashedSignature, uint256 _currentSignatureUses, address _signer, address _caller)
+    function _verifyChecks(Checks calldata _checks, bytes32 _hashedSignature, uint256 _currentSignatureUses, address _signer, address _caller)
         internal
         view
     {
@@ -37,8 +37,8 @@ abstract contract Verifications is Signatures, CommonTypes {
             revert UsingCancelledSignature();
         }
 
-        if (_checks.uses > 0 && _currentSignatureUses >= _checks.uses) {
-            revert SignatureReuse();
+        if (_currentSignatureUses >= _checks.uses) {
+            revert SignatureOveruse();
         }
 
         if (_checks.effective > block.timestamp) {
@@ -70,7 +70,7 @@ abstract contract Verifications is Signatures, CommonTypes {
     /// @param _allowedRoot The Merkle Root of the allowed addresses.
     /// @param _allowedProof The Merkle Proof that validates that the caller is allowed.
     /// @param _caller The address that sent the transaction.
-    function _verifyAllowed(bytes32 _allowedRoot, bytes32[] memory _allowedProof, address _caller) private pure {
+    function _verifyAllowed(bytes32 _allowedRoot, bytes32[] calldata _allowedProof, address _caller) private pure {
         if (!MerkleProof.verify(_allowedProof, _allowedRoot, keccak256(bytes.concat(keccak256(abi.encode(address(_caller))))))) {
             revert NotAllowed();
         }
@@ -88,13 +88,13 @@ abstract contract Verifications is Signatures, CommonTypes {
     ///
     /// If the selector is `balanceOf`, it will be checked that the balance is greater than or equal to the `value`.
     /// If the selector is `ownerOf`, it will be checked that the owner of `value` is the caller.
-    /// Otherwise, the function will call the selector with the caller and expect it returns true.
-    function _verifyExternalChecks(ExternalCheck[] memory _externalChecks, address _caller) private view {
+    /// Otherwise, the function will call the selector with the caller and value, and expect it to return true.
+    function _verifyExternalChecks(ExternalCheck[] calldata _externalChecks, address _caller) private view {
         bool hasOptionalChecks = false;
         bool hasPassingOptionalCheck = false;
 
         for (uint256 i = 0; i < _externalChecks.length; i++) {
-            ExternalCheck memory externalCheck = _externalChecks[i];
+            ExternalCheck calldata externalCheck = _externalChecks[i];
 
             bool isRequiredCheck = externalCheck.required;
 
@@ -112,9 +112,9 @@ abstract contract Verifications is Signatures, CommonTypes {
                 functionData = abi.encodeWithSelector(selector, _caller);
             } else if (selector == OWNER_OF_SELECTOR) {
                 // ownerOf(uint256 _tokenId)
-                functionData = abi.encodeWithSelector(selector, externalCheck.value);
+                functionData = abi.encodeWithSelector(selector, abi.decode(externalCheck.value, (uint256)));
             } else {
-                // custom(address _user, uint256 _value)
+                // custom(address _user, bytes _value)
                 functionData = abi.encodeWithSelector(selector, _caller, externalCheck.value);
             }
 
@@ -125,7 +125,7 @@ abstract contract Verifications is Signatures, CommonTypes {
                 // Do nothing here, an unsuccessful call will be treated as a failed check later.
             } else if (selector == BALANCE_OF_SELECTOR) {
                 // Check that the returned balance is >= the provided value.
-                success = abi.decode(data, (uint256)) >= externalCheck.value;
+                success = abi.decode(data, (uint256)) >= abi.decode(externalCheck.value, (uint256));
             } else if (selector == OWNER_OF_SELECTOR) {
                 // Check that the owner of the nft is the caller.
                 success = abi.decode(data, (address)) == _caller;

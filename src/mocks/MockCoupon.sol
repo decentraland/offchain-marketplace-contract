@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 import {CouponTypes} from "src/coupons/CouponTypes.sol";

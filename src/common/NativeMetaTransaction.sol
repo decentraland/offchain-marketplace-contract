@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -21,20 +21,15 @@ import {EIP712} from "src/common/EIP712.sol";
  */
 abstract contract NativeMetaTransaction is EIP712 {
     /// @dev EIP712 type hash for recovering the signer from the signature.
-    bytes32 private constant META_TRANSACTION_TYPEHASH = keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)"));
+    /// keccak256("MetaTransaction(uint256 nonce,address from,bytes functionData)")
+    bytes32 private constant META_TRANSACTION_TYPEHASH = 0x01ecdc01065da9f72bf56a9def24a074b7ef512994beb776867cfbc664b5b959;
 
     /// @notice Track signer nonces so the same signature cannot be used more than once.
     mapping(address => uint256) private nonces;
 
-    /// @notice Struct with the data required to verify that the signature signer is the same as `from`.
-    struct MetaTransaction {
-        uint256 nonce;
-        address from;
-        bytes functionData;
-    }
-
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
 
+    error SignerAndSignatureDoNotMatch();
     error MetaTransactionFailedWithoutReason();
 
     /// @notice Get the current nonce of a given signer.
@@ -56,11 +51,13 @@ abstract contract NativeMetaTransaction is EIP712 {
         bytes calldata _functionData,
         bytes calldata _signature
     ) external payable returns (bytes memory) {
-        MetaTransaction memory metaTx = MetaTransaction({nonce: nonces[_userAddress], from: _userAddress, functionData: _functionData});
+        bytes32 metaTxStructHash = keccak256(abi.encode(META_TRANSACTION_TYPEHASH, nonces[_userAddress], _userAddress, keccak256(_functionData)));
 
-        require(_verify(_userAddress, metaTx, _signature), "NativeMetaTransaction#executeMetaTransaction: SIGNER_AND_SIGNATURE_DO_NOT_MATCH");
+        if (_userAddress != ECDSA.recover(_hashTypedDataV4(metaTxStructHash), _signature)) {
+            revert SignerAndSignatureDoNotMatch();
+        }
 
-        nonces[_userAddress]++;
+        ++nonces[_userAddress];
 
         emit MetaTransactionExecuted(_userAddress, msg.sender, _functionData);
 
@@ -83,17 +80,6 @@ abstract contract NativeMetaTransaction is EIP712 {
         return returnData;
     }
 
-    function _verify(
-        address _signer,
-        MetaTransaction memory _metaTx,
-        bytes calldata _signature
-    ) private view returns (bool) {
-        bytes32 structHash = keccak256(abi.encode(META_TRANSACTION_TYPEHASH, _metaTx.nonce, _metaTx.from, keccak256(_metaTx.functionData)));
-        bytes32 typedDataHash = _hashTypedDataV4(structHash);
-
-        return _signer == ECDSA.recover(typedDataHash, _signature);
-    }
-
     /// @dev Extract the address of the sender from the msg.data if available. If not, fallback to returning the msg.sender.
     /// @dev It is vital that the implementor uses this function for meta transaction support.
     function _getMsgSender() internal view returns (address sender) {
@@ -104,7 +90,5 @@ abstract contract NativeMetaTransaction is EIP712 {
         } else {
             sender = msg.sender;
         }
-
-        return sender;
     }
 }

@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
@@ -10,8 +10,28 @@ import {DecentralandMarketplaceEthereum} from "src/marketplace/DecentralandMarke
 import {IComposable} from "src/marketplace/interfaces/IComposable.sol";
 
 contract DecentralandMarketplaceEthereumHarness is DecentralandMarketplaceEthereum {
-    constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate)
-        DecentralandMarketplaceEthereum(_owner, _couponManager, _feeCollector, _feeRate)
+    constructor(
+        address _owner,
+        address _couponManager,
+        address _feeCollector,
+        uint256 _feeRate,
+        address _manaAddress,
+        address _manaEthAggregator,
+        uint256 _manaEthAggregatorTolerance,
+        address _ethUsdAggregator,
+        uint256 _ethUsdAggregatorTolerance
+    )
+        DecentralandMarketplaceEthereum(
+            _owner,
+            _couponManager,
+            _feeCollector,
+            _feeRate,
+            _manaAddress,
+            _manaEthAggregator,
+            _manaEthAggregatorTolerance,
+            _ethUsdAggregator,
+            _ethUsdAggregatorTolerance
+        )
     {}
 
     function eip712Name() external view returns (string memory) {
@@ -22,7 +42,7 @@ contract DecentralandMarketplaceEthereumHarness is DecentralandMarketplaceEthere
         return _EIP712Version();
     }
 
-    function eip712TradeHash(Trade memory _trade) external view returns (bytes32) {
+    function eip712TradeHash(Trade calldata _trade) external view returns (bytes32) {
         return _hashTypedDataV4(_hashTrade(_trade));
     }
 }
@@ -31,6 +51,9 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     VmSafe.Wallet signer;
     address other;
     address dao;
+    address manaAddress;
+    address manaEthAggregator;
+    address ethUsdAggregator;
     DecentralandMarketplaceEthereumHarness marketplace;
 
     error OwnableUnauthorizedAccount(address account);
@@ -38,11 +61,17 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/mainnet", 19755898); // Apr-28-2024 07:27:59 PM +UTC
         vm.selectFork(forkId);
+        vm.chainId(31337);
 
         signer = vm.createWallet("signer");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
         dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
-        marketplace = new DecentralandMarketplaceEthereumHarness(dao, address(0), dao, 25_000);
+        manaAddress = 0x0F5D2fB29fb7d3CFeE444a200298f468908cC942;
+        manaEthAggregator = 0x82A44D92D6c329826dc557c5E1Be6ebeC5D5FeB9;
+        ethUsdAggregator = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+
+        marketplace =
+            new DecentralandMarketplaceEthereumHarness(dao, address(0), dao, 25_000, manaAddress, manaEthAggregator, 86400, ethUsdAggregator, 3600);
     }
 
     function signTrade(DecentralandMarketplaceEthereumHarness.Trade memory _trade) internal view returns (bytes memory) {
@@ -53,6 +82,7 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     function _getBaseTrades() internal view virtual returns (DecentralandMarketplaceEthereumHarness.Trade[] memory) {
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].signer = signer.addr;
         return trades;
     }
@@ -86,7 +116,7 @@ contract TransferERC20Tests is DecentralandMarketplaceEthereumTests {
 
     function setUp() public override {
         super.setUp();
-        erc20 = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+        erc20 = IERC20(manaAddress);
         erc20Sent = 1 ether;
         erc20OriginalHolder = 0x67c231cF2B0E9518aBa46bDea6b10E0D0C5fEd1B;
     }
@@ -201,6 +231,163 @@ contract TransferERC20Tests is DecentralandMarketplaceEthereumTests {
         assertEq(erc20.balanceOf(other), 0);
         assertEq(erc20.balanceOf(signer.addr), erc20Sent - expectedFee);
         assertEq(erc20.balanceOf(dao), daoBalance + expectedFee);
+    }
+}
+
+contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
+    IERC20 erc20;
+    address erc20OriginalHolder;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    error AggregatorAnswerIsStale();
+
+    function setUp() public override {
+        super.setUp();
+
+        erc20 = IERC20(manaAddress);
+        erc20OriginalHolder = 0x67c231cF2B0E9518aBa46bDea6b10E0D0C5fEd1B;
+    }
+
+    function test_TransfersTheCorrectAmountOfMana() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, 1000 ether);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), 1000 ether);
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        // The amount of MANA to be transferred is 218217984311399563430
+        // Which is the equivalent to 218,21 MANA
+        // That is because the price of MANA is 0.45 USD at the moment of the Trade
+        // As the value defined is 100 USD, the amount of MANA to be transferred is 100 / 0.43 = ~218
+        // As the trade only contains an ERC20, the fee collector will receive 2.5% of the amount
+        // The fee collector will receive 2.5% of 218,21 MANA = 5.45 MANA
+
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 212762534703614574345);
+
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 5455449607784989085);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_TransfersTheCorrectAmountOfMana_WithRandomAssetContractAddress() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, 1000 ether);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), 1000 ether);
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        // The contract address is ignored as it is replaced by the mana contract address
+        trades[0].received[0].contractAddress = other;
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 212762534703614574345);
+
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 5455449607784989085);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfManaEthAggregatorIsAddressZero() public {
+        vm.startPrank(dao);
+        marketplace.updateManaEthAggregator(address(0), marketplace.manaEthAggregatorTolerance());
+        vm.stopPrank();
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.expectRevert();
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfManaEthAggregatorToleranceIsZero() public {
+        vm.startPrank(dao);
+        marketplace.updateManaEthAggregator(address(marketplace.manaEthAggregator()), 0);
+        vm.stopPrank();
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.expectRevert(AggregatorAnswerIsStale.selector);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfEthUsdAggregatorIsAddressZero() public {
+        vm.startPrank(dao);
+        marketplace.updateEthUsdAggregator(address(0), marketplace.ethUsdAggregatorTolerance());
+        vm.stopPrank();
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.expectRevert();
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfEthUsdAggregatorToleranceIsZero() public {
+        vm.startPrank(dao);
+        marketplace.updateEthUsdAggregator(address(marketplace.ethUsdAggregator()), 0);
+        vm.stopPrank();
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].signer = signer.addr;
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_USD_PEGGED_MANA();
+        trades[0].received[0].value = 100 ether;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.expectRevert(AggregatorAnswerIsStale.selector);
+
+        vm.prank(other);
+        marketplace.accept(trades);
     }
 }
 
@@ -490,6 +677,54 @@ contract UpdateFeeRateTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
+contract UpdateManaEthAggregatorTests is DecentralandMarketplaceEthereumTests {
+    event ManaEthAggregatorUpdated(address indexed _aggregator, uint256 _tolerance);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateManaEthAggregator(address(0), 0 seconds);
+    }
+
+    function test_UpdatesManaEthAggregator() public {
+        assertEq(address(marketplace.manaEthAggregator()), manaEthAggregator);
+        assertEq(marketplace.manaEthAggregatorTolerance(), 86400);
+
+        vm.expectEmit(address(marketplace));
+        emit ManaEthAggregatorUpdated(other, 100);
+
+        vm.prank(dao);
+        marketplace.updateManaEthAggregator(other, 100);
+
+        assertEq(address(marketplace.manaEthAggregator()), other);
+        assertEq(marketplace.manaEthAggregatorTolerance(), 100);
+    }
+}
+
+contract UpdateEthUsdAggregatorTests is DecentralandMarketplaceEthereumTests {
+    event EthUsdAggregatorUpdated(address indexed _aggregator, uint256 _tolerance);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateEthUsdAggregator(address(0), 0 seconds);
+    }
+
+    function test_UpdatesEthUsdAggregator() public {
+        assertEq(address(marketplace.ethUsdAggregator()), ethUsdAggregator);
+        assertEq(marketplace.ethUsdAggregatorTolerance(), 3600);
+
+        vm.expectEmit(address(marketplace));
+        emit EthUsdAggregatorUpdated(other, 100);
+
+        vm.prank(dao);
+        marketplace.updateEthUsdAggregator(other, 100);
+
+        assertEq(address(marketplace.ethUsdAggregator()), other);
+        assertEq(marketplace.ethUsdAggregatorTolerance(), 100);
+    }
+}
+
 contract ExampleTests is DecentralandMarketplaceEthereumTests {
     IERC20 mana;
     IERC721 land;
@@ -501,7 +736,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
     function setUp() public override {
         super.setUp();
 
-        mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+        mana = IERC20(manaAddress);
         land = IERC721(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d);
         names = IERC721(0x2A187453064356c898cAe034EAed119E1663ACb8);
         estate = IComposable(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
@@ -535,6 +770,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(land);
@@ -573,11 +809,14 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
         vm.prank(manaOriginalHolder);
         mana.transfer(other, manaOriginalHolderBalance);
 
+        uint256 externalCheckValue = 1;
+
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].checks.externalChecks = new DecentralandMarketplaceEthereumHarness.ExternalCheck[](1);
         trades[0].checks.externalChecks[0].contractAddress = address(names);
-        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].value = abi.encode(externalCheckValue);
         trades[0].checks.externalChecks[0].selector = names.balanceOf.selector;
         trades[0].checks.externalChecks[0].required = true;
         trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](1);
@@ -638,6 +877,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](3);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(land);
@@ -693,6 +933,7 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
 
         DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
         trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(estate);
@@ -707,6 +948,59 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
         trades[0].received[1].value = nameTokenId;
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
+
+        assertEq(estate.ownerOf(estateTokenId), signer.addr);
+        assertEq(land.ownerOf(landTokenId), other);
+        assertEq(names.ownerOf(nameTokenId), other);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        assertEq(estate.ownerOf(estateTokenId), other);
+        assertEq(land.ownerOf(landTokenId), signer.addr);
+        assertEq(names.ownerOf(nameTokenId), signer.addr);
+    }
+
+    // Test to check the signature created by the UI on ui/src/pages/index.tsx
+    // This was achieved by importing the private key from the signer.privateKey into the browser wallet.
+    function test_Trade1EstateFor1LandAnd1Name_UISignature() public {
+        address landOriginalOwner = 0x001B71FAD769B3cd47fD4C9849c704FdFaBF6096;
+        uint256 landTokenId = 42535295865117307932921825928971026431990;
+        vm.prank(landOriginalOwner);
+        land.transferFrom(landOriginalOwner, other, landTokenId);
+
+        address nameOriginalOwner = 0xf0ABCFEAA30A95D32569Fcf2B3a48bc7CB639871;
+        uint256 nameTokenId = 100000524771658066136810291574007504540382436851477100100347508325030054457380;
+        vm.prank(nameOriginalOwner);
+        names.transferFrom(nameOriginalOwner, other, nameTokenId);
+
+        address estateOriginalOwner = 0x9aBdCb8825696CC2Ef3A0a955f99850418847F5D;
+        uint256 estateTokenId = 1;
+        vm.prank(estateOriginalOwner);
+        estate.transferFrom(estateOriginalOwner, signer.addr, estateTokenId);
+
+        DecentralandMarketplaceEthereumHarness.Trade[] memory trades = new DecentralandMarketplaceEthereumHarness.Trade[](1);
+        trades[0].checks.expiration = 4878105366;
+        trades[0].checks.uses = 1;
+        trades[0].checks.externalChecks = new DecentralandMarketplaceEthereumHarness.ExternalCheck[](1);
+        trades[0].checks.externalChecks[0].contractAddress = address(land);
+        trades[0].checks.externalChecks[0].value = abi.encode(landTokenId);
+        trades[0].checks.externalChecks[0].selector = 0x6352211e;
+        trades[0].checks.externalChecks[0].required = true;
+        trades[0].sent = new DecentralandMarketplaceEthereumHarness.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        trades[0].sent[0].contractAddress = address(estate);
+        trades[0].sent[0].value = estateTokenId;
+        trades[0].sent[0].extra = abi.encode(estate.getFingerprint(estateTokenId));
+        trades[0].received = new DecentralandMarketplaceEthereumHarness.Asset[](2);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        trades[0].received[0].contractAddress = address(land);
+        trades[0].received[0].value = landTokenId;
+        trades[0].received[1].assetType = marketplace.ASSET_TYPE_ERC721();
+        trades[0].received[1].contractAddress = address(names);
+        trades[0].received[1].value = nameTokenId;
+        trades[0].signer = signer.addr;
+        trades[0].signature = hex"0665fcfd79cab23b62e420ca62020e82eaadb3e8b0cc9bd06da02830c0da9f1f41e0723e2765c5bfc011659f0dd544c0159be2f0a324895b70ed7960b81802a51c";
 
         assertEq(estate.ownerOf(estateTokenId), signer.addr);
         assertEq(land.ownerOf(landTokenId), other);

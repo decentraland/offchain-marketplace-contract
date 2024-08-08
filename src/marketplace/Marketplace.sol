@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -29,14 +29,14 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         _unpause();
     }
 
-    /// @notice Revokes a signature so it cannot be used anymore.
-    /// The caller must be the signer of the signature.
-    /// @param _trades The list of Trade signatures to cancel.
+    /// @notice Revokes the signatures of all provided trades.
+    /// The caller must be the signer of those trades.
+    /// @param _trades The list of trade signatures to be canceled.
     function cancelSignature(Trade[] calldata _trades) external {
         address caller = _msgSender();
 
         for (uint256 i = 0; i < _trades.length; i++) {
-            Trade memory trade = _trades[i];
+            Trade calldata trade = _trades[i];
 
             _verifyTradeSignature(trade, caller);
 
@@ -62,11 +62,11 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     ///
     /// @dev The trade id is composed of hashing the following values:
     /// Salt + Caller + Received Assets (Contract Address + Value)
-    function getTradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
+    function getTradeId(Trade calldata _trade, address _caller) public pure returns (bytes32) {
         bytes32 tradeId = keccak256(abi.encodePacked(_trade.checks.salt, _caller));
 
         for (uint256 i = 0; i < _trade.received.length; i++) {
-            Asset memory asset = _trade.received[i];
+            Asset calldata asset = _trade.received[i];
 
             tradeId = keccak256(abi.encodePacked(tradeId, asset.contractAddress, asset.value));
         }
@@ -78,19 +78,19 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     /// This function is internal to allow child contracts to use it in their own accept function.
     /// Does not perform any checks, only transfers the assets and emits the Traded event.
     function _accept(Trade memory _trade, address _caller) internal {
-        Trade memory modifiedTrade = _modifyTrade(_trade);
+        _modifyTrade(_trade);
 
-        bytes32 hashedSignature = keccak256(modifiedTrade.signature);
-        address signer = modifiedTrade.signer;
+        bytes32 hashedSignature = keccak256(_trade.signature);
+        address signer = _trade.signer;
 
         emit Traded(_caller, hashedSignature);
 
-        _transferAssets(modifiedTrade.sent, signer, _caller, signer, _caller);
-        _transferAssets(modifiedTrade.received, _caller, signer, signer, _caller);
+        _transferAssets(_trade.sent, signer, _caller, signer, _caller);
+        _transferAssets(_trade.received, _caller, signer, signer, _caller);
     }
 
     /// @dev Verifies that the Trade passes all checks and the signature is valid.
-    function _verifyTrade(Trade memory _trade, address _caller) internal {
+    function _verifyTrade(Trade calldata _trade, address _caller) internal {
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
         bytes32 tradeId = getTradeId(_trade, _caller);
@@ -111,7 +111,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     }
 
     /// @dev Verifies that the Trade signature is valid.
-    function _verifyTradeSignature(Trade memory _trade, address _signer) private view {
+    function _verifyTradeSignature(Trade calldata _trade, address _signer) private view {
         _verifySignature(_hashTrade(_trade), _trade.signature, _signer);
     }
 
@@ -130,12 +130,8 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     }
 
     /// @dev Allows the child contract to update the Trade before accepting it.
-    function _modifyTrade(Trade memory _trade) internal view virtual returns (Trade memory) {
-        return _trade; // Override
-    }
+    function _modifyTrade(Trade memory _trade) internal view virtual;
 
     /// @dev Allows the child contract to handle the transfer of assets.
-    function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal virtual {
-        // Override
-    }
+    function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal virtual;
 }

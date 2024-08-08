@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {Marketplace} from "src/marketplace/Marketplace.sol";
 import {ICouponManager} from "src/coupons/interfaces/ICouponManager.sol";
@@ -13,8 +13,6 @@ abstract contract MarketplaceWithCouponManager is Marketplace, CouponTypes {
 
     event CouponManagerUpdated(address indexed _caller, address indexed _couponManager);
 
-    error TradesAndCouponsLengthMismatch();
-
     constructor(address _couponManager) {
         _updateCouponManager(_couponManager);
     }
@@ -24,10 +22,6 @@ abstract contract MarketplaceWithCouponManager is Marketplace, CouponTypes {
     /// @param _coupons The list of Coupons to apply to the Trades.
     function acceptWithCoupon(Trade[] calldata _trades, Coupon[] calldata _coupons) external whenNotPaused nonReentrant {
         address caller = _msgSender();
-
-        if (_trades.length != _coupons.length) {
-            revert TradesAndCouponsLengthMismatch();
-        }
 
         for (uint256 i = 0; i < _trades.length; i++) {
             // It is important to verify the Trade before applying the coupons to avoid issues with the signature.

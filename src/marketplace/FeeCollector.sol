@@ -1,13 +1,8 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
-
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
-import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 /// @notice Contract that abstracts the storage of the fee collector and fee rate used by Marketplace contracts.
-abstract contract FeeCollector is MarketplaceTypes {
+abstract contract FeeCollector {
     /// @notice The address that will receive the fees.
     address public feeCollector;
     /// @notice The rate at which the fees will be charged. 25_000 is 2.5%

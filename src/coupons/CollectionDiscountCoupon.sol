@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
@@ -7,9 +7,10 @@ import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
+import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 
 /// @notice Coupon that allows creators to apply discounts to Trades involving their Collections.
-contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, CouponTypes, MarketplaceTypes {
+contract CollectionDiscountCoupon is ICoupon, DecentralandMarketplacePolygonAssetTypes, CouponTypes, MarketplaceTypes {
     uint256 public constant DISCOUNT_TYPE_RATE = 1;
     uint256 public constant DISCOUNT_TYPE_FLAT = 2;
 
@@ -29,7 +30,8 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
         bytes32[][] proofs;
     }
 
-    error InvalidSentOrProofsLength();
+    error InvalidReceivedLength();
+    error InvalidSentLength();
     error InvalidProof(uint256 _index);
     error SignerIsNotTheCreator(uint256 _index);
     error InvalidDiscountType();
@@ -40,7 +42,7 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
     /// @param _trade The Trade to apply the discount to.
     /// @param _coupon The Coupon to apply.
     /// @return - The Trade with the discount applied.
-    function applyCoupon(MarketplaceTypes.Trade memory _trade, CouponTypes.Coupon memory _coupon)
+    function applyCoupon(MarketplaceTypes.Trade memory _trade, CouponTypes.Coupon calldata _coupon)
         external
         view
         returns (MarketplaceTypes.Trade memory)
@@ -48,8 +50,14 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
         CollectionDiscountCouponData memory data = abi.decode(_coupon.data, (CollectionDiscountCouponData));
         CollectionDiscountCouponCallerData memory callerData = abi.decode(_coupon.callerData, (CollectionDiscountCouponCallerData));
 
-        if (_trade.sent.length == 0 || _trade.sent.length != callerData.proofs.length) {
-            revert InvalidSentOrProofsLength();
+        // The coupon should not be applicable if there are no received ERC20 assets to be applied on.
+        if (_trade.received.length == 0) {
+            revert InvalidReceivedLength();
+        }
+
+        // The coupon should not be applicable if there are no sent Collection items.
+        if (_trade.sent.length == 0) {
+            revert InvalidSentLength();
         }
 
         // For each collection item being traded, a proof in the same index will be used to validate that the collection of that item is valid for the discount.
@@ -71,11 +79,13 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
             }
         }
 
-        // Every received asset must be an ERC20 token.
+        // Every received asset must be an ERC20 or USD_PEGGED_MANA.
         // The discount will be applied to each one of them.
         // Keep in mind that if you provide a flat discount, the discount will be applied to each one.
         for (uint256 i = 0; i < _trade.received.length; i++) {
-            if (_trade.received[i].assetType != ASSET_TYPE_ERC20) {
+            uint256 assetType = _trade.received[i].assetType;
+
+            if (assetType != ASSET_TYPE_ERC20 && assetType != ASSET_TYPE_USD_PEGGED_MANA) {
                 revert UnsupportedReceivedAssetType(i);
             }
 
