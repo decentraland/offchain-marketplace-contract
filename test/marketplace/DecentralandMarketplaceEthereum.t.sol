@@ -87,7 +87,7 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     }
 }
 
-contract UnsupportedAssetTypeTests is DecentralandMarketplaceEthereumTests {
+contract UnsupportedAssetTypeTestsEthereum is DecentralandMarketplaceEthereumTests {
     error UnsupportedAssetType(uint256 _assetType);
 
     function test_RevertsIfAssetTypeIsInvalid() public {
@@ -104,7 +104,7 @@ contract UnsupportedAssetTypeTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract TransferERC20Tests is DecentralandMarketplaceEthereumTests {
+contract TransferERC20TestsEthereum is DecentralandMarketplaceEthereumTests {
     IERC20 erc20;
     uint256 erc20Sent;
     address erc20OriginalHolder;
@@ -233,7 +233,7 @@ contract TransferERC20Tests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
+contract TransferUsdPeggedManaTestsEthereum is DecentralandMarketplaceEthereumTests {
     IERC20 erc20;
     address erc20OriginalHolder;
 
@@ -390,7 +390,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract TransferERC721Tests is DecentralandMarketplaceEthereumTests {
+contract TransferERC721TestsEthereum is DecentralandMarketplaceEthereumTests {
     IERC721 erc721;
     uint256 erc721TokenId;
     address erc721OriginalHolder;
@@ -640,7 +640,7 @@ contract TransferComposableTokenTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract UpdateFeeCollectorTests is DecentralandMarketplaceEthereumTests {
+contract UpdateFeeCollectorTestsEthereum is DecentralandMarketplaceEthereumTests {
     event FeeCollectorUpdated(address indexed _caller, address indexed _feeCollector);
 
     function test_RevertsIfCallerIsNotTheOwner() public {
@@ -658,7 +658,7 @@ contract UpdateFeeCollectorTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract UpdateFeeRateTests is DecentralandMarketplaceEthereumTests {
+contract UpdateFeeRateTestsEthereum is DecentralandMarketplaceEthereumTests {
     event FeeRateUpdated(address indexed _caller, uint256 _feeRate);
 
     function test_RevertsIfCallerIsNotTheOwner() public {

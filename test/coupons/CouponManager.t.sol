@@ -212,7 +212,7 @@ contract ApplyCouponTests is CouponsTests {
     }
 }
 
-contract CancelSignatureTests is CouponsTests {
+contract CancelSignatureTestsCouponManager is CouponsTests {
     event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
 
     function test_CanSendEmptyListOfCoupons() public {
