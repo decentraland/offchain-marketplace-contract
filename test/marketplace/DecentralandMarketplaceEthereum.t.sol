@@ -61,7 +61,6 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/mainnet", 19755898); // Apr-28-2024 07:27:59 PM +UTC
         vm.selectFork(forkId);
-        vm.chainId(31337);
 
         signer = vm.createWallet("signer");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
@@ -1005,6 +1004,10 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
         assertEq(estate.ownerOf(estateTokenId), signer.addr);
         assertEq(land.ownerOf(landTokenId), other);
         assertEq(names.ownerOf(nameTokenId), other);
+
+        // The signature was created on a local network with chainId 31337
+        // To prevent the test from failing, we need to simulate block.chainid to be the same
+        vm.chainId(31337);
 
         vm.prank(other);
         marketplace.accept(trades);
