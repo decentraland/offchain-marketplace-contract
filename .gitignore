@@ -17,3 +17,4 @@ coverage/
 lcov.info
 
 .gas-snapshot
+.gas-report
