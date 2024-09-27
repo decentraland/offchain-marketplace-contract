@@ -61,7 +61,6 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/mainnet", 19755898); // Apr-28-2024 07:27:59 PM +UTC
         vm.selectFork(forkId);
-        vm.chainId(31337);
 
         signer = vm.createWallet("signer");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
@@ -88,7 +87,7 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     }
 }
 
-contract UnsupportedAssetTypeTests is DecentralandMarketplaceEthereumTests {
+contract UnsupportedAssetTypeTestsEthereum is DecentralandMarketplaceEthereumTests {
     error UnsupportedAssetType(uint256 _assetType);
 
     function test_RevertsIfAssetTypeIsInvalid() public {
@@ -105,7 +104,7 @@ contract UnsupportedAssetTypeTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract TransferERC20Tests is DecentralandMarketplaceEthereumTests {
+contract TransferERC20TestsEthereum is DecentralandMarketplaceEthereumTests {
     IERC20 erc20;
     uint256 erc20Sent;
     address erc20OriginalHolder;
@@ -234,7 +233,7 @@ contract TransferERC20Tests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
+contract TransferUsdPeggedManaTestsEthereum is DecentralandMarketplaceEthereumTests {
     IERC20 erc20;
     address erc20OriginalHolder;
 
@@ -391,7 +390,7 @@ contract TransferUsdPeggedManaTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract TransferERC721Tests is DecentralandMarketplaceEthereumTests {
+contract TransferERC721TestsEthereum is DecentralandMarketplaceEthereumTests {
     IERC721 erc721;
     uint256 erc721TokenId;
     address erc721OriginalHolder;
@@ -641,7 +640,7 @@ contract TransferComposableTokenTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract UpdateFeeCollectorTests is DecentralandMarketplaceEthereumTests {
+contract UpdateFeeCollectorTestsEthereum is DecentralandMarketplaceEthereumTests {
     event FeeCollectorUpdated(address indexed _caller, address indexed _feeCollector);
 
     function test_RevertsIfCallerIsNotTheOwner() public {
@@ -659,7 +658,7 @@ contract UpdateFeeCollectorTests is DecentralandMarketplaceEthereumTests {
     }
 }
 
-contract UpdateFeeRateTests is DecentralandMarketplaceEthereumTests {
+contract UpdateFeeRateTestsEthereum is DecentralandMarketplaceEthereumTests {
     event FeeRateUpdated(address indexed _caller, uint256 _feeRate);
 
     function test_RevertsIfCallerIsNotTheOwner() public {
@@ -1005,6 +1004,10 @@ contract ExampleTests is DecentralandMarketplaceEthereumTests {
         assertEq(estate.ownerOf(estateTokenId), signer.addr);
         assertEq(land.ownerOf(landTokenId), other);
         assertEq(names.ownerOf(nameTokenId), other);
+
+        // The signature was created on a local network with chainId 31337
+        // To prevent the test from failing, we need to simulate block.chainid to be the same
+        vm.chainId(31337);
 
         vm.prank(other);
         marketplace.accept(trades);

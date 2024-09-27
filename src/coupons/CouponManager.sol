@@ -23,7 +23,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
 
     event MarketplaceUpdated(address indexed _caller, address indexed _marketplace);
     event AllowedCouponsUpdated(address indexed _caller, address indexed _coupon, bool _value);
-    event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature);
+    event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature, Coupon _coupon);
 
     error LengthMissmatch();
     error UnauthorizedCaller(address _caller);
@@ -100,7 +100,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         // Verify that the Coupon signature is valid.
         _verifyCouponSignature(_coupon, signer);
 
-        emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature);
+        emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature, _coupon);
 
         // Increase the amount of uses of the Coupon signature.
         signatureUses[hashedCouponSignature]++;
