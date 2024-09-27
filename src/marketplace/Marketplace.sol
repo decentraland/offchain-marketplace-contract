@@ -15,7 +15,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     mapping(bytes32 => bool) public usedTradeIds;
 
     /// @dev The event is emitted with the hashed signature so it can be identified off chain.
-    event Traded(address indexed _caller, bytes32 indexed _signature);
+    event Traded(address indexed _caller, bytes32 indexed _signature, Trade _trade);
 
     error UsedTradeId();
 
@@ -83,7 +83,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
 
-        emit Traded(_caller, hashedSignature);
+        emit Traded(_caller, hashedSignature, _trade);
 
         _transferAssets(_trade.sent, signer, _caller, signer, _caller);
         _transferAssets(_trade.received, _caller, signer, signer, _caller);

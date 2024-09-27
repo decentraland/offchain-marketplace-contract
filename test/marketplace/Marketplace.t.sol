@@ -318,7 +318,7 @@ contract CancelSignatureTests is MarketplaceTests {
 }
 
 contract AcceptTests is MarketplaceTests {
-    event Traded(address indexed _caller, bytes32 indexed _signature);
+    event Traded(address indexed _caller, bytes32 indexed _signature, MarketplaceHarness.Trade _trade);
 
     error UsedTradeId();
     error NotEffective();
@@ -887,7 +887,7 @@ contract AcceptTests is MarketplaceTests {
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit Traded(other, keccak256(trades[0].signature));
+        emit Traded(other, keccak256(trades[0].signature), trades[0]);
         marketplace.accept(trades);
     }
 }
