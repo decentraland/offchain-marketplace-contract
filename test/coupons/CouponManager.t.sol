@@ -123,7 +123,7 @@ contract UpdateAllowedCouponsTests is CouponsTests {
 }
 
 contract ApplyCouponTests is CouponsTests {
-    event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature);
+    event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature, CouponManagerHarness.Coupon _coupon);
 
     error UnauthorizedCaller(address _caller);
     error CouponNotAllowed(address _coupon);
@@ -204,7 +204,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(marketplace);
         vm.expectEmit(address(couponManager));
-        emit CouponApplied(marketplace, keccak256(trade.signature), keccak256(coupon.signature));
+        emit CouponApplied(marketplace, keccak256(trade.signature), keccak256(coupon.signature), coupon);
         CouponManagerHarness.Trade memory updatedTrade = couponManager.applyCoupon(trade, coupon);
         // Mock coupon implementation updates the signer of the trade to address(1337).
         assertEq(updatedTrade.signer, address(1337));
