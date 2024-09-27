@@ -83,10 +83,10 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
 
-        emit Traded(_caller, hashedSignature, _trade);
-
         _transferAssets(_trade.sent, signer, _caller, signer, _caller);
         _transferAssets(_trade.received, _caller, signer, signer, _caller);
+
+        emit Traded(_caller, hashedSignature, _trade);
     }
 
     /// @dev Verifies that the Trade passes all checks and the signature is valid.
