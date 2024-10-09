@@ -1503,4 +1503,70 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         marketplace.acceptWithCoupon(trades, coupons);
         assertEq(logs.length, 0);
     }
+
+    function test_TradeCollectionItemWithRevenueShare() public {
+        address revenueShareBeneficiary = vm.createWallet("revenueShareBeneficiary").addr;
+
+        // Transfers MANA to the buyer.
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        // Transfers the collection ownership to the trade signer.
+        vm.prank(collectionItemOriginalCreator);
+        collection.transferCreatorship(signer.addr);
+
+        // Approve the marketplace to spend MANA from buyer.
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        // Set the marketplace as minter of the collection.
+        vm.prank(signer.addr);
+        address[] memory setMintersMinters = new address[](1);
+        setMintersMinters[0] = address(marketplace);
+        bool[] memory setMintersValues = new bool[](1);
+        setMintersValues[0] = true;
+        collection.setMinters(setMintersMinters, setMintersValues);
+
+        // The collection item to be minted in the trade.
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_COLLECTION_ITEM();
+        sent[0].contractAddress = address(collection);
+        sent[0].value = collectionItemId;
+
+        // The collection item is sold for a total of 100 MANA.
+        // The seller wants to split the earnings 70% to itself and 30% to a friend.
+        // Two received assets have to be defined.
+        // One with 70 as value and no beneficiary.
+        // The other with 30 as value and the friend as beneficiary.
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](2);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        received[0].contractAddress = address(erc20);
+        received[0].value = 70 ether;
+        received[1].assetType = marketplace.ASSET_TYPE_ERC20();
+        received[1].contractAddress = address(erc20);
+        received[1].value = 30 ether;
+        received[1].beneficiary = revenueShareBeneficiary;
+
+        // Define the trade.
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        uint256 otherBalance = erc20.balanceOf(other);
+        uint256 signerBalance = erc20.balanceOf(signer.addr);
+        uint256 revenueShareBeneficiaryBalance = erc20.balanceOf(revenueShareBeneficiary);
+        uint256 daoBalance = erc20.balanceOf(dao);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        assertEq(erc20.balanceOf(other), otherBalance - 100 ether);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance + 68.25 ether); // 70 - 1.75 in fees
+        assertEq(erc20.balanceOf(revenueShareBeneficiary), revenueShareBeneficiaryBalance + 29.25 ether); // 30 - 0.75 in fees
+        assertEq(erc20.balanceOf(dao), daoBalance + 2.5 ether); // 2.5 in fees (2.5% of 100)
+    }
 }
