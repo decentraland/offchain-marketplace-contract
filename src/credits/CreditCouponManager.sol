@@ -78,8 +78,56 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
             revert("Sender is denied");
         }
 
-        if (_trades.length == 0 || _creditCoupons.length == 0) {
-            revert("Invalid argument arrays length");
+        _validateTrades(_trades);
+
+        uint256 oldBalance = mana.balanceOf(address(this));
+
+        marketplace.accept(_trades);
+
+        uint256 newBalance = mana.balanceOf(address(this));
+
+        uint256 totalManaTransferred = oldBalance - newBalance;
+
+        if (totalManaTransferred == 0) {
+            revert("No mana was transferred");
+        }
+
+        uint256 totalCreditSpent = 0;
+
+        if (_creditCoupons.length == 0) {
+            revert("Invalid coupons length");
+        }
+
+        for (uint256 i = 0; i < _creditCoupons.length; i++) {
+            CreditCoupon calldata creditCoupon = _creditCoupons[i];
+
+            _validateCoupon(creditCoupon);
+
+            bytes32 couponSigHash = keccak256(creditCoupon.signature);
+
+            uint256 totalManaTransferredAndCreditSpentDiff = totalManaTransferred - totalCreditSpent;
+
+            uint256 spendableCredit = creditCoupon.amount - spentCouponCredits[couponSigHash];
+
+            if (spendableCredit == 0) {
+                revert("Coupon has been fully spent");
+            }
+
+            uint256 creditToBeSpent = totalManaTransferredAndCreditSpentDiff > spendableCredit ? spendableCredit : totalManaTransferredAndCreditSpentDiff;
+
+            totalCreditSpent += creditToBeSpent;
+
+            spentCouponCredits[couponSigHash] += creditToBeSpent;
+        }
+
+        mana.safeTransfer(sender, totalCreditSpent);
+
+        mana.safeTransferFrom(sender, address(this), totalManaTransferred - totalCreditSpent);
+    }
+
+    function _validateTrades(Trade[] calldata _trades) private view {
+        if (_trades.length == 0) {
+            revert("Invalid trades length");
         }
 
         for (uint256 i = 0; i < _trades.length; i++) {
@@ -101,54 +149,6 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
                 }
             }
         }
-
-        uint256 oldBalance = mana.balanceOf(address(this));
-
-        marketplace.accept(_trades);
-
-        uint256 newBalance = mana.balanceOf(address(this));
-
-        uint256 totalManaTransferred = oldBalance - newBalance;
-
-        if (totalManaTransferred == 0) {
-            revert("No mana was transferred");
-        }
-
-        uint256 totalCreditSpent = 0;
-
-        for (uint256 i = 0; i < _creditCoupons.length; i++) {
-            CreditCoupon calldata creditCoupon = _creditCoupons[i];
-
-            if (creditCoupon.amount == 0) {
-                revert("Invalid coupon amount");
-            }
-
-            if (block.timestamp > creditCoupon.expiration) {
-                revert("Coupon has expired");
-            }
-
-            bytes32 couponHash = keccak256(abi.encode(sender, creditCoupon.amount, creditCoupon.expiration, creditCoupon.salt));
-
-            if (!hasRole(SIGNER_ROLE, couponHash.recover(creditCoupon.signature))) {
-                revert("Invalid coupon signature");
-            }
-
-            bytes32 couponSigHash = keccak256(creditCoupon.signature);
-
-            uint256 totalManaTransferredAndCreditSpentDiff = totalManaTransferred - totalCreditSpent;
-
-            uint256 spendableCredit = creditCoupon.amount - spentCouponCredits[couponSigHash];
-
-            uint256 creditToBeSpent = totalManaTransferredAndCreditSpentDiff > spendableCredit ? spendableCredit : totalManaTransferredAndCreditSpentDiff;
-
-            totalCreditSpent += creditToBeSpent;
-
-            spentCouponCredits[couponSigHash] += creditToBeSpent;
-        }
-
-        mana.safeTransfer(sender, totalCreditSpent);
-
-        mana.safeTransferFrom(sender, address(this), totalManaTransferred - totalCreditSpent);
     }
 
     function _isDecentralandItem(address _contractAddress) private view returns (bool) {
@@ -159,5 +159,21 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
         }
 
         return false;
+    }
+
+    function _validateCoupon(CreditCoupon calldata _coupon) private view {
+        if (_coupon.amount == 0) {
+            revert("Invalid coupon amount");
+        }
+
+        if (block.timestamp > _coupon.expiration) {
+            revert("Coupon has expired");
+        }
+
+        bytes32 couponHash = keccak256(abi.encode(_msgSender(), _coupon.amount, _coupon.expiration, _coupon.salt, address(this), block.chainid));
+
+        if (!hasRole(SIGNER_ROLE, couponHash.recover(_coupon.signature))) {
+            revert("Invalid coupon signature");
+        }
     }
 }
