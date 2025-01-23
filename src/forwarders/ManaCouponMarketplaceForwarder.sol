@@ -15,6 +15,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     struct ManaCoupon {
         uint256 amount;
         uint256 expiration;
+        uint256 effective;
         bytes signature;
     }
 
@@ -22,6 +23,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
 
     error InvalidSigner(address _signer);
     error CouponExpired(uint256 _currentTime);
+    error CouponIneffective(uint256 _currentTime);
 
     constructor(address _caller, address _pauser, address _signer) {
         _grantRole(CALLER_ROLE, _caller);
@@ -38,7 +40,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     }
 
     function forward(ManaCoupon calldata _coupon) external onlyRole(CALLER_ROLE) whenNotPaused {
-        bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration));
+        bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective));
         address signer = hashedCoupon.recover(_coupon.signature);
 
         if (!hasRole(SIGNER_ROLE, signer)) {
@@ -47,6 +49,10 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
 
         if (_coupon.expiration < block.timestamp) {
             revert CouponExpired(block.timestamp);
+        }
+
+        if (_coupon.effective > block.timestamp) {
+            revert CouponIneffective(block.timestamp);
         }
 
         consumedCoupons[keccak256(_coupon.signature)] += _coupon.amount;

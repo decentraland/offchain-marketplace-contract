@@ -24,9 +24,10 @@ contract ManaCouponMarketplaceForwarderTests is Test {
     error EnforcedPause();
     error InvalidSigner(address _signer);
     error CouponExpired(uint256 _currentTime);
+    error CouponIneffective(uint256 _currentTime);
 
     function _sign(uint256 _pk, ManaCouponMarketplaceForwarderHarness.ManaCoupon memory _coupon) private pure returns (bytes memory) {
-        bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration));
+        bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk, hashedCoupon);
 
@@ -94,6 +95,15 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         coupon.signature = _sign(signer.privateKey, coupon);
 
         vm.expectRevert(abi.encodeWithSelector(CouponExpired.selector, block.timestamp));
+        vm.prank(caller);
+        forwarder.forward(coupon);
+    }
+
+    function test_forward_RevertsIfCouponIsInnefective() public {
+        coupon.effective = block.timestamp + 1 days;
+        coupon.signature = _sign(signer.privateKey, coupon);
+
+        vm.expectRevert(abi.encodeWithSelector(CouponIneffective.selector, block.timestamp));
         vm.prank(caller);
         forwarder.forward(coupon);
     }
