@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
 
 contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     using ECDSA for bytes32;
@@ -20,14 +21,15 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     }
 
     mapping(bytes32 => uint256) public amountUsedFromCoupon;
-    address public marketplace;
+    DecentralandMarketplacePolygon public marketplace;
 
     error InvalidSigner(address _signer);
     error CouponExpired(uint256 _currentTime);
     error CouponIneffective(uint256 _currentTime);
+    error InvalidSelector(bytes4 _selector);
     error MarketplaceCallFailed();
 
-    constructor(address _owner, address _pauser, address _signer, address _marketplace) {
+    constructor(address _owner, address _pauser, address _signer, DecentralandMarketplacePolygon _marketplace) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(PAUSER_ROLE, _owner);
         _grantRole(PAUSER_ROLE, _pauser);
@@ -60,12 +62,30 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
             revert CouponIneffective(block.timestamp);
         }
 
+        (bytes4 selector, bytes memory data) = _separateSelectorAndData(_executeMetaTx);
+
+        if (selector != marketplace.executeMetaTransaction.selector) {
+            revert InvalidSelector(selector);
+        }
+
         amountUsedFromCoupon[keccak256(_coupon.signature)] += _coupon.amount;
 
-        (bool success,) = marketplace.call(_executeMetaTx);
+        (bool success,) = address(marketplace).call(_executeMetaTx);
 
         if (!success) {
             revert MarketplaceCallFailed();
+        }
+    }
+
+    function _separateSelectorAndData(bytes memory _bytes) private pure returns (bytes4 selector, bytes memory data) {
+        selector = bytes4(_bytes);
+
+        uint256 dataLength = _bytes.length - 4;
+
+        data = new bytes(dataLength);
+
+        for (uint256 i = 0; i < dataLength; i++) {
+            data[i] = _bytes[4 + i];
         }
     }
 }

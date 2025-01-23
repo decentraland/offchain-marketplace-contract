@@ -8,7 +8,7 @@ import {ManaCouponMarketplaceForwarder} from "src/forwarders/ManaCouponMarketpla
 import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
 
 contract ManaCouponMarketplaceForwarderHarness is ManaCouponMarketplaceForwarder {
-    constructor(address _owner, address _pauser, address _signer, address _marketplace)
+    constructor(address _owner, address _pauser, address _signer, DecentralandMarketplacePolygon _marketplace)
         ManaCouponMarketplaceForwarder(_owner, _pauser, _signer, _marketplace)
     {}
 }
@@ -33,6 +33,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
     error InvalidSigner(address _signer);
     error CouponExpired(uint256 _currentTime);
     error CouponIneffective(uint256 _currentTime);
+    error InvalidSelector(bytes4 _selector);
     error MarketplaceCallFailed();
 
     function _sign(uint256 _pk, ManaCouponMarketplaceForwarderHarness.ManaCoupon memory _coupon) private pure returns (bytes memory) {
@@ -95,7 +96,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         coupon.signature = _sign(signer.privateKey, coupon);
 
         marketplace = new DecentralandMarketplacePolygon(owner, address(0), address(0), 0, address(0), 0, address(0), address(0), 0);
-        forwarder = new ManaCouponMarketplaceForwarderHarness(owner, pauser, signer.addr, address(marketplace));
+        forwarder = new ManaCouponMarketplaceForwarderHarness(owner, pauser, signer.addr, marketplace);
 
         executeMetaTx = _buildExecuteMetaTx();
     }
@@ -159,9 +160,18 @@ contract ManaCouponMarketplaceForwarderTests is Test {
     }
 
     function test_forward_RevertsIfMarketplaceCallFails() public {
-        executeMetaTx = "";
+        executeMetaTx = abi.encodeWithSelector(marketplace.executeMetaTransaction.selector, address(0), "", "");
 
         vm.expectRevert(abi.encodeWithSelector(MarketplaceCallFailed.selector));
+        forwarder.forward(coupon, executeMetaTx);
+    }
+
+    function test_forward_RevertsIfExecuteMetaTxSelectorIsInvalid() public {
+        bytes4 invalidSelector = bytes4(0x12345678);
+
+        executeMetaTx = abi.encodeWithSelector(invalidSelector, address(0), "", "");
+        
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, invalidSelector));
         forwarder.forward(coupon, executeMetaTx);
     }
 }
