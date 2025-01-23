@@ -8,11 +8,11 @@ import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 
-contract CreditManager is MarketplaceTypes, CouponTypes {
+contract CreditCouponManager is MarketplaceTypes, CouponTypes {
     uint256 private constant TRADE_TYPE_LISTING = 1;
     uint256 private constant TRADE_TYPE_BID = 2;
 
-    struct Credit {
+    struct CreditCoupon {
         uint256 amount;
         uint256 expiration;
         bytes32 salt;
@@ -33,15 +33,15 @@ contract CreditManager is MarketplaceTypes, CouponTypes {
         factories = _factories;
     }
 
-    function accept(Trade[] calldata _trades, Credit[][] calldata _credits) external {
+    function accept(Trade[] calldata _trades, CreditCoupon[][] calldata _credits) external {
         marketplace.accept(_trades);
     }
 
-    function acceptWithCoupon(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[][] calldata _credits) external {
+    function acceptWithCoupon(Trade[] calldata _trades, Coupon[] calldata _coupons, CreditCoupon[][] calldata _credits) external {
         marketplace.acceptWithCoupon(_trades, _coupons);
     }
 
-    function _tradeType(Trade calldata _trade) private view returns (uint256 tradeType) {
+    function _validateAndComputeTradeType(Trade calldata _trade) private view returns (uint256 tradeType) {
         for (uint256 i = 0; i < _trade.sent.length; i++) {
             Asset calldata asset = _trade.sent[i];
 
