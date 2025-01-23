@@ -3,10 +3,12 @@ pragma solidity 0.8.20;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
+import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
+import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
+
+contract ManaCouponMarketplaceForwarder is AccessControl, Pausable, MarketplaceTypes {
     using ECDSA for bytes32;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -34,6 +36,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     error CouponIneffective(uint256 _currentTime);
     error InvalidSelector(bytes4 _selector);
     error InvalidMetaTxUser(address _user);
+    error InvalidMetaTxFunctionDataSelector(bytes4 _selector);
     error MarketplaceCallFailed();
 
     constructor(address _owner, address _pauser, address _signer, DecentralandMarketplacePolygon _marketplace) {
@@ -75,6 +78,8 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
             revert InvalidMetaTxUser(metaTx.user);
         }
 
+        Trade[] memory trades = _extractTrades(metaTx.data);
+
         amountUsedFromCoupon[keccak256(_coupon.signature)] += _coupon.amount;
 
         (bool success,) = address(marketplace).call(_executeMetaTx);
@@ -92,6 +97,16 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         }
 
         (metaTx.user, metaTx.data) = abi.decode(data, (address, bytes));
+    }
+
+    function _extractTrades(bytes memory _bytes) private view returns (Trade[] memory trades) {
+        (bytes4 selector, bytes memory data) = _separateSelectorAndData(_bytes);
+
+        if (selector != marketplace.accept.selector && selector != marketplace.acceptWithCoupon.selector) {
+            revert InvalidMetaTxFunctionDataSelector(selector);
+        }
+
+        trades = abi.decode(data, (Trade[]));
     }
 
     function _separateSelectorAndData(bytes memory _bytes) private pure returns (bytes4 selector, bytes memory data) {

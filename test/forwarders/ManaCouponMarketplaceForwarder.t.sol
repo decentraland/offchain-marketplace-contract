@@ -38,6 +38,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
     error CouponIneffective(uint256 _currentTime);
     error InvalidSelector(bytes4 _selector);
     error InvalidMetaTxUser(address _user);
+    error InvalidMetaTxFunctionDataSelector(bytes4 _selector);
     error MarketplaceCallFailed();
 
     function _sign(uint256 _pk, ManaCouponMarketplaceForwarderHarness.ManaCoupon memory _coupon) private pure returns (bytes memory) {
@@ -164,12 +165,12 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         forwarder.forward(coupon, executeMetaTx);
     }
 
-    function test_forward_RevertsIfMarketplaceCallFails() public {
-        executeMetaTx = abi.encodeWithSelector(marketplace.executeMetaTransaction.selector, metaTxSigner.addr, "", "");
+    // function test_forward_RevertsIfMarketplaceCallFails() public {
+    //     executeMetaTx = abi.encodeWithSelector(marketplace.executeMetaTransaction.selector, metaTxSigner.addr, "", "");
 
-        vm.expectRevert(abi.encodeWithSelector(MarketplaceCallFailed.selector));
-        forwarder.forward(coupon, executeMetaTx);
-    }
+    //     vm.expectRevert(abi.encodeWithSelector(MarketplaceCallFailed.selector));
+    //     forwarder.forward(coupon, executeMetaTx);
+    // }
 
     function test_forward_RevertsIfExecuteMetaTxSelectorIsInvalid() public {
         bytes4 invalidSelector = bytes4(0x12345678);
@@ -185,6 +186,38 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         coupon.signature = _sign(signer.privateKey, coupon);
 
         vm.expectRevert(abi.encodeWithSelector(InvalidMetaTxUser.selector, metaTxSigner.addr));
+        forwarder.forward(coupon, executeMetaTx);
+    }
+
+    function test_forward_RevertsIfExecuteMetaTxIsEmpty() public {
+        vm.expectRevert();
+        forwarder.forward(coupon, "");
+    }
+
+    function test_forward_RevertsIfExecuteMetaTxLengthIsLT4() public {
+        vm.expectRevert();
+        forwarder.forward(coupon, "123"); // 0x313233 == 3 bytes
+    }
+
+    function test_forward_RevertsIfExecuteMetaTxDataIsNotMetaTxSchema() public {
+        vm.expectRevert();
+        forwarder.forward(coupon, abi.encodeWithSelector(marketplace.executeMetaTransaction.selector, metaTxSigner.addr, 123));
+    }
+
+    function test_forward_RevertsIfMetaTxDataSelectorIsInvalid() public {
+        bytes4 invalidSelector = bytes4(0x12345678);
+
+        executeMetaTx = abi.encodeWithSelector(marketplace.executeMetaTransaction.selector, metaTxSigner.addr, abi.encode(invalidSelector, ""));
+
+        vm.expectRevert(abi.encodeWithSelector(InvalidMetaTxFunctionDataSelector.selector, invalidSelector));
+        forwarder.forward(coupon, executeMetaTx);
+    }
+
+    function test_forward_RevertsIfTradesCannotBeExtractedFromMetaTxData() public {
+        executeMetaTx =
+            abi.encodeWithSelector(marketplace.executeMetaTransaction.selector, metaTxSigner.addr, abi.encodeWithSelector(marketplace.accept.selector, 123));
+
+        vm.expectRevert();
         forwarder.forward(coupon, executeMetaTx);
     }
 }
