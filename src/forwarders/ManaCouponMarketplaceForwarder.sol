@@ -8,7 +8,6 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     using ECDSA for bytes32;
 
-    bytes32 public constant CALLER_ROLE = keccak256("CALLER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
 
@@ -28,8 +27,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     error CouponIneffective(uint256 _currentTime);
     error MarketplaceCallFailed();
 
-    constructor(address _caller, address _pauser, address _signer, address _marketplace) {
-        _grantRole(CALLER_ROLE, _caller);
+    constructor(address _pauser, address _signer, address _marketplace) {
         _grantRole(PAUSER_ROLE, _pauser);
         _grantRole(SIGNER_ROLE, _signer);
 
@@ -44,7 +42,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         _unpause();
     }
 
-    function forward(ManaCoupon calldata _coupon, bytes calldata _executeMetaTx) external onlyRole(CALLER_ROLE) whenNotPaused {
+    function forward(ManaCoupon calldata _coupon, bytes calldata _executeMetaTx) external whenNotPaused {
         bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective, _coupon.salt));
         address signer = hashedCoupon.recover(_coupon.signature);
 
