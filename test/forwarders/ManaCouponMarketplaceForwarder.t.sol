@@ -83,11 +83,11 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         forwarder.forward(coupon);
     }
 
-    function test_forward_AddsTheCouponAmountToTheConsumedCouponsMapping() public {
+    function test_forward_AddsTheCouponAmountToTheAmountUsedFromCouponMapping() public {
         vm.prank(caller);
         forwarder.forward(coupon);
 
-        assertEq(forwarder.consumedCoupons(keccak256(coupon.signature)), coupon.amount);
+        assertEq(forwarder.amountUsedFromCoupon(keccak256(coupon.signature)), coupon.amount);
     }
 
     function test_forward_RevertsIfCouponIsExpired() public {

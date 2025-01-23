@@ -19,7 +19,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         bytes signature;
     }
 
-    mapping(bytes32 => uint256) public consumedCoupons;
+    mapping(bytes32 => uint256) public amountUsedFromCoupon;
 
     error InvalidSigner(address _signer);
     error CouponExpired(uint256 _currentTime);
@@ -55,6 +55,6 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
             revert CouponIneffective(block.timestamp);
         }
 
-        consumedCoupons[keccak256(_coupon.signature)] += _coupon.amount;
+        amountUsedFromCoupon[keccak256(_coupon.signature)] += _coupon.amount;
     }
 }
