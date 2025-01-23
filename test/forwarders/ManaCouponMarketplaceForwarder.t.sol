@@ -27,7 +27,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
     error CouponIneffective(uint256 _currentTime);
 
     function _sign(uint256 _pk, ManaCouponMarketplaceForwarderHarness.ManaCoupon memory _coupon) private pure returns (bytes memory) {
-        bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective));
+        bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective, _coupon.salt));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk, hashedCoupon);
 

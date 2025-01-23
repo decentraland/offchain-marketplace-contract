@@ -16,6 +16,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         uint256 amount;
         uint256 expiration;
         uint256 effective;
+        bytes32 salt;
         bytes signature;
     }
 
@@ -40,7 +41,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     }
 
     function forward(ManaCoupon calldata _coupon) external onlyRole(CALLER_ROLE) whenNotPaused {
-        bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective));
+        bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective, _coupon.salt));
         address signer = hashedCoupon.recover(_coupon.signature);
 
         if (!hasRole(SIGNER_ROLE, signer)) {
