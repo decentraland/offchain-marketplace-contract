@@ -12,8 +12,10 @@ import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCoupo
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
+import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
+import {EIP712} from "src/common/EIP712.sol";
 
-contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausable, AccessControl {
+contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausable, AccessControl, NativeMetaTransaction {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
@@ -38,7 +40,7 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
 
     mapping(address => bool) public denyList;
 
-    constructor(address _owner, address _signer, address _pauser, address _denier, MarketplaceWithCouponManager _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories) {
+    constructor(address _owner, address _signer, address _pauser, address _denier, MarketplaceWithCouponManager _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories) EIP712("CreditCouponManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(SIGNER_ROLE, _signer);
         _grantRole(PAUSER_ROLE, _pauser);
@@ -175,5 +177,9 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
         if (!hasRole(SIGNER_ROLE, couponHash.recover(_coupon.signature))) {
             revert("Invalid coupon signature");
         }
+    }
+
+    function _msgSender() internal view override returns (address) {
+        return _getMsgSender();
     }
 }
