@@ -5,9 +5,12 @@ import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
 import {ManaCouponMarketplaceForwarder} from "src/forwarders/ManaCouponMarketplaceForwarder.sol";
+import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
 
 contract ManaCouponMarketplaceForwarderHarness is ManaCouponMarketplaceForwarder {
-    constructor(address _caller, address _pauser, address _signer) ManaCouponMarketplaceForwarder(_caller, _pauser, _signer) {}
+    constructor(address _caller, address _pauser, address _signer, address _marketplace)
+        ManaCouponMarketplaceForwarder(_caller, _pauser, _signer, _marketplace)
+    {}
 }
 
 contract ManaCouponMarketplaceForwarderTests is Test {
@@ -16,22 +19,68 @@ contract ManaCouponMarketplaceForwarderTests is Test {
     address pauser;
     VmSafe.Wallet signer;
     VmSafe.Wallet otherSigner;
+    address owner;
+    VmSafe.Wallet metaTxSigner;
+
+    ManaCouponMarketplaceForwarderHarness.ManaCoupon coupon;
 
     ManaCouponMarketplaceForwarderHarness forwarder;
-    ManaCouponMarketplaceForwarderHarness.ManaCoupon coupon;
+    DecentralandMarketplacePolygon marketplace;
+
+    bytes executeMetaTx;
 
     error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);
     error EnforcedPause();
     error InvalidSigner(address _signer);
     error CouponExpired(uint256 _currentTime);
     error CouponIneffective(uint256 _currentTime);
+    error MarketplaceCallFailed();
 
     function _sign(uint256 _pk, ManaCouponMarketplaceForwarderHarness.ManaCoupon memory _coupon) private pure returns (bytes memory) {
         bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective, _coupon.salt));
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk, hashedCoupon);
+        return _sign(_pk, hashedCoupon);
+    }
+
+    function _sign(uint256 _pk, bytes32 _hash) private pure returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk, _hash);
 
         return abi.encodePacked(r, s, v);
+    }
+
+    function _buildExecuteMetaTx() private view returns (bytes memory) {
+        DecentralandMarketplacePolygon.Trade[] memory trades = new DecentralandMarketplacePolygon.Trade[](0);
+
+        return abi.encodeWithSelector(
+            marketplace.executeMetaTransaction.selector,
+            metaTxSigner.addr,
+            abi.encodeWithSelector(marketplace.accept.selector, trades),
+            _sign(
+                metaTxSigner.privateKey,
+                keccak256(
+                    abi.encodePacked(
+                        "\x19\x01",
+                        keccak256(
+                            abi.encode(
+                                0x36c25de3e541d5d970f66e4210d728721220fff5c077cc6cd008b3a0c62adab7,
+                                keccak256("DecentralandMarketplacePolygon"),
+                                keccak256("1.0.0"),
+                                address(marketplace),
+                                block.chainid
+                            )
+                        ),
+                        keccak256(
+                            abi.encode(
+                                0x01ecdc01065da9f72bf56a9def24a074b7ef512994beb776867cfbc664b5b959,
+                                0,
+                                metaTxSigner.addr,
+                                keccak256(abi.encodeWithSelector(marketplace.accept.selector, trades))
+                            )
+                        )
+                    )
+                )
+            )
+        );
     }
 
     function setUp() public {
@@ -40,12 +89,17 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         pauser = makeAddr("pauser");
         signer = vm.createWallet("signer");
         otherSigner = vm.createWallet("otherSigner");
+        owner = makeAddr("owner");
+        metaTxSigner = vm.createWallet("metaTxSigner");
 
         coupon.amount = 100;
         coupon.expiration = block.timestamp + 1 days;
         coupon.signature = _sign(signer.privateKey, coupon);
 
-        forwarder = new ManaCouponMarketplaceForwarderHarness(caller, pauser, signer.addr);
+        marketplace = new DecentralandMarketplacePolygon(owner, address(0), address(0), 0, address(0), 0, address(0), address(0), 0);
+        forwarder = new ManaCouponMarketplaceForwarderHarness(caller, pauser, signer.addr, address(marketplace));
+
+        executeMetaTx = _buildExecuteMetaTx();
     }
 
     function test_pause_RevertsIfSenderIsNotPauser() public {
@@ -63,7 +117,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
     function test_forward_RevertsIfSenderIsNotAuthorizedCaller() public {
         vm.expectRevert(abi.encodeWithSelector(AccessControlUnauthorizedAccount.selector, other, forwarder.CALLER_ROLE()));
         vm.prank(other);
-        forwarder.forward(coupon);
+        forwarder.forward(coupon, executeMetaTx);
     }
 
     function test_forward_RevertsIfPaused() public {
@@ -72,7 +126,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
 
         vm.expectRevert(EnforcedPause.selector);
         vm.prank(caller);
-        forwarder.forward(coupon);
+        forwarder.forward(coupon, executeMetaTx);
     }
 
     function test_forward_RevertsIfMessageSignerIsInvalid() public {
@@ -80,12 +134,12 @@ contract ManaCouponMarketplaceForwarderTests is Test {
 
         vm.expectRevert(abi.encodeWithSelector(InvalidSigner.selector, otherSigner.addr));
         vm.prank(caller);
-        forwarder.forward(coupon);
+        forwarder.forward(coupon, executeMetaTx);
     }
 
     function test_forward_AddsTheCouponAmountToTheAmountUsedFromCouponMapping() public {
         vm.prank(caller);
-        forwarder.forward(coupon);
+        forwarder.forward(coupon, executeMetaTx);
 
         assertEq(forwarder.amountUsedFromCoupon(keccak256(coupon.signature)), coupon.amount);
     }
@@ -96,7 +150,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
 
         vm.expectRevert(abi.encodeWithSelector(CouponExpired.selector, block.timestamp));
         vm.prank(caller);
-        forwarder.forward(coupon);
+        forwarder.forward(coupon, executeMetaTx);
     }
 
     function test_forward_RevertsIfCouponIsInnefective() public {
@@ -105,6 +159,19 @@ contract ManaCouponMarketplaceForwarderTests is Test {
 
         vm.expectRevert(abi.encodeWithSelector(CouponIneffective.selector, block.timestamp));
         vm.prank(caller);
-        forwarder.forward(coupon);
+        forwarder.forward(coupon, executeMetaTx);
+    }
+
+    function test_forward_ForwardsTheMetaTrxToTheMarketplace() public {
+        vm.prank(caller);
+        forwarder.forward(coupon, executeMetaTx);
+    }
+
+    function test_forward_RevertsIfMarketplaceCallFails() public {
+        executeMetaTx = "";
+
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSelector(MarketplaceCallFailed.selector));
+        forwarder.forward(coupon, executeMetaTx);
     }
 }

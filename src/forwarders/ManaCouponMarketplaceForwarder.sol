@@ -21,15 +21,19 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     }
 
     mapping(bytes32 => uint256) public amountUsedFromCoupon;
+    address public marketplace;
 
     error InvalidSigner(address _signer);
     error CouponExpired(uint256 _currentTime);
     error CouponIneffective(uint256 _currentTime);
+    error MarketplaceCallFailed();
 
-    constructor(address _caller, address _pauser, address _signer) {
+    constructor(address _caller, address _pauser, address _signer, address _marketplace) {
         _grantRole(CALLER_ROLE, _caller);
         _grantRole(PAUSER_ROLE, _pauser);
         _grantRole(SIGNER_ROLE, _signer);
+
+        marketplace = _marketplace;
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {
@@ -40,7 +44,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         _unpause();
     }
 
-    function forward(ManaCoupon calldata _coupon) external onlyRole(CALLER_ROLE) whenNotPaused {
+    function forward(ManaCoupon calldata _coupon, bytes calldata _executeMetaTx) external onlyRole(CALLER_ROLE) whenNotPaused {
         bytes32 hashedCoupon = keccak256(abi.encode(_coupon.amount, _coupon.expiration, _coupon.effective, _coupon.salt));
         address signer = hashedCoupon.recover(_coupon.signature);
 
@@ -57,5 +61,11 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         }
 
         amountUsedFromCoupon[keccak256(_coupon.signature)] += _coupon.amount;
+
+        (bool success,) = marketplace.call(_executeMetaTx);
+
+        if (!success) {
+            revert MarketplaceCallFailed();
+        }
     }
 }
