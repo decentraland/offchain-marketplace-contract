@@ -27,7 +27,9 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     error CouponIneffective(uint256 _currentTime);
     error MarketplaceCallFailed();
 
-    constructor(address _pauser, address _signer, address _marketplace) {
+    constructor(address _owner, address _pauser, address _signer, address _marketplace) {
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(PAUSER_ROLE, _owner);
         _grantRole(PAUSER_ROLE, _pauser);
         _grantRole(SIGNER_ROLE, _signer);
 
@@ -38,7 +40,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         _pause();
     }
 
-    function unpause() external onlyRole(PAUSER_ROLE) {
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
 

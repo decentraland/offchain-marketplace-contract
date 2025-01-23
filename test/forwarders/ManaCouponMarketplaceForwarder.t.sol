@@ -8,8 +8,8 @@ import {ManaCouponMarketplaceForwarder} from "src/forwarders/ManaCouponMarketpla
 import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
 
 contract ManaCouponMarketplaceForwarderHarness is ManaCouponMarketplaceForwarder {
-    constructor(address _pauser, address _signer, address _marketplace)
-        ManaCouponMarketplaceForwarder(_pauser, _signer, _marketplace)
+    constructor(address _owner, address _pauser, address _signer, address _marketplace)
+        ManaCouponMarketplaceForwarder(_owner, _pauser, _signer, _marketplace)
     {}
 }
 
@@ -95,7 +95,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         coupon.signature = _sign(signer.privateKey, coupon);
 
         marketplace = new DecentralandMarketplacePolygon(owner, address(0), address(0), 0, address(0), 0, address(0), address(0), 0);
-        forwarder = new ManaCouponMarketplaceForwarderHarness(pauser, signer.addr, address(marketplace));
+        forwarder = new ManaCouponMarketplaceForwarderHarness(owner, pauser, signer.addr, address(marketplace));
 
         executeMetaTx = _buildExecuteMetaTx();
     }
@@ -106,9 +106,14 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         forwarder.pause();
     }
 
-    function test_unpause_RevertsIfSenderIsNotPauser() public {
-        vm.expectRevert(abi.encodeWithSelector(AccessControlUnauthorizedAccount.selector, other, forwarder.PAUSER_ROLE()));
-        vm.prank(other);
+    function test_pause_AllowsOwnerToPause() public {
+        vm.prank(owner);
+        forwarder.pause();
+    }
+
+    function test_unpause_RevertsIfSenderIsNotOwner() public {
+        vm.expectRevert(abi.encodeWithSelector(AccessControlUnauthorizedAccount.selector, pauser, forwarder.DEFAULT_ADMIN_ROLE()));
+        vm.prank(pauser);
         forwarder.unpause();
     }
 
