@@ -17,7 +17,13 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         uint256 expiration;
         uint256 effective;
         bytes32 salt;
+        address beneficiary;
         bytes signature;
+    }
+
+    struct MetaTx {
+        address user;
+        bytes data;
     }
 
     mapping(bytes32 => uint256) public amountUsedFromCoupon;
@@ -27,6 +33,7 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
     error CouponExpired(uint256 _currentTime);
     error CouponIneffective(uint256 _currentTime);
     error InvalidSelector(bytes4 _selector);
+    error InvalidMetaTxUser(address _user);
     error MarketplaceCallFailed();
 
     constructor(address _owner, address _pauser, address _signer, DecentralandMarketplacePolygon _marketplace) {
@@ -62,10 +69,10 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
             revert CouponIneffective(block.timestamp);
         }
 
-        (bytes4 selector, bytes memory data) = _separateSelectorAndData(_executeMetaTx);
+        MetaTx memory metaTx = _extractMetaTx(_executeMetaTx);
 
-        if (selector != marketplace.executeMetaTransaction.selector) {
-            revert InvalidSelector(selector);
+        if (metaTx.user != _coupon.beneficiary) {
+            revert InvalidMetaTxUser(metaTx.user);
         }
 
         amountUsedFromCoupon[keccak256(_coupon.signature)] += _coupon.amount;
@@ -75,6 +82,16 @@ contract ManaCouponMarketplaceForwarder is AccessControl, Pausable {
         if (!success) {
             revert MarketplaceCallFailed();
         }
+    }
+
+    function _extractMetaTx(bytes memory _bytes) private view returns (MetaTx memory metaTx) {
+        (bytes4 selector, bytes memory data) = _separateSelectorAndData(_bytes);
+
+        if (selector != marketplace.executeMetaTransaction.selector) {
+            revert InvalidSelector(selector);
+        }
+
+        (metaTx.user, metaTx.data) = abi.decode(data, (address, bytes));
     }
 
     function _separateSelectorAndData(bytes memory _bytes) private pure returns (bytes4 selector, bytes memory data) {

@@ -28,12 +28,16 @@ contract ManaCouponMarketplaceForwarderTests is Test {
 
     bytes executeMetaTx;
 
+    // Third Party Errors
     error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);
     error EnforcedPause();
+
+    // Local Errors
     error InvalidSigner(address _signer);
     error CouponExpired(uint256 _currentTime);
     error CouponIneffective(uint256 _currentTime);
     error InvalidSelector(bytes4 _selector);
+    error InvalidMetaTxUser(address _user);
     error MarketplaceCallFailed();
 
     function _sign(uint256 _pk, ManaCouponMarketplaceForwarderHarness.ManaCoupon memory _coupon) private pure returns (bytes memory) {
@@ -94,6 +98,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         coupon.amount = 100;
         coupon.expiration = block.timestamp + 1 days;
         coupon.signature = _sign(signer.privateKey, coupon);
+        coupon.beneficiary = metaTxSigner.addr;
 
         marketplace = new DecentralandMarketplacePolygon(owner, address(0), address(0), 0, address(0), 0, address(0), address(0), 0);
         forwarder = new ManaCouponMarketplaceForwarderHarness(owner, pauser, signer.addr, marketplace);
@@ -160,7 +165,7 @@ contract ManaCouponMarketplaceForwarderTests is Test {
     }
 
     function test_forward_RevertsIfMarketplaceCallFails() public {
-        executeMetaTx = abi.encodeWithSelector(marketplace.executeMetaTransaction.selector, address(0), "", "");
+        executeMetaTx = abi.encodeWithSelector(marketplace.executeMetaTransaction.selector, metaTxSigner.addr, "", "");
 
         vm.expectRevert(abi.encodeWithSelector(MarketplaceCallFailed.selector));
         forwarder.forward(coupon, executeMetaTx);
@@ -170,8 +175,16 @@ contract ManaCouponMarketplaceForwarderTests is Test {
         bytes4 invalidSelector = bytes4(0x12345678);
 
         executeMetaTx = abi.encodeWithSelector(invalidSelector, address(0), "", "");
-        
+
         vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, invalidSelector));
+        forwarder.forward(coupon, executeMetaTx);
+    }
+
+    function test_forward_RevertsIfMetaTxUserIsNotCouponBeneficiary() public {
+        coupon.beneficiary = address(0);
+        coupon.signature = _sign(signer.privateKey, coupon);
+
+        vm.expectRevert(abi.encodeWithSelector(InvalidMetaTxUser.selector, metaTxSigner.addr));
         forwarder.forward(coupon, executeMetaTx);
     }
 }
