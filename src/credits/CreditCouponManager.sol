@@ -15,7 +15,7 @@ import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol"
 import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
 import {EIP712} from "src/common/EIP712.sol";
 
-contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausable, AccessControl, NativeMetaTransaction {
+contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausable, AccessControl, NativeMetaTransaction {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
@@ -23,7 +23,7 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant DENIER_ROLE = keccak256("DENIER_ROLE");
 
-    struct CreditCoupon {
+    struct Credit {
         uint256 amount;
         uint256 expiration;
         bytes32 salt;
@@ -36,11 +36,11 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
 
     ICollectionFactory[] public factories;
 
-    mapping(bytes32 => uint256) public spentCouponCredits;
+    mapping(bytes32 => uint256) public spentCredits;
 
     mapping(address => bool) public denyList;
 
-    constructor(address _owner, address _signer, address _pauser, address _denier, MarketplaceWithCouponManager _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories) EIP712("CreditCouponManager", "1.0.0") {
+    constructor(address _owner, address _signer, address _pauser, address _denier, MarketplaceWithCouponManager _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(SIGNER_ROLE, _signer);
         _grantRole(PAUSER_ROLE, _pauser);
@@ -73,7 +73,7 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
         }
     }
 
-    function accept(Trade[] calldata _trades, CreditCoupon[] calldata _creditCoupons) external nonReentrant whenNotPaused {
+    function accept(Trade[] calldata _trades, Credit[] calldata _credits) external nonReentrant whenNotPaused {
         address sender = _msgSender();
 
         if (denyList[sender]) {
@@ -96,30 +96,30 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
 
         uint256 totalCreditSpent = 0;
 
-        if (_creditCoupons.length == 0) {
-            revert("Invalid coupons length");
+        if (_credits.length == 0) {
+            revert("Invalid credits length");
         }
 
-        for (uint256 i = 0; i < _creditCoupons.length; i++) {
-            CreditCoupon calldata creditCoupon = _creditCoupons[i];
+        for (uint256 i = 0; i < _credits.length; i++) {
+            Credit calldata credit = _credits[i];
 
-            _validateCoupon(creditCoupon);
+            _validateCredit(credit);
 
-            bytes32 couponSigHash = keccak256(creditCoupon.signature);
+            bytes32 creditSigHash = keccak256(credit.signature);
 
             uint256 totalManaTransferredAndCreditSpentDiff = totalManaTransferred - totalCreditSpent;
 
-            uint256 spendableCredit = creditCoupon.amount - spentCouponCredits[couponSigHash];
+            uint256 spendableCredit = credit.amount - spentCredits[creditSigHash];
 
             if (spendableCredit == 0) {
-                revert("Coupon has been fully spent");
+                revert("Credit has been fully spent");
             }
 
             uint256 creditToBeSpent = totalManaTransferredAndCreditSpentDiff > spendableCredit ? spendableCredit : totalManaTransferredAndCreditSpentDiff;
 
             totalCreditSpent += creditToBeSpent;
 
-            spentCouponCredits[couponSigHash] += creditToBeSpent;
+            spentCredits[creditSigHash] += creditToBeSpent;
         }
 
         mana.safeTransfer(sender, totalCreditSpent);
@@ -163,19 +163,19 @@ contract CreditCouponManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, 
         return false;
     }
 
-    function _validateCoupon(CreditCoupon calldata _coupon) private view {
-        if (_coupon.amount == 0) {
-            revert("Invalid coupon amount");
+    function _validateCredit(Credit calldata _credit) private view {
+        if (_credit.amount == 0) {
+            revert("Invalid credit amount");
         }
 
-        if (block.timestamp > _coupon.expiration) {
-            revert("Coupon has expired");
+        if (block.timestamp > _credit.expiration) {
+            revert("Credit has expired");
         }
 
-        bytes32 couponHash = keccak256(abi.encode(_msgSender(), _coupon.amount, _coupon.expiration, _coupon.salt, address(this), block.chainid));
+        bytes32 digest = keccak256(abi.encode(_msgSender(), _credit.amount, _credit.expiration, _credit.salt, address(this), block.chainid));
 
-        if (!hasRole(SIGNER_ROLE, couponHash.recover(_coupon.signature))) {
-            revert("Invalid coupon signature");
+        if (!hasRole(SIGNER_ROLE, digest.recover(_credit.signature))) {
+            revert("Invalid credit signature");
         }
     }
 
