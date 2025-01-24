@@ -63,14 +63,6 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         allowedSales = _allowedSales;
     }
 
-    modifier onlyUndenied() {
-        if (denyList[_msgSender()]) {
-            revert("Sender is denied");
-        }
-
-        _;
-    }
-
     function setAllowedSales(AllowedSales calldata _allowedSales) external onlyRole(DEFAULT_ADMIN_ROLE) {
         allowedSales = _allowedSales;
     }
@@ -95,7 +87,13 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
-    function accept(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[] calldata _credits) external nonReentrant whenNotPaused onlyUndenied {
+    function accept(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[] calldata _credits) external nonReentrant whenNotPaused {
+        address sender = _msgSender();
+        
+        if (denyList[sender]) {
+            revert("Sender is denied");
+        }
+
         uint256 expectedManaTransfer = _validateTrades(_trades);
 
         mana.approve(address(marketplace), expectedManaTransfer);
@@ -106,9 +104,9 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         uint256 manaCredited = _handleCredits(_credits, manaTransferred);
 
-        mana.safeTransfer(_msgSender(), manaCredited);
+        mana.safeTransfer(sender, manaCredited);
 
-        mana.safeTransferFrom(_msgSender(), address(this), manaTransferred - manaCredited);
+        mana.safeTransferFrom(sender, address(this), manaTransferred - manaCredited);
     }
 
     function _validateTrades(Trade[] calldata _trades) private view returns (uint256 expectedManaTransfer) {
