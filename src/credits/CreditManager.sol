@@ -31,6 +31,11 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         bytes signature;
     }
 
+    struct AllowedSales {
+        bool primary;
+        bool secondary;
+    }
+
     DecentralandMarketplacePolygon public immutable marketplace;
 
     IERC20 public immutable mana;
@@ -41,7 +46,9 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
     mapping(address => bool) public denyList;
 
-    constructor(address _owner, address _signer, address _pauser, address _denier, DecentralandMarketplacePolygon _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories) EIP712("CreditManager", "1.0.0") {
+    AllowedSales public allowedSales;
+
+    constructor(address _owner, address _signer, address _pauser, address _denier, DecentralandMarketplacePolygon _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories, AllowedSales memory _allowedSales) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(SIGNER_ROLE, _signer);
         _grantRole(PAUSER_ROLE, _pauser);
@@ -52,6 +59,8 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         marketplace = _marketplace;
         mana = _mana;
         factories = _factories;
+
+        allowedSales = _allowedSales;
     }
 
     modifier onlyUndenied() {
@@ -60,6 +69,10 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
 
         _;
+    }
+
+    function setAllowedSales(AllowedSales calldata _allowedSales) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        allowedSales = _allowedSales;
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {
@@ -132,8 +145,26 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
             for (uint256 j = 0; j < sent.length; j++) {
                 Asset calldata asset = sent[j];
 
-                if (!_isDecentralandItem(asset.contractAddress) || asset.beneficiary == address(0)) {
-                    revert("Invalid sent asset");
+                AllowedSales memory m_allowedSales = allowedSales;
+
+                if (asset.assetType == marketplace.ASSET_TYPE_COLLECTION_ITEM()) {
+                    if (!m_allowedSales.primary) {
+                        revert("Primary sales are not allowed");
+                    }
+                } else if (asset.assetType == marketplace.ASSET_TYPE_ERC721()) {
+                    if (!m_allowedSales.secondary) {
+                        revert("Secondary sales are not allowed");
+                    }
+                } else {
+                    revert("Invalid sent asset type");
+                }
+
+                if (!_isDecentralandItem(asset.contractAddress)) {
+                    revert("Not a decentraland item");
+                }
+
+                if (asset.beneficiary == address(0)) {
+                    revert("Invalid asset beneficiary");
                 }
             }
         }
