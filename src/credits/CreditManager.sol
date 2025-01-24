@@ -98,7 +98,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         for (uint256 i = 0; i < _credits.length; i++) {
             Credit calldata credit = _credits[i];
 
-            uint256 spendableCreditAmount = _computeSpendableCreditAmount(credit);
+            uint256 spendableCreditAmount = _validateCredit(credit);
 
             uint256 totalManaTransferredAndCreditSpentDiff = manaTransferred - totalCreditSpent;
 
@@ -173,7 +173,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
-    function _computeSpendableCreditAmount(Credit calldata _credit) private view returns (uint256 spendableCreditAmount) {
+    function _validateCredit(Credit calldata _credit) private view returns (uint256 spendableCreditAmount) {
         if (_credit.amount == 0) {
             revert("Invalid credit amount");
         }
