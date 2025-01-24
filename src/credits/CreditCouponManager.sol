@@ -73,7 +73,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
-    function accept(Trade[] calldata _trades, Credit[] calldata _credits) external nonReentrant whenNotPaused {
+    function accept(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[] calldata _credits) external nonReentrant whenNotPaused {
         address sender = _msgSender();
 
         if (denyList[sender]) {
@@ -84,7 +84,11 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         uint256 oldBalance = mana.balanceOf(address(this));
 
-        marketplace.accept(_trades);
+        if (_coupons.length > 0) {
+            marketplace.acceptWithCoupon(_trades, _coupons);
+        } else {
+            marketplace.accept(_trades);
+        }
 
         uint256 newBalance = mana.balanceOf(address(this));
 
