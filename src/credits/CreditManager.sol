@@ -8,14 +8,15 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
+import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
 import {EIP712} from "src/common/EIP712.sol";
+import {AggregatorHelper} from "src/marketplace/AggregatorHelper.sol";
 
-contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausable, AccessControl, NativeMetaTransaction {
+contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausable, AccessControl, NativeMetaTransaction, AggregatorHelper {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
@@ -30,7 +31,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         bytes signature;
     }
 
-    MarketplaceWithCouponManager public immutable marketplace;
+    DecentralandMarketplacePolygon public immutable marketplace;
 
     IERC20 public immutable mana;
 
@@ -40,7 +41,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
     mapping(address => bool) public denyList;
 
-    constructor(address _owner, address _signer, address _pauser, address _denier, MarketplaceWithCouponManager _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories) EIP712("CreditManager", "1.0.0") {
+    constructor(address _owner, address _signer, address _pauser, address _denier, DecentralandMarketplacePolygon _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(SIGNER_ROLE, _signer);
         _grantRole(PAUSER_ROLE, _pauser);
@@ -80,9 +81,11 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
             revert("Sender is denied");
         }
 
-        _validateTrades(_trades);
+        uint256 expectedManaTransfer = _computeExpectedManaTransfer(_trades);
 
-        uint256 oldBalance = mana.balanceOf(address(this));
+        uint256 originalBalance = mana.balanceOf(address(this));
+
+        mana.approve(address(marketplace), expectedManaTransfer);
 
         if (_coupons.length > 0) {
             marketplace.acceptWithCoupon(_trades, _coupons);
@@ -90,9 +93,11 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
             marketplace.accept(_trades);
         }
 
-        uint256 newBalance = mana.balanceOf(address(this));
+        mana.approve(address(marketplace), 0);
 
-        uint256 totalManaTransferred = oldBalance - newBalance;
+        uint256 currentBalance = mana.balanceOf(address(this));
+
+        uint256 totalManaTransferred = originalBalance - currentBalance;
 
         if (totalManaTransferred == 0) {
             revert("No mana was transferred");
@@ -131,24 +136,39 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         mana.safeTransferFrom(sender, address(this), totalManaTransferred - totalCreditSpent);
     }
 
-    function _validateTrades(Trade[] calldata _trades) private view {
+    function _computeExpectedManaTransfer(Trade[] calldata _trades) private view returns (uint256 totalMana) {
         if (_trades.length == 0) {
             revert("Invalid trades length");
         }
 
-        for (uint256 i = 0; i < _trades.length; i++) {
-            Trade calldata trade = _trades[i];
+        int256 manaUsdRate;
 
-            if (trade.sent.length < 1 || trade.received.length != 1) {
+        for (uint256 i = 0; i < _trades.length; i++) {
+            Asset[] calldata sent = _trades[i].sent;
+            Asset[] calldata received = _trades[i].received;
+
+            if (sent.length < 1 || received.length != 1) {
                 revert("Invalid assets length");
             }
 
-            if (trade.received[0].contractAddress != address(mana)) {
-                revert("Invalid received asset");
+            if (received[0].assetType == marketplace.ASSET_TYPE_ERC20()) {
+                if (received[0].contractAddress != address(mana)) {
+                    revert("Invalid received asset contract address");
+                }
+
+                totalMana += received[0].value;
+            } else if (received[0].assetType == marketplace.ASSET_TYPE_USD_PEGGED_MANA()) {
+                if (manaUsdRate == 0) {
+                    manaUsdRate = _getRateFromAggregator(marketplace.manaUsdAggregator(), marketplace.manaUsdAggregatorTolerance());
+                }
+
+                totalMana += received[0].value * 1e18 / uint256(manaUsdRate);
+            } else {
+                revert("Invalid received asset type");
             }
 
-            for (uint256 j = 0; j < trade.sent.length; j++) {
-                Asset calldata asset = trade.sent[j];
+            for (uint256 j = 0; j < sent.length; j++) {
+                Asset calldata asset = sent[j];
 
                 if (!_isDecentralandItem(asset.contractAddress) || asset.beneficiary == address(0)) {
                     revert("Invalid sent asset");
