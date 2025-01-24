@@ -112,23 +112,15 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         for (uint256 i = 0; i < _credits.length; i++) {
             Credit calldata credit = _credits[i];
 
-            _validateCredit(credit);
-
-            bytes32 creditSigHash = keccak256(credit.signature);
+            uint256 spendableCreditAmount = _computeSpendableCreditAmount(credit);
 
             uint256 totalManaTransferredAndCreditSpentDiff = totalManaTransferred - totalCreditSpent;
 
-            uint256 spendableCredit = credit.amount - spentCredits[creditSigHash];
-
-            if (spendableCredit == 0) {
-                revert("Credit has been fully spent");
-            }
-
-            uint256 creditToBeSpent = totalManaTransferredAndCreditSpentDiff > spendableCredit ? spendableCredit : totalManaTransferredAndCreditSpentDiff;
+            uint256 creditToBeSpent = totalManaTransferredAndCreditSpentDiff > spendableCreditAmount ? spendableCreditAmount : totalManaTransferredAndCreditSpentDiff;
 
             totalCreditSpent += creditToBeSpent;
 
-            spentCredits[creditSigHash] += creditToBeSpent;
+            spentCredits[keccak256(credit.signature)] += creditToBeSpent;
         }
 
         mana.safeTransfer(sender, totalCreditSpent);
@@ -187,7 +179,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         return false;
     }
 
-    function _validateCredit(Credit calldata _credit) private view {
+    function _computeSpendableCreditAmount(Credit calldata _credit) private view returns (uint256 spendableCreditAmount) {
         if (_credit.amount == 0) {
             revert("Invalid credit amount");
         }
@@ -200,6 +192,12 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         if (!hasRole(SIGNER_ROLE, digest.recover(_credit.signature))) {
             revert("Invalid credit signature");
+        }
+
+        spendableCreditAmount = _credit.amount - spentCredits[keccak256(_credit.signature)];
+
+        if (spendableCreditAmount == 0) {
+            revert("Credit has been spent");
         }
     }
 
