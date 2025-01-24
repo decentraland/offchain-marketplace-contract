@@ -89,7 +89,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         mana.approve(address(marketplace), 0);
 
-        uint256 totalCreditSpent = 0;
+        uint256 manaCredited = 0;
 
         if (_credits.length == 0) {
             revert("Invalid credits length");
@@ -100,18 +100,18 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
             uint256 spendableCreditAmount = _validateCredit(credit);
 
-            uint256 totalManaTransferredAndCreditSpentDiff = manaTransferred - totalCreditSpent;
+            uint256 totalManaTransferredAndCreditSpentDiff = manaTransferred - manaCredited;
 
             uint256 creditToBeSpent = totalManaTransferredAndCreditSpentDiff > spendableCreditAmount ? spendableCreditAmount : totalManaTransferredAndCreditSpentDiff;
 
-            totalCreditSpent += creditToBeSpent;
+            manaCredited += creditToBeSpent;
 
             spentCredits[keccak256(credit.signature)] += creditToBeSpent;
         }
 
-        mana.safeTransfer(sender, totalCreditSpent);
+        mana.safeTransfer(sender, manaCredited);
 
-        mana.safeTransferFrom(sender, address(this), manaTransferred - totalCreditSpent);
+        mana.safeTransferFrom(sender, address(this), manaTransferred - manaCredited);
     }
 
     function _validateTrades(Trade[] calldata _trades) private view returns (uint256 expectedManaTransfer) {
