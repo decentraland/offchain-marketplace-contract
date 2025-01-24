@@ -83,25 +83,11 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         uint256 expectedManaTransfer = _computeExpectedManaTransfer(_trades);
 
-        uint256 originalBalance = mana.balanceOf(address(this));
-
         mana.approve(address(marketplace), expectedManaTransfer);
 
-        if (_coupons.length > 0) {
-            marketplace.acceptWithCoupon(_trades, _coupons);
-        } else {
-            marketplace.accept(_trades);
-        }
+        uint256 manaTransferred = _executeMarketplaceCall(_trades, _coupons);
 
         mana.approve(address(marketplace), 0);
-
-        uint256 currentBalance = mana.balanceOf(address(this));
-
-        uint256 totalManaTransferred = originalBalance - currentBalance;
-
-        if (totalManaTransferred == 0) {
-            revert("No mana was transferred");
-        }
 
         uint256 totalCreditSpent = 0;
 
@@ -114,7 +100,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
             uint256 spendableCreditAmount = _computeSpendableCreditAmount(credit);
 
-            uint256 totalManaTransferredAndCreditSpentDiff = totalManaTransferred - totalCreditSpent;
+            uint256 totalManaTransferredAndCreditSpentDiff = manaTransferred - totalCreditSpent;
 
             uint256 creditToBeSpent = totalManaTransferredAndCreditSpentDiff > spendableCreditAmount ? spendableCreditAmount : totalManaTransferredAndCreditSpentDiff;
 
@@ -125,7 +111,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         mana.safeTransfer(sender, totalCreditSpent);
 
-        mana.safeTransferFrom(sender, address(this), totalManaTransferred - totalCreditSpent);
+        mana.safeTransferFrom(sender, address(this), manaTransferred - totalCreditSpent);
     }
 
     function _computeExpectedManaTransfer(Trade[] calldata _trades) private view returns (uint256 totalMana) {
@@ -169,14 +155,22 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
-    function _isDecentralandItem(address _contractAddress) private view returns (bool) {
-        for (uint256 i = 0; i < factories.length; i++) {
-            if (factories[i].isCollectionFromFactory(_contractAddress)) {
-                return true;
-            }
+    function _executeMarketplaceCall(Trade[] calldata _trades, Coupon[] calldata _coupons) private returns (uint256 manaTransferred){
+        uint256 originalBalance = mana.balanceOf(address(this));
+
+        if (_coupons.length > 0) {
+            marketplace.acceptWithCoupon(_trades, _coupons);
+        } else {
+            marketplace.accept(_trades);
         }
 
-        return false;
+        uint256 currentBalance = mana.balanceOf(address(this));
+
+        manaTransferred = originalBalance - currentBalance;
+
+        if (manaTransferred == 0) {
+            revert("No mana was transferred");
+        }
     }
 
     function _computeSpendableCreditAmount(Credit calldata _credit) private view returns (uint256 spendableCreditAmount) {
@@ -199,6 +193,16 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         if (spendableCreditAmount == 0) {
             revert("Credit has been spent");
         }
+    }
+
+    function _isDecentralandItem(address _contractAddress) private view returns (bool) {
+        for (uint256 i = 0; i < factories.length; i++) {
+            if (factories[i].isCollectionFromFactory(_contractAddress)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     function _msgSender() internal view override returns (address) {
