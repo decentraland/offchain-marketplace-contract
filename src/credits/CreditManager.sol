@@ -54,6 +54,14 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         factories = _factories;
     }
 
+    modifier onlyUndenied() {
+        if (denyList[_msgSender()]) {
+            revert("Sender is denied");
+        }
+
+        _;
+    }
+
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
@@ -74,13 +82,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
-    function accept(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[] calldata _credits) external nonReentrant whenNotPaused {
-        address sender = _msgSender();
-
-        if (denyList[sender]) {
-            revert("Sender is denied");
-        }
-
+    function accept(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[] calldata _credits) external nonReentrant whenNotPaused onlyUndenied {
         uint256 expectedManaTransfer = _validateTrades(_trades);
 
         mana.approve(address(marketplace), expectedManaTransfer);
@@ -91,9 +93,9 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         uint256 manaCredited = _handleCredits(_credits, manaTransferred);
 
-        mana.safeTransfer(sender, manaCredited);
+        mana.safeTransfer(_msgSender(), manaCredited);
 
-        mana.safeTransferFrom(sender, address(this), manaTransferred - manaCredited);
+        mana.safeTransferFrom(_msgSender(), address(this), manaTransferred - manaCredited);
     }
 
     function _validateTrades(Trade[] calldata _trades) private view returns (uint256 expectedManaTransfer) {
@@ -137,7 +139,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
-    function _executeMarketplaceCall(Trade[] calldata _trades, Coupon[] calldata _coupons) private returns (uint256 manaTransferred){
+    function _executeMarketplaceCall(Trade[] calldata _trades, Coupon[] calldata _coupons) private returns (uint256 manaTransferred) {
         uint256 originalBalance = mana.balanceOf(address(this));
 
         if (_coupons.length > 0) {
