@@ -81,7 +81,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
             revert("Sender is denied");
         }
 
-        uint256 expectedManaTransfer = _computeExpectedManaTransfer(_trades);
+        uint256 expectedManaTransfer = _validateTrades(_trades);
 
         mana.approve(address(marketplace), expectedManaTransfer);
 
@@ -114,7 +114,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         mana.safeTransferFrom(sender, address(this), manaTransferred - totalCreditSpent);
     }
 
-    function _computeExpectedManaTransfer(Trade[] calldata _trades) private view returns (uint256 totalMana) {
+    function _validateTrades(Trade[] calldata _trades) private view returns (uint256 expectedManaTransfer) {
         if (_trades.length == 0) {
             revert("Invalid trades length");
         }
@@ -134,13 +134,13 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
                     revert("Invalid received asset contract address");
                 }
 
-                totalMana += received[0].value;
+                expectedManaTransfer += received[0].value;
             } else if (received[0].assetType == marketplace.ASSET_TYPE_USD_PEGGED_MANA()) {
                 if (manaUsdRate == 0) {
                     manaUsdRate = _getRateFromAggregator(marketplace.manaUsdAggregator(), marketplace.manaUsdAggregatorTolerance());
                 }
 
-                totalMana += received[0].value * 1e18 / uint256(manaUsdRate);
+                expectedManaTransfer += received[0].value * 1e18 / uint256(manaUsdRate);
             } else {
                 revert("Invalid received asset type");
             }
