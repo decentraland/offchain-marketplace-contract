@@ -89,25 +89,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         mana.approve(address(marketplace), 0);
 
-        uint256 manaCredited = 0;
-
-        if (_credits.length == 0) {
-            revert("Invalid credits length");
-        }
-
-        for (uint256 i = 0; i < _credits.length; i++) {
-            Credit calldata credit = _credits[i];
-
-            uint256 spendableCreditAmount = _validateCredit(credit);
-
-            uint256 totalManaTransferredAndCreditSpentDiff = manaTransferred - manaCredited;
-
-            uint256 creditToBeSpent = totalManaTransferredAndCreditSpentDiff > spendableCreditAmount ? spendableCreditAmount : totalManaTransferredAndCreditSpentDiff;
-
-            manaCredited += creditToBeSpent;
-
-            spentCredits[keccak256(credit.signature)] += creditToBeSpent;
-        }
+        uint256 manaCredited = _handleCredits(_credits, manaTransferred);
 
         mana.safeTransfer(sender, manaCredited);
 
@@ -170,6 +152,26 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         if (manaTransferred == 0) {
             revert("No mana was transferred");
+        }
+    }
+
+    function _handleCredits(Credit[] calldata _credits, uint256 manaTransferred) private returns (uint256 creditedMana) {
+        if (_credits.length == 0) {
+            revert("Invalid credits length");
+        }
+
+        for (uint256 i = 0; i < _credits.length; i++) {
+            Credit calldata credit = _credits[i];
+
+            uint256 spendableCreditAmount = _validateCredit(credit);
+
+            uint256 manaTransferredAndCreditedManaDiff = manaTransferred - creditedMana;
+
+            uint256 spentCreditAmount = manaTransferredAndCreditedManaDiff > spendableCreditAmount ? spendableCreditAmount : manaTransferredAndCreditedManaDiff;
+
+            creditedMana += spentCreditAmount;
+
+            spentCredits[keccak256(credit.signature)] += spentCreditAmount;
         }
     }
 
