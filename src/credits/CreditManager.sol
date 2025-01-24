@@ -63,8 +63,22 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         allowedSales = _allowedSales;
     }
 
-    function setAllowedSales(AllowedSales calldata _allowedSales) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateAllowedSales(AllowedSales calldata _allowedSales) external onlyRole(DEFAULT_ADMIN_ROLE) {
         allowedSales = _allowedSales;
+    }
+
+    function updateDenyList(address[] calldata _users, bool[] calldata _values) external {
+        address sender = _msgSender();
+
+        for (uint256 i = 0; i < _users.length; i++) {
+            bool value = _values[i];
+
+            if (!hasRole(value ? DENIER_ROLE : DEFAULT_ADMIN_ROLE, sender)) {
+                revert("Sender is not allowed");
+            }
+
+            denyList[_users[i]] = value;
+        }
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {
@@ -75,21 +89,9 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         _unpause();
     }
 
-    function deny(address[] calldata _user) external onlyRole(DENIER_ROLE) {
-        for (uint256 i = 0; i < _user.length; i++) {
-            denyList[_user[i]] = true;
-        }
-    }
-
-    function undeny(address[] calldata _user) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        for (uint256 i = 0; i < _user.length; i++) {
-            denyList[_user[i]] = false;
-        }
-    }
-
     function accept(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[] calldata _credits) external nonReentrant whenNotPaused {
         address sender = _msgSender();
-        
+
         if (denyList[sender]) {
             revert("Sender is denied");
         }
