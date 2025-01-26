@@ -36,6 +36,12 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         bool secondary;
     }
 
+    struct ManaTransferLimit {
+        uint256 maxPerHour;
+        uint256 transferredThisHour;
+        uint256 currentHour;
+    }
+
     DecentralandMarketplacePolygon public immutable marketplace;
 
     IERC20 public immutable mana;
@@ -48,6 +54,8 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
     AllowedSales public allowedSales;
 
+    ManaTransferLimit public manaTransferLimit;
+
     constructor(
         address _owner,
         address _signer,
@@ -56,7 +64,8 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         DecentralandMarketplacePolygon _marketplace,
         IERC20 _mana,
         ICollectionFactory[] memory _factories,
-        AllowedSales memory _allowedSales
+        AllowedSales memory _allowedSales,
+        uint256 _maxManaTransferPerHour
     ) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(SIGNER_ROLE, _signer);
@@ -70,6 +79,11 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         factories = _factories;
 
         allowedSales = _allowedSales;
+        manaTransferLimit.maxPerHour = _maxManaTransferPerHour;
+    }
+
+    function updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        manaTransferLimit.maxPerHour = _maxManaTransferPerHour;
     }
 
     function updateAllowedSales(AllowedSales calldata _allowedSales) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -110,6 +124,8 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         mana.approve(address(marketplace), expectedManaTransfer);
 
         uint256 manaTransferred = _executeMarketplaceCall(_trades, _coupons);
+
+        _validateManaTransferLimit(manaTransferred);
 
         mana.approve(address(marketplace), 0);
 
@@ -195,6 +211,21 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         if (manaTransferred == 0) {
             revert("No mana was transferred");
         }
+    }
+
+    function _validateManaTransferLimit(uint256 _manaTransferred) private {
+        uint256 currentHour = block.timestamp / 1 hours;
+
+        if (manaTransferLimit.currentHour != currentHour) {
+            manaTransferLimit.transferredThisHour = 0;
+            manaTransferLimit.currentHour = currentHour;
+        }
+
+        if (manaTransferLimit.transferredThisHour + _manaTransferred > manaTransferLimit.maxPerHour) {
+            revert("Max mana transfer per hour exceeded");
+        }
+
+        manaTransferLimit.transferredThisHour += _manaTransferred;
     }
 
     function _handleCredits(Credit[] calldata _credits, uint256 manaTransferred) private returns (uint256 creditedMana) {
