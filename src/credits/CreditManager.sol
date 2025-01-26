@@ -48,7 +48,16 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
     AllowedSales public allowedSales;
 
-    constructor(address _owner, address _signer, address _pauser, address _denier, DecentralandMarketplacePolygon _marketplace, IERC20 _mana, ICollectionFactory[] memory _factories, AllowedSales memory _allowedSales) EIP712("CreditManager", "1.0.0") {
+    constructor(
+        address _owner,
+        address _signer,
+        address _pauser,
+        address _denier,
+        DecentralandMarketplacePolygon _marketplace,
+        IERC20 _mana,
+        ICollectionFactory[] memory _factories,
+        AllowedSales memory _allowedSales
+    ) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(SIGNER_ROLE, _signer);
         _grantRole(PAUSER_ROLE, _pauser);
@@ -200,7 +209,8 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
             uint256 manaTransferredAndCreditedManaDiff = manaTransferred - creditedMana;
 
-            uint256 spentCreditAmount = manaTransferredAndCreditedManaDiff > spendableCreditAmount ? spendableCreditAmount : manaTransferredAndCreditedManaDiff;
+            uint256 spentCreditAmount =
+                manaTransferredAndCreditedManaDiff > spendableCreditAmount ? spendableCreditAmount : manaTransferredAndCreditedManaDiff;
 
             creditedMana += spentCreditAmount;
 
