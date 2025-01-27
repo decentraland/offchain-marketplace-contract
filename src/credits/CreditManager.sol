@@ -112,6 +112,10 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         _unpause();
     }
 
+    function withdraw(uint256 _amount, address _beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        mana.safeTransfer(_beneficiary, _amount);
+    }
+
     function accept(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[] calldata _credits) external nonReentrant whenNotPaused {
         address sender = _msgSender();
 
