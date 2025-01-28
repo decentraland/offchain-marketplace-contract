@@ -69,6 +69,10 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
     /// @notice The hour of the last mana transfer.
     uint256 public hourOfLastManaTransfer;
 
+    event AllowedSalesUpdated(address _sender, bool _primary, bool _secondary);
+    event MaxManaTransferPerHourUpdated(address _sender, uint256 _maxManaTransferPerHour);
+    event DenyListUpdated(address _sender, address _user, bool _value);
+
     constructor(
         address _owner, // The address that can set other roles as well as operate the most critical functions.
         address _signer, // The address that can sign credits.
@@ -91,18 +95,17 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         marketplace = _marketplace;
         mana = _mana;
         factories = _factories;
-        primarySalesAllowed = _primarySalesAllowed;
-        secondarySalesAllowed = _secondarySalesAllowed;
-        maxManaTransferPerHour = _maxManaTransferPerHour;
-    }
 
-    function updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        maxManaTransferPerHour = _maxManaTransferPerHour;
+        _updateAllowedSales(_primarySalesAllowed, _secondarySalesAllowed);
+        _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
     }
 
     function updateAllowedSales(bool _primary, bool _secondary) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        primarySalesAllowed = _primary;
-        secondarySalesAllowed = _secondary;
+        _updateAllowedSales(_primary, _secondary);
+    }
+
+    function updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
     }
 
     function updateDenyList(address[] calldata _users, bool[] calldata _values) external {
@@ -115,7 +118,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
                 revert("Sender is not allowed");
             }
 
-            denyList[_users[i]] = value;
+            _updateDenyList(_users[i], value);
         }
     }
 
@@ -153,6 +156,25 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         mana.safeTransfer(sender, manaCredited);
 
         mana.safeTransferFrom(sender, address(this), manaTransferred - manaCredited);
+    }
+
+    function _updateAllowedSales(bool _primary, bool _secondary) private {
+        primarySalesAllowed = _primary;
+        secondarySalesAllowed = _secondary;
+
+        emit AllowedSalesUpdated(_msgSender(), _primary, _secondary);
+    }
+
+    function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) private {
+        maxManaTransferPerHour = _maxManaTransferPerHour;
+
+        emit MaxManaTransferPerHourUpdated(_msgSender(), _maxManaTransferPerHour);
+    }
+
+    function _updateDenyList(address _user, bool _value) private {
+        denyList[_user] = _value;
+
+        emit DenyListUpdated(_msgSender(), _user, _value);
     }
 
     function _validateTrades(Trade[] calldata _trades) private view returns (uint256 expectedManaTransfer) {
