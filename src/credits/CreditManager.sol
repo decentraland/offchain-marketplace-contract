@@ -69,6 +69,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
     /// @notice The hour of the last mana transfer.
     uint256 public hourOfLastManaTransfer;
 
+    event FactoriesUpdated(address _sender, ICollectionFactory[] _factories);
     event AllowedSalesUpdated(address _sender, bool _primary, bool _secondary);
     event MaxManaTransferPerHourUpdated(address _sender, uint256 _maxManaTransferPerHour);
     event DenyListUpdated(address _sender, address _user, bool _value);
@@ -83,7 +84,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         ICollectionFactory[] memory _factories, // The collection factories used to check that a contract address is a Decentraland Item/NFT.
         bool _primarySalesAllowed, // Whether using credits for primary sales is allowed.
         bool _secondarySalesAllowed, // Whether using credits for secondary sales is allowed.
-        uint256 _maxManaTransferPerHour
+        uint256 _maxManaTransferPerHour // Maximum amount of mana that can be transferred out of the contract per hour.
     ) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(SIGNER_ROLE, _signer);
@@ -94,10 +95,14 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         marketplace = _marketplace;
         mana = _mana;
-        factories = _factories;
 
+        _updateFactories(_factories);
         _updateAllowedSales(_primarySalesAllowed, _secondarySalesAllowed);
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+    }
+
+    function updateFactories(ICollectionFactory[] calldata _factories) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateFactories(_factories);
     }
 
     function updateAllowedSales(bool _primary, bool _secondary) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -156,6 +161,12 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         mana.safeTransfer(sender, manaCredited);
 
         mana.safeTransferFrom(sender, address(this), manaTransferred - manaCredited);
+    }
+
+    function _updateFactories(ICollectionFactory[] memory _factories) private {
+        factories = _factories;
+
+        emit FactoriesUpdated(_msgSender(), _factories);
     }
 
     function _updateAllowedSales(bool _primary, bool _secondary) private {
