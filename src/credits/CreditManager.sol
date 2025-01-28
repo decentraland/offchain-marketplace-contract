@@ -91,7 +91,6 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         marketplace = _marketplace;
         mana = _mana;
         factories = _factories;
-
         primarySalesAllowed = _primarySalesAllowed;
         secondarySalesAllowed = _secondarySalesAllowed;
         maxManaTransferPerHour = _maxManaTransferPerHour;
