@@ -101,18 +101,23 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
     }
 
+    /// @notice Allows the owner to update the collection factories.
     function updateFactories(ICollectionFactory[] calldata _factories) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateFactories(_factories);
     }
 
+    /// @notice Allows the owner to update if primary or secondary sales are allowed.
     function updateAllowedSales(bool _primary, bool _secondary) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateAllowedSales(_primary, _secondary);
     }
 
+    /// @notice Allows the owner to update how much mana can be transferred out of the contract per hour.
     function updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
     }
 
+    /// @notice Allows users with the denier role to add users to the deny list and prevent them from using credits.
+    /// Only the owner can remove users from the deny list.
     function updateDenyList(address[] calldata _users, bool[] calldata _values) external {
         address sender = _msgSender();
 
@@ -127,18 +132,24 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
+    /// @notice Allows users with the pauser role to pause the contract.
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
+    /// @notice Allows the owner to unpause the contract.
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
 
+    /// @notice Allows the owner to withdraw mana from the contract.
     function withdraw(uint256 _amount, address _beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
         mana.safeTransfer(_beneficiary, _amount);
     }
 
+    /// @notice Allows a user to accept trades by using signed credits.
+    /// Credits are consumed partialy in case the mana transfer is less than the credit amount.
+    /// If the credit amount is not enough to cover the mana transfer, the user will have to pay the difference with their own mana.
     function accept(Trade[] calldata _trades, Coupon[] calldata _coupons, Credit[] calldata _credits) external nonReentrant whenNotPaused {
         address sender = _msgSender();
 
@@ -163,12 +174,14 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         mana.safeTransferFrom(sender, address(this), manaTransferred - manaCredited);
     }
 
+    /// @dev Updates the collection factories and emits an event.
     function _updateFactories(ICollectionFactory[] memory _factories) private {
         factories = _factories;
 
         emit FactoriesUpdated(_msgSender(), _factories);
     }
 
+    /// @dev Updates if primary or secondary sales are allowed and emits an event.
     function _updateAllowedSales(bool _primary, bool _secondary) private {
         primarySalesAllowed = _primary;
         secondarySalesAllowed = _secondary;
@@ -176,18 +189,24 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         emit AllowedSalesUpdated(_msgSender(), _primary, _secondary);
     }
 
+    /// @dev Updates the maximum mana transfer per hour and emits an event.
     function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) private {
         maxManaTransferPerHour = _maxManaTransferPerHour;
 
         emit MaxManaTransferPerHourUpdated(_msgSender(), _maxManaTransferPerHour);
     }
 
+    /// @dev Updates the deny list and emits an event.
     function _updateDenyList(address _user, bool _value) private {
         denyList[_user] = _value;
 
         emit DenyListUpdated(_msgSender(), _user, _value);
     }
 
+    /// @dev Validates that the assets involved in the Trade are valid for a Credit to be used.
+    /// Valid Trades consist of Listings that have a single sent asset that has the mana contract address and is of type ERC20 or USD_PEGGED_MANA.
+    /// The received assets must all be Decentraland Items or NFTs, which are validated by the collection factories.
+    /// Returns how much Mana is expected to be transferred based on the sent asset.
     function _validateTrades(Trade[] calldata _trades) private view returns (uint256 expectedManaTransfer) {
         if (_trades.length == 0) {
             revert("Invalid trades length");
@@ -245,6 +264,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
+    /// @dev Calls the accept or acceptWithCoupon function on the marketplace contract and returns how much mana was transferred based on the balance of the contract before and after the execution.
     function _executeMarketplaceCall(Trade[] calldata _trades, Coupon[] calldata _coupons) private returns (uint256 manaTransferred) {
         uint256 originalBalance = mana.balanceOf(address(this));
 
@@ -263,6 +283,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
+    /// @dev Validates that the mana transferred does not exceed the limit per hour.
     function _validateManaTransferLimit(uint256 _manaTransferred) private {
         uint256 currentHour = block.timestamp / 1 hours;
 
@@ -278,6 +299,10 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         manaTransferredThisHour += _manaTransferred;
     }
 
+    /// @dev Calculates how much Mana has to be transferred to the user based on the credits being used.
+    /// This function will use as much credits as possible to cover the mana transfer.
+    /// The credits are consumed partialy in case the mana transfer is less than the credit amount.
+    /// Credits that have not been spent completely can be used in future trades.
     function _handleCredits(Credit[] calldata _credits, uint256 manaTransferred) private returns (uint256 creditedMana) {
         if (_credits.length == 0) {
             revert("Invalid credits length");
@@ -299,6 +324,8 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
+    /// @dev Validates that the credit has been signed by the signer.
+    /// Returns how much of the credit can be spent based on the amount that has already been spent.
     function _validateCredit(Credit calldata _credit) private view returns (uint256 spendableCreditAmount) {
         if (_credit.amount == 0) {
             revert("Invalid credit amount");
@@ -321,6 +348,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         }
     }
 
+    /// @dev Checks if a contract address is a Decentraland Item/NFT.
     function _isDecentralandItem(address _contractAddress) private view returns (bool) {
         for (uint256 i = 0; i < factories.length; i++) {
             if (factories[i].isCollectionFromFactory(_contractAddress)) {
@@ -331,6 +359,7 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         return false;
     }
 
+    /// @dev Overrides the _msgSender function to support Meta Transactions.
     function _msgSender() internal view override returns (address) {
         return _getMsgSender();
     }
