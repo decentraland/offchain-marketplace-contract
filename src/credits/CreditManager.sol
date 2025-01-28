@@ -16,19 +16,26 @@ import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
 import {EIP712} from "src/common/EIP712.sol";
 import {AggregatorHelper} from "src/marketplace/AggregatorHelper.sol";
 
+/// @notice Enables users to use off-chain signed credit instead of spending mana for trades.
 contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausable, AccessControl, NativeMetaTransaction, AggregatorHelper {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
+    /// @notice The role that can sign credits.
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
+
+    /// @notice The role that can pause the contract.
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
+    /// @notice The role that can deny users from using credits.
     bytes32 public constant DENIER_ROLE = keccak256("DENIER_ROLE");
 
+    /// @notice The schema of the Credit type.
     struct Credit {
-        uint256 amount;
-        uint256 expiration;
-        bytes32 salt;
-        bytes signature;
+        uint256 amount; // The amount of mana that the credit is worth.
+        uint256 expiration; // The expiration timestamp of the credit.
+        bytes32 salt; // The salt used to generate a unique the credit signature.
+        bytes signature; // The signature of the credit.
     }
 
     struct AllowedSales {
@@ -42,14 +49,20 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         uint256 currentHour;
     }
 
+    /// @notice The Decentraland Marketplace contract.
     DecentralandMarketplacePolygon public immutable marketplace;
 
+    /// @notice The MANA token contract.
     IERC20 public immutable mana;
 
+    /// @notice The collection factories used to check that a contract address is a Decentraland Item/NFT.
     ICollectionFactory[] public factories;
 
+    /// @notice How many credits have been spent from a particular credit.
+    /// The key is the keccak256 hash of the credit signature.
     mapping(bytes32 => uint256) public spentCredits;
 
+    /// @notice The users that have been denied from using credits.
     mapping(address => bool) public denyList;
 
     AllowedSales public allowedSales;
@@ -57,13 +70,13 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
     ManaTransferLimit public manaTransferLimit;
 
     constructor(
-        address _owner,
-        address _signer,
-        address _pauser,
-        address _denier,
-        DecentralandMarketplacePolygon _marketplace,
-        IERC20 _mana,
-        ICollectionFactory[] memory _factories,
+        address _owner, // The address that can set other roles as well as operate the most critical functions.
+        address _signer, // The address that can sign credits.
+        address _pauser, // The address that can pause the contract.
+        address _denier, // The address that can deny users from using credits.
+        DecentralandMarketplacePolygon _marketplace, // The Decentraland Marketplace contract.
+        IERC20 _mana, // The MANA token contract.
+        ICollectionFactory[] memory _factories, // The collection factories used to check that a contract address is a Decentraland Item/NFT.
         AllowedSales memory _allowedSales,
         uint256 _maxManaTransferPerHour
     ) EIP712("CreditManager", "1.0.0") {
