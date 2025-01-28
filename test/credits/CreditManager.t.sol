@@ -85,18 +85,14 @@ contract CreditManagerTest is Test {
         assertTrue(creditManager.hasRole(creditManager.PAUSER_ROLE(), owner));
         assertTrue(creditManager.hasRole(creditManager.DENIER_ROLE(), denier));
         assertTrue(creditManager.hasRole(creditManager.DENIER_ROLE(), owner));
-
         assertEq(address(creditManager.marketplace()), address(marketplace));
         assertEq(address(creditManager.mana()), address(mana));
         assertEq(address(creditManager.factories(0)), address(factories[0]));
         assertEq(address(creditManager.factories(1)), address(factories[1]));
         assertTrue(creditManager.primarySalesAllowed());
         assertTrue(creditManager.secondarySalesAllowed());
-
-        (uint256 maxPerHour, uint256 transferredThisHour, uint256 currentHour) = creditManager.manaTransferLimit();
-
-        assertEq(maxPerHour, maxManaTransferPerHour);
-        assertEq(transferredThisHour, 0);
-        assertEq(currentHour, 0);
+        assertEq(creditManager.maxManaTransferPerHour(), maxManaTransferPerHour);
+        assertEq(creditManager.manaTransferredThisHour(), 0);
+        assertEq(creditManager.hourOfLastManaTransfer(), 0);
     }
 }

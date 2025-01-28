@@ -38,12 +38,6 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         bytes signature; // The signature of the credit.
     }
 
-    struct ManaTransferLimit {
-        uint256 maxPerHour;
-        uint256 transferredThisHour;
-        uint256 currentHour;
-    }
-
     /// @notice The Decentraland Marketplace contract.
     DecentralandMarketplacePolygon public immutable marketplace;
 
@@ -66,7 +60,14 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
     /// @notice Whether using credits for secondary sales is allowed.
     bool public secondarySalesAllowed;
 
-    ManaTransferLimit public manaTransferLimit;
+    /// @notice Maximum amount of mana that can be transferred out of the contract per hour.
+    uint256 public maxManaTransferPerHour;
+
+    /// @notice How much mana has been transferred out of the contract this hour.
+    uint256 public manaTransferredThisHour;
+
+    /// @notice The hour of the last mana transfer.
+    uint256 public hourOfLastManaTransfer;
 
     constructor(
         address _owner, // The address that can set other roles as well as operate the most critical functions.
@@ -93,12 +94,11 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
 
         primarySalesAllowed = _primarySalesAllowed;
         secondarySalesAllowed = _secondarySalesAllowed;
-
-        manaTransferLimit.maxPerHour = _maxManaTransferPerHour;
+        maxManaTransferPerHour = _maxManaTransferPerHour;
     }
 
     function updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        manaTransferLimit.maxPerHour = _maxManaTransferPerHour;
+        maxManaTransferPerHour = _maxManaTransferPerHour;
     }
 
     function updateAllowedSales(bool _primary, bool _secondary) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -234,16 +234,16 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
     function _validateManaTransferLimit(uint256 _manaTransferred) private {
         uint256 currentHour = block.timestamp / 1 hours;
 
-        if (manaTransferLimit.currentHour != currentHour) {
-            manaTransferLimit.transferredThisHour = 0;
-            manaTransferLimit.currentHour = currentHour;
+        if (currentHour != hourOfLastManaTransfer) {
+            manaTransferredThisHour = 0;
+            hourOfLastManaTransfer = currentHour;
         }
 
-        if (manaTransferLimit.transferredThisHour + _manaTransferred > manaTransferLimit.maxPerHour) {
+        if (manaTransferredThisHour + _manaTransferred > maxManaTransferPerHour) {
             revert("Max mana transfer per hour exceeded");
         }
 
-        manaTransferLimit.transferredThisHour += _manaTransferred;
+        manaTransferredThisHour += _manaTransferred;
     }
 
     function _handleCredits(Credit[] calldata _credits, uint256 manaTransferred) private returns (uint256 creditedMana) {
