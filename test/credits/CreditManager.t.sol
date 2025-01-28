@@ -18,9 +18,23 @@ contract CreditManagerHarness is CreditManager {
         DecentralandMarketplacePolygon _marketplace,
         IERC20 _mana,
         ICollectionFactory[] memory _factories,
-        AllowedSales memory _allowedSales,
+        bool _primarySalesAllowed,
+        bool _secondarySalesAllowed,
         uint256 _maxManaTransferPerHour
-    ) CreditManager(_owner, _signer, _pauser, _denier, _marketplace, _mana, _factories, _allowedSales, _maxManaTransferPerHour) {}
+    )
+        CreditManager(
+            _owner,
+            _signer,
+            _pauser,
+            _denier,
+            _marketplace,
+            _mana,
+            _factories,
+            _primarySalesAllowed,
+            _secondarySalesAllowed,
+            _maxManaTransferPerHour
+        )
+    {}
 }
 
 contract CreditManagerTest is Test {
@@ -35,14 +49,15 @@ contract CreditManagerTest is Test {
     DecentralandMarketplacePolygon private marketplace;
     IERC20 private mana;
     ICollectionFactory[] private factories;
-    CreditManager.AllowedSales private allowedSales;
+    bool primarySalesAllowed;
+    bool secondarySalesAllowed;
     uint256 private maxManaTransferPerHour;
 
     // CreditManager Instance
     CreditManagerHarness private creditManager;
 
     function setUp() public {
-        uint256 forkId = vm.createFork("https://rpc.decentraland.org/polygon", 67186585); // Jan-27-2025 12:05:04 AM +UTC
+        forkId = vm.createFork("https://rpc.decentraland.org/polygon", 67186585); // Jan-27-2025 12:05:04 AM +UTC
         vm.selectFork(forkId);
 
         owner = 0x0E659A116e161d8e502F9036bAbDA51334F2667E;
@@ -54,11 +69,13 @@ contract CreditManagerTest is Test {
         factories = new ICollectionFactory[](2);
         factories[0] = ICollectionFactory(0xB549B2442b2BD0a53795BC5cDcBFE0cAF7ACA9f8);
         factories[1] = ICollectionFactory(0x3195e88aE10704b359764CB38e429D24f1c2f781);
-        allowedSales = CreditManager.AllowedSales({primary: true, secondary: true});
+        primarySalesAllowed = true;
+        secondarySalesAllowed = true;
         maxManaTransferPerHour = 1000 ether;
 
-        creditManager =
-            new CreditManagerHarness(owner, signer.addr, pauser, denier, marketplace, mana, factories, allowedSales, maxManaTransferPerHour);
+        creditManager = new CreditManagerHarness(
+            owner, signer.addr, pauser, denier, marketplace, mana, factories, primarySalesAllowed, secondarySalesAllowed, maxManaTransferPerHour
+        );
     }
 
     function test_SetUpState() public view {
@@ -73,11 +90,8 @@ contract CreditManagerTest is Test {
         assertEq(address(creditManager.mana()), address(mana));
         assertEq(address(creditManager.factories(0)), address(factories[0]));
         assertEq(address(creditManager.factories(1)), address(factories[1]));
-
-        (bool allowedPrimary, bool allowedSecondary) = creditManager.allowedSales();
-
-        assertTrue(allowedPrimary);
-        assertTrue(allowedSecondary);
+        assertTrue(creditManager.primarySalesAllowed());
+        assertTrue(creditManager.secondarySalesAllowed());
 
         (uint256 maxPerHour, uint256 transferredThisHour, uint256 currentHour) = creditManager.manaTransferLimit();
 

@@ -38,11 +38,6 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         bytes signature; // The signature of the credit.
     }
 
-    struct AllowedSales {
-        bool primary;
-        bool secondary;
-    }
-
     struct ManaTransferLimit {
         uint256 maxPerHour;
         uint256 transferredThisHour;
@@ -65,7 +60,11 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
     /// @notice The users that have been denied from using credits.
     mapping(address => bool) public denyList;
 
-    AllowedSales public allowedSales;
+    /// @notice Whether using credits for primary sales is allowed.
+    bool public primarySalesAllowed;
+
+    /// @notice Whether using credits for secondary sales is allowed.
+    bool public secondarySalesAllowed;
 
     ManaTransferLimit public manaTransferLimit;
 
@@ -77,7 +76,8 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         DecentralandMarketplacePolygon _marketplace, // The Decentraland Marketplace contract.
         IERC20 _mana, // The MANA token contract.
         ICollectionFactory[] memory _factories, // The collection factories used to check that a contract address is a Decentraland Item/NFT.
-        AllowedSales memory _allowedSales,
+        bool _primarySalesAllowed, // Whether using credits for primary sales is allowed.
+        bool _secondarySalesAllowed, // Whether using credits for secondary sales is allowed.
         uint256 _maxManaTransferPerHour
     ) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
@@ -91,7 +91,9 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         mana = _mana;
         factories = _factories;
 
-        allowedSales = _allowedSales;
+        primarySalesAllowed = _primarySalesAllowed;
+        secondarySalesAllowed = _secondarySalesAllowed;
+
         manaTransferLimit.maxPerHour = _maxManaTransferPerHour;
     }
 
@@ -99,8 +101,9 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
         manaTransferLimit.maxPerHour = _maxManaTransferPerHour;
     }
 
-    function updateAllowedSales(AllowedSales calldata _allowedSales) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        allowedSales = _allowedSales;
+    function updateAllowedSales(bool _primary, bool _secondary) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        primarySalesAllowed = _primary;
+        secondarySalesAllowed = _secondary;
     }
 
     function updateDenyList(address[] calldata _users, bool[] calldata _values) external {
@@ -187,14 +190,12 @@ contract CreditManager is MarketplaceTypes, CouponTypes, ReentrancyGuard, Pausab
             for (uint256 j = 0; j < sent.length; j++) {
                 Asset calldata asset = sent[j];
 
-                AllowedSales memory m_allowedSales = allowedSales;
-
                 if (asset.assetType == marketplace.ASSET_TYPE_COLLECTION_ITEM()) {
-                    if (!m_allowedSales.primary) {
+                    if (!primarySalesAllowed) {
                         revert("Primary sales are not allowed");
                     }
                 } else if (asset.assetType == marketplace.ASSET_TYPE_ERC721()) {
-                    if (!m_allowedSales.secondary) {
+                    if (!secondarySalesAllowed) {
                         revert("Secondary sales are not allowed");
                     }
                 } else {
