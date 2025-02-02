@@ -4,39 +4,39 @@ pragma solidity 0.8.20;
 import {CreditManagerBase} from "src/credits/CreditManagerBase.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
 
+/// @notice Strategy to handle credits for marketplace order execution.
 abstract contract MarketplaceStrategy is CreditManagerBase {
+    /// @notice The marketplace contract.
     IMarketplace public immutable marketplace;
 
     constructor(IMarketplace _marketplace) {
         marketplace = _marketplace;
     }
 
+    /// @notice Executes a marketplace order applying the credits.
     function executeMarketplaceExecuteOrder(
-        address[] calldata _nftAddress,
-        uint256[] calldata _assetId,
-        uint256[] calldata _price,
+        address _contractAddress,
+        uint256 _tokenId,
+        uint256 _price,
+        bytes calldata _fingerprint,
         Credit[] calldata _credits
     ) external {
         _validateSecondarySalesAllowed();
 
-        uint256 totalManaToTransfer;
+        uint256 manaToCredit = _computeTotalManaToCredit(_credits, _price);
 
-        for (uint256 i = 0; i < _price.length; i++) {
-            totalManaToTransfer += _price[i];
-        }
-
-        uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
-
-        mana.approve(address(marketplace), totalManaToTransfer);
+        mana.approve(address(marketplace), _price);
 
         uint256 balanceBefore = mana.balanceOf(address(this));
 
-        for (uint256 i = 0; i < _nftAddress.length; i++) {
-            marketplace.executeOrder(_nftAddress[i], _assetId[i], _price[i]);
+        if (_fingerprint.length > 0) {
+            marketplace.safeExecuteOrder(_contractAddress, _tokenId, _price, _fingerprint);
+        } else {
+            marketplace.executeOrder(_contractAddress, _tokenId, _price);
         }
 
-        _validateResultingBalance(balanceBefore, totalManaToTransfer);
+        _validateResultingBalance(balanceBefore, _price);
 
-        _executeManaTransfers(manaToCredit, totalManaToTransfer);
+        _executeManaTransfers(manaToCredit, _price);
     }
 }
