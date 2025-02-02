@@ -21,7 +21,7 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
         uint256 _price,
         bytes calldata _fingerprint,
         Credit[] calldata _credits
-    ) external {
+    ) external nonReentrant {
         _validateSecondarySalesAllowed();
 
         uint256 manaToCredit = _computeTotalManaToCredit(_credits, _price);
