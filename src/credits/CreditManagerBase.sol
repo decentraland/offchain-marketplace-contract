@@ -32,8 +32,13 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         address signer;
         address pauser;
         address denier;
+        bool isPolygon;
+        ICollectionFactory collectionFactory;
+        ICollectionFactory collectionFactoryV3;
+        address land;
+        address estate;
+        address nameRegistry;
         IERC20 mana;
-        ICollectionFactory[] factories;
         bool primarySalesAllowed;
         bool secondarySalesAllowed;
         uint256 maxManaTransferPerHour;
@@ -47,11 +52,31 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         bytes signature; // The signature of the credit.
     }
 
+    /// @notice Wheter the contract is being deployed on Polygon or Polygon Testnet, or Ethereum or Ethereum Testnet.
+    bool public immutable isPolygon;
+
+    /// @notice One of the collection factories used to check that a contract address is a Decentraland Item/NFT.
+    /// @dev This is only used on Polygon or Polygon Testnets.
+    ICollectionFactory public immutable collectionFactory;
+
+    /// @notice The other collection factory used to check that a contract address is a Decentraland Item/NFT.
+    /// @dev This is only used on Polygon or Polygon Testnets.
+    ICollectionFactory public immutable collectionFactoryV3;
+
+    /// @notice The contract address of the LAND NFT used to validate that the traded NFT is a LAND.
+    /// @dev This is only used on Ethereum or Ethereum Testnet.
+    address public immutable land;
+
+    /// @notice The contract address of the ESTATE NFT used to validate that the traded NFT is an ESTATE.
+    /// @dev This is only used on Ethereum or Ethereum Testnet.
+    address public immutable estate;
+
+    /// @notice The contract address of the NAME REGISTRY used to validate that the traded NFT is a NAME.
+    /// @dev This is only used on Ethereum or Ethereum Testnet.
+    address public immutable nameRegistry;
+
     /// @notice The MANA token contract.
     IERC20 public immutable mana;
-
-    /// @notice The collection factories used to check that a contract address is a Decentraland Item/NFT.
-    ICollectionFactory[] public factories;
 
     /// @notice How many credits have been spent from a particular credit.
     /// The key is the keccak256 hash of the credit signature.
@@ -88,15 +113,15 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         _grantRole(DENIER_ROLE, _init.owner);
 
         mana = _init.mana;
+        isPolygon = _init.isPolygon;
+        collectionFactory = _init.collectionFactory;
+        collectionFactoryV3 = _init.collectionFactoryV3;
+        land = _init.land;
+        estate = _init.estate;
+        nameRegistry = _init.nameRegistry;
 
-        _updateFactories(_init.factories);
         _updateAllowedSales(_init.primarySalesAllowed, _init.secondarySalesAllowed);
         _updateMaxManaTransferPerHour(_init.maxManaTransferPerHour);
-    }
-
-    /// @notice Allows the owner to update the collection factories.
-    function updateFactories(ICollectionFactory[] calldata _factories) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updateFactories(_factories);
     }
 
     /// @notice Allows the owner to update if primary or secondary sales are allowed.
@@ -138,13 +163,6 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     /// @notice Allows the owner to withdraw any ERC20 token from the contract.
     function withdraw(IERC20 _token, uint256 _amount, address _beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _token.safeTransfer(_beneficiary, _amount);
-    }
-
-    /// @dev Updates the collection factories and emits an event.
-    function _updateFactories(ICollectionFactory[] memory _factories) internal {
-        factories = _factories;
-
-        emit FactoriesUpdated(_msgSender(), _factories);
     }
 
     /// @dev Updates if primary or secondary sales are allowed and emits an event.
@@ -226,14 +244,16 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     }
 
     /// @dev Validates that a contract address is a Decentraland Item/NFT.
-    function _validateIsDecentralandItem(address _contractAddress) internal view {
-        for (uint256 i = 0; i < factories.length; i++) {
-            if (factories[i].isCollectionFromFactory(_contractAddress)) {
+    function _validateContractAddress(address _contractAddress) internal view {
+        if (isPolygon) {
+            if (collectionFactoryV3.isCollectionFromFactory(_contractAddress) || collectionFactory.isCollectionFromFactory(_contractAddress)) {
                 return;
             }
+        } else if (_contractAddress == land || _contractAddress == estate || _contractAddress == nameRegistry) {
+            return;
         }
 
-        revert("Contract is not a Decentraland Item/NFT");
+        revert("Invalid contract address");
     }
 
     /// @dev Validates that primary sales are allowed.

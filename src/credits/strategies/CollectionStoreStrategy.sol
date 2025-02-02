@@ -24,7 +24,7 @@ abstract contract CollectionStoreStrategy is CreditManagerBase {
         for (uint256 i = 0; i < _itemsToBuy.length; i++) {
             ICollectionStore.ItemToBuy calldata itemToBuy = _itemsToBuy[i];
 
-            _validateIsDecentralandItem(address(itemToBuy.collection));
+            _validateContractAddress(address(itemToBuy.collection));
 
             for (uint256 j = 0; j < itemToBuy.prices.length; j++) {
                 totalManaToTransfer += itemToBuy.prices[j];

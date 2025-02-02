@@ -108,7 +108,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
             }
 
             for (uint256 j = 0; j < sent.length; j++) {
-                _validateIsDecentralandItem(sent[j].contractAddress);
+                _validateContractAddress(sent[j].contractAddress);
 
                 if (sent[j].assetType == ASSET_TYPE_ERC721) {
                     _validateSecondarySalesAllowed();
