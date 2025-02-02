@@ -25,7 +25,7 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
             totalManaToTransfer += _price[i];
         }
 
-        _consumeCredits(_credits, totalManaToTransfer);
+        uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
 
         mana.approve(address(marketplace), totalManaToTransfer);
 
@@ -36,5 +36,7 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
         }
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
+
+        _executeManaTransfers(manaToCredit, totalManaToTransfer);
     }
 }

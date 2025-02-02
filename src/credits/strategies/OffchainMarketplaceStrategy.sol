@@ -63,7 +63,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
 
         uint256 totalManaToTransfer = _computeTotalManaToTransfer(tradesWithCoupons);
 
-        _consumeCredits(_credits, totalManaToTransfer);
+        uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
 
         mana.approve(address(offchainMarketplace), totalManaToTransfer);
 
@@ -72,6 +72,8 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         offchainMarketplace.acceptWithCoupon(tradesWithUpdatedBeneficiaries, _coupons);
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
+
+        _executeManaTransfers(manaToCredit, totalManaToTransfer);
     }
 
     function _validateTrades(MarketplaceWithCouponManager.Trade[] memory _trades) private view {

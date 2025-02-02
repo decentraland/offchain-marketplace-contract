@@ -33,7 +33,7 @@ abstract contract CollectionStoreStrategy is CreditManagerBase {
             }
         }
 
-        _consumeCredits(_credits, totalManaToTransfer);
+        uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
 
         mana.approve(address(collectionStore), totalManaToTransfer);
 
@@ -42,5 +42,7 @@ abstract contract CollectionStoreStrategy is CreditManagerBase {
         collectionStore.buy(_itemsToBuy);
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
+
+        _executeManaTransfers(manaToCredit, totalManaToTransfer);
     }
 }

@@ -250,9 +250,24 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         }
     }
 
+    /// @dev Validates that the balance of the contract after a marketplace trade is the expected one.
     function _validateResultingBalance(uint256 _originalBalance, uint256 _expectedDiff) internal view {
         if (_originalBalance - mana.balanceOf(address(this)) != _expectedDiff) {
             revert("MANA transfer mismatch");
+        }
+    }
+
+    /// @dev Transfers `_manaToCredit` to the caller and the difference between `_manaToTransfer` and `_manaToCredit`
+    /// from the caller to the contract.
+    function _executeManaTransfers(uint256 _manaToCredit, uint256 _manaToTransfer) internal {
+        address sender = _msgSender();
+
+        mana.safeTransfer(sender, _manaToCredit);
+
+        uint256 diff = _manaToTransfer - _manaToCredit;
+
+        if (diff > 0) {
+            mana.safeTransferFrom(sender, address(this), diff);
         }
     }
 
