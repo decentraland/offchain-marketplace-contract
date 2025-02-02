@@ -6,13 +6,14 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
 import {EIP712} from "src/common/EIP712.sol";
 
 /// @notice Enables users to use off-chain signed credits for marketplace trades.
-abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransaction {
+abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransaction, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
