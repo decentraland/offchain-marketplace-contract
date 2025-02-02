@@ -41,8 +41,6 @@ abstract contract CollectionStoreStrategy is CreditManagerBase {
 
         collectionStore.buy(_itemsToBuy);
 
-        if (balanceBefore - mana.balanceOf(address(this)) != totalManaToTransfer) {
-            revert("MANA transfer mismatch");
-        }
+        _validateResultingBalance(balanceBefore, totalManaToTransfer);
     }
 }

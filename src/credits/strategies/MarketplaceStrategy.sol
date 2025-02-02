@@ -19,10 +19,6 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
     ) external {
         _validateSecondarySalesAllowed();
 
-        if (_nftAddress.length != _assetId.length || _nftAddress.length != _price.length || _nftAddress.length == 0) {
-            revert("Invalid input");
-        }
-
         uint256 totalManaToTransfer;
 
         for (uint256 i = 0; i < _price.length; i++) {
@@ -39,8 +35,6 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
             marketplace.executeOrder(_nftAddress[i], _assetId[i], _price[i]);
         }
 
-        if (balanceBefore - mana.balanceOf(address(this)) != totalManaToTransfer) {
-            revert("MANA transfer mismatch");
-        }
+        _validateResultingBalance(balanceBefore, totalManaToTransfer);
     }
 }

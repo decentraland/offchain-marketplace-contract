@@ -260,6 +260,12 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         }
     }
 
+    function _validateResultingBalance(uint256 _originalBalance, uint256 _expectedDiff) internal view {
+        if (_originalBalance - mana.balanceOf(address(this)) != _expectedDiff) {
+            revert("MANA transfer mismatch");
+        }
+    }
+
     /// @dev Overrides the _msgSender function to support Meta Transactions.
     function _msgSender() internal view override returns (address) {
         return _getMsgSender();

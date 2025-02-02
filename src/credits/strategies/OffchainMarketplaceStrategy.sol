@@ -28,9 +28,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
 
         offchainMarketplace.accept(_trades);
 
-        if (balanceBefore - mana.balanceOf(address(this)) != totalManaToTransfer) {
-            revert("MANA transfer mismatch");
-        }
+        _validateResultingBalance(balanceBefore, totalManaToTransfer);
     }
 
     function _validateTrades(MarketplaceWithCouponManager.Trade[] memory _trades) private view {
