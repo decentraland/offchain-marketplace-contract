@@ -244,6 +244,19 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
 
         revert("Contract is not a Decentraland Item/NFT");
     }
+
+    /// @dev Validates that primary sales are allowed.
+    function _validatePrimarySalesAllowed() internal view {
+        if (!primarySalesAllowed) {
+            revert("Primary sales are not allowed");
+        }
+    }
+
+    /// @dev Validates that secondary sales are allowed.
+    function _validateSecondarySalesAllowed() internal view {
+        if (!secondarySalesAllowed) {
+            revert("Secondary sales are not allowed");
+        }
     }
 
     /// @dev Overrides the _msgSender function to support Meta Transactions.
