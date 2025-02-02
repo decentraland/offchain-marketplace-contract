@@ -25,6 +25,19 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     /// @notice The role that can deny users from using credits.
     bytes32 public constant DENIER_ROLE = keccak256("DENIER_ROLE");
 
+    /// @notice The initialization parameters for the contract.
+    struct BaseConstructorParams {
+        address owner;
+        address signer;
+        address pauser;
+        address denier;
+        IERC20 mana;
+        ICollectionFactory[] factories;
+        bool primarySalesAllowed;
+        bool secondarySalesAllowed;
+        uint256 maxManaTransferPerHour;
+    }
+
     /// @notice The schema of the Credit type.
     struct Credit {
         uint256 amount; // The amount of MANA that the credit is worth.
@@ -66,29 +79,18 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     event MaxManaTransferPerHourUpdated(address _sender, uint256 _maxManaTransferPerHour);
     event DenyListUpdated(address _sender, address _user, bool _value);
 
-    constructor(
-        address _owner, // The address that can set other roles as well as operate the most critical functions.
-        address _signer, // The address that can sign credits.
-        address _pauser, // The address that can pause the contract.
-        address _denier, // The address that can deny users from using credits.
-        IERC20 _mana, // The MANA token contract.
-        ICollectionFactory[] memory _factories, // The collection factories used to check that a contract address is a Decentraland Item/NFT.
-        bool _primarySalesAllowed, // Whether using credits for primary sales is allowed.
-        bool _secondarySalesAllowed, // Whether using credits for secondary sales is allowed.
-        uint256 _maxManaTransferPerHour // Maximum amount of MANA that can be transferred out of the contract per hour.
-    ) EIP712("CreditManager", "1.0.0") {
-        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
-        _grantRole(SIGNER_ROLE, _signer);
-        _grantRole(PAUSER_ROLE, _pauser);
-        _grantRole(PAUSER_ROLE, _owner);
-        _grantRole(DENIER_ROLE, _denier);
-        _grantRole(DENIER_ROLE, _owner);
+    constructor(BaseConstructorParams memory _init) EIP712("CreditManager", "1.0.0") {
+        _grantRole(DEFAULT_ADMIN_ROLE, _init.owner);
+        _grantRole(SIGNER_ROLE, _init.signer);
+        _grantRole(PAUSER_ROLE, _init.pauser);
+        _grantRole(DENIER_ROLE, _init.denier);
+        _grantRole(DENIER_ROLE, _init.owner);
 
-        mana = _mana;
+        mana = _init.mana;
 
-        _updateFactories(_factories);
-        _updateAllowedSales(_primarySalesAllowed, _secondarySalesAllowed);
-        _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+        _updateFactories(_init.factories);
+        _updateAllowedSales(_init.primarySalesAllowed, _init.secondarySalesAllowed);
+        _updateMaxManaTransferPerHour(_init.maxManaTransferPerHour);
     }
 
     /// @notice Allows the owner to update the collection factories.
