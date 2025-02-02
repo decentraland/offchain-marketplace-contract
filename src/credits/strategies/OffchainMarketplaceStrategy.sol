@@ -24,7 +24,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         // Calculates how much mana will be transferred after the trades are accepted.
         uint256 totalManaToTransfer = _computeTotalManaToTransfer(_trades);
 
-        _consumeCredits(_credits, totalManaToTransfer);
+        uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
 
         mana.approve(address(offchainMarketplace), totalManaToTransfer);
 
@@ -33,6 +33,8 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         offchainMarketplace.accept(_trades);
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
+
+        _executeManaTransfers(manaToCredit, totalManaToTransfer);
     }
 
     function executeOffchainMarketplaceAcceptWithCoupon(
