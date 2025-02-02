@@ -5,6 +5,7 @@ import {CreditManagerBase} from "src/credits/CreditManagerBase.sol";
 import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
 import {IManaUsdRateProvider} from "src/credits/rates/interfaces/IManaUsdRateProvider.sol";
+import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 
 abstract contract OffchainMarketplaceStrategy is CreditManagerBase, DecentralandMarketplacePolygonAssetTypes {
     MarketplaceWithCouponManager public immutable offchainMarketplace;
@@ -15,9 +16,12 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         manaUsdRateProvider = _manaUsdRateProvider;
     }
 
+    /// @dev _trades is defined in memory to allow _validateTrades to update the sent asset beneficiaries from address(0) to
+    /// the caller and prevent this contract from receiving the assets.
     function executeOffchainMarketplaceAccept(MarketplaceWithCouponManager.Trade[] memory _trades, Credit[] calldata _credits) external {
         _validateTrades(_trades);
-        
+
+        // Calculates how much mana will be transferred after the trades are accepted.
         uint256 totalManaToTransfer = _computeTotalManaToTransfer(_trades);
 
         _consumeCredits(_credits, totalManaToTransfer);
@@ -27,6 +31,45 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         uint256 balanceBefore = mana.balanceOf(address(this));
 
         offchainMarketplace.accept(_trades);
+
+        _validateResultingBalance(balanceBefore, totalManaToTransfer);
+    }
+
+    function executeOffchainMarketplaceAcceptWithCoupon(
+        MarketplaceWithCouponManager.Trade[] calldata _trades,
+        MarketplaceWithCouponManager.Coupon[] calldata _coupons,
+        Credit[] calldata _credits
+    ) external {
+        // Copy the trades to memory so _validateTrades can update the sent asset beneficiaries from address(0) to
+        // the caller and prevent this contract from receiving the assets.
+        MarketplaceWithCouponManager.Trade[] memory tradesWithUpdatedBeneficiaries = _trades;
+
+        _validateTrades(tradesWithUpdatedBeneficiaries);
+
+        // Copy the trades to memory again so the trades used in acceptWithCoupon are not affected by the next coupon
+        // application used only to calculate total mana to transfer.
+        MarketplaceWithCouponManager.Trade[] memory tradesWithCoupons = _trades;
+
+        for (uint256 i = 0; i < _trades.length; i++) {
+            address couponAddress = _coupons[i].couponAddress;
+
+            // I don't need to check if the coupon address is valid because it is validated afterwards when calling
+            // the marketplace.acceptWithCoupon function.
+            ICoupon coupon = ICoupon(couponAddress);
+
+            // Apply the coupon to the trade so the values are updated and can be used to calculate the total mana to transfer.
+            tradesWithCoupons[i] = coupon.applyCoupon(tradesWithUpdatedBeneficiaries[i], _coupons[i]);
+        }
+
+        uint256 totalManaToTransfer = _computeTotalManaToTransfer(tradesWithCoupons);
+
+        _consumeCredits(_credits, totalManaToTransfer);
+
+        mana.approve(address(offchainMarketplace), totalManaToTransfer);
+
+        uint256 balanceBefore = mana.balanceOf(address(this));
+
+        offchainMarketplace.acceptWithCoupon(tradesWithUpdatedBeneficiaries, _coupons);
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
     }
@@ -68,6 +111,8 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
                     revert("Invalid Sent Asset Type");
                 }
 
+                // If the beneficiary is address(0), it is updated to the caller to prevent this contract from receiving the assets.
+                // This can be done because the sent asset beneficiary is not part of the Trade signature.
                 if (sent[j].beneficiary == address(0)) {
                     sent[j].beneficiary = _msgSender();
                 }
