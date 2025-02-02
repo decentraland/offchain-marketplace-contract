@@ -237,6 +237,7 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     }
 
     /// @dev Validates that primary sales are allowed.
+    /// This is toggled by the owner of the contract.
     function _validatePrimarySalesAllowed() internal view {
         if (!primarySalesAllowed) {
             revert("Primary sales are not allowed");
@@ -244,6 +245,7 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     }
 
     /// @dev Validates that secondary sales are allowed.
+    /// This is toggled by the owner of the contract.
     function _validateSecondarySalesAllowed() internal view {
         if (!secondarySalesAllowed) {
             revert("Secondary sales are not allowed");
