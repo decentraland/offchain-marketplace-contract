@@ -184,28 +184,54 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         manaTransferredThisHour += _manaTransferred;
     }
 
-    /// @dev Validates that the credit has been signed by the signer.
-    /// Returns how much of the credit can be spent based on the amount that has already been spent.
-    function _validateCredit(Credit calldata _credit) internal view returns (uint256 spendableCreditAmount) {
-        if (_credit.amount == 0) {
+    /// @dev Consumes the credits according to the amount of MANA to be transferred by the underlying operation and transfers the credited MANA to the user.
+    function _consumeCredits(Credit[] calldata _credits, uint256 _manaToTransfer) internal {
+        if (_credits.length == 0) {
+            revert("Invalid credits length");
+        }
+
+        uint256 totalManaToCredit;
+
+        for (uint256 i = 0; i < _credits.length; i++) {
+            Credit calldata credit = _credits[i];
+
+            if (credit.amount == 0) {
             revert("Invalid credit amount");
         }
 
-        if (block.timestamp > _credit.expiration) {
+            if (block.timestamp > credit.expiration) {
             revert("Credit has expired");
         }
 
-        bytes32 digest = keccak256(abi.encode(_msgSender(), _credit.amount, _credit.expiration, _credit.salt, address(this), block.chainid));
-
-        if (!hasRole(SIGNER_ROLE, digest.recover(_credit.signature))) {
+            if (
+                !hasRole(
+                    SIGNER_ROLE,
+                    keccak256(abi.encode(_msgSender(), credit.amount, credit.expiration, credit.salt, address(this), block.chainid)).recover(
+                        credit.signature
+                    )
+                )
+            ) {
             revert("Invalid credit signature");
         }
 
-        spendableCreditAmount = _credit.amount - spentCredits[keccak256(_credit.signature)];
+            bytes32 sigHash = keccak256(credit.signature);
 
-        if (spendableCreditAmount == 0) {
+            uint256 manaToCredit = credit.amount - spentCredits[sigHash];
+
+            if (manaToCredit == 0) {
             revert("Credit has been spent");
         }
+
+            uint256 diff = _manaToTransfer - totalManaToCredit;
+
+            manaToCredit = manaToCredit > diff ? diff : manaToCredit;
+
+            totalManaToCredit += manaToCredit;
+
+            spentCredits[sigHash] += manaToCredit;
+        }
+
+        mana.safeTransfer(_msgSender(), totalManaToCredit);
     }
 
     /// @dev Checks if a contract address is a Decentraland Item/NFT.
