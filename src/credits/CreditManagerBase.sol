@@ -192,10 +192,6 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         for (uint256 i = 0; i < _credits.length; i++) {
             Credit calldata credit = _credits[i];
 
-            if (credit.amount == 0) {
-                revert("Invalid credit amount");
-            }
-
             if (block.timestamp > credit.expiration) {
                 revert("Credit has expired");
             }
