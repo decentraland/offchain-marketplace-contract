@@ -234,15 +234,16 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         mana.safeTransfer(_msgSender(), totalManaToCredit);
     }
 
-    /// @dev Checks if a contract address is a Decentraland Item/NFT.
-    function _isDecentralandItem(address _contractAddress) internal view returns (bool) {
+    /// @dev Validates that a contract address is a Decentraland Item/NFT.
+    function _validateIsDecentralandItem(address _contractAddress) internal view {
         for (uint256 i = 0; i < factories.length; i++) {
             if (factories[i].isCollectionFromFactory(_contractAddress)) {
-                return true;
+                return;
             }
         }
 
-        return false;
+        revert("Contract is not a Decentraland Item/NFT");
+    }
     }
 
     /// @dev Overrides the _msgSender function to support Meta Transactions.
