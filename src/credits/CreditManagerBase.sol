@@ -196,12 +196,12 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
             Credit calldata credit = _credits[i];
 
             if (credit.amount == 0) {
-            revert("Invalid credit amount");
-        }
+                revert("Invalid credit amount");
+            }
 
             if (block.timestamp > credit.expiration) {
-            revert("Credit has expired");
-        }
+                revert("Credit has expired");
+            }
 
             if (
                 !hasRole(
@@ -211,16 +211,16 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
                     )
                 )
             ) {
-            revert("Invalid credit signature");
-        }
+                revert("Invalid credit signature");
+            }
 
             bytes32 sigHash = keccak256(credit.signature);
 
             uint256 manaToCredit = credit.amount - spentCredits[sigHash];
 
             if (manaToCredit == 0) {
-            revert("Credit has been spent");
-        }
+                revert("Credit has been spent");
+            }
 
             uint256 diff = _manaToTransfer - totalManaToCredit;
 
