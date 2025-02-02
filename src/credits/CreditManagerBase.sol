@@ -193,6 +193,8 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
 
         uint256 totalManaToCredit;
 
+        uint256 manaToTransferAndTotalManaToCreditDiff;
+
         for (uint256 i = 0; i < _credits.length; i++) {
             Credit calldata credit = _credits[i];
 
@@ -223,9 +225,9 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
                 revert("Credit has been spent");
             }
 
-            uint256 diff = _manaToTransfer - totalManaToCredit;
+            manaToTransferAndTotalManaToCreditDiff = _manaToTransfer - totalManaToCredit;
 
-            manaToCredit = manaToCredit > diff ? diff : manaToCredit;
+            manaToCredit = manaToCredit > manaToTransferAndTotalManaToCreditDiff ? manaToTransferAndTotalManaToCreditDiff : manaToCredit;
 
             totalManaToCredit += manaToCredit;
 
@@ -233,6 +235,10 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         }
 
         mana.safeTransfer(_msgSender(), totalManaToCredit);
+
+        if (manaToTransferAndTotalManaToCreditDiff > 0) {
+            mana.safeTransferFrom(_msgSender(), address(this), manaToTransferAndTotalManaToCreditDiff);
+        }
     }
 
     /// @dev Validates that a contract address is a Decentraland Item/NFT.
