@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
 import {CreditManagerBase} from "src/credits/CreditManagerBase.sol";
 import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
 import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
@@ -12,8 +14,12 @@ abstract contract CollectionStoreStrategy is CreditManagerBase {
         collectionStore = _collectionStore;
     }
 
-    function executeCollectionStoreBuy(ICollectionStore.ItemToBuy[] calldata _itemsToBuy, Credit[] calldata _credits) external {
+    function executeCollectionStoreBuy(ICollectionStore.ItemToBuy[] calldata _itemsToBuy, Credit[] calldata _credits) external nonReentrant {
         _validatePrimarySalesAllowed();
+
+        if (_itemsToBuy.length == 0) {
+            revert("Invalid input");
+        }
 
         uint256 totalManaToTransfer;
 
