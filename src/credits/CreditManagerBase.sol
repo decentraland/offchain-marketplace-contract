@@ -185,16 +185,10 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         manaTransferredThisHour += _manaTransferred;
     }
 
-    /// @dev Consumes the credits according to the amount of MANA to be transferred by the underlying operation and transfers the credited MANA to the user.
-    function _consumeCredits(Credit[] calldata _credits, uint256 _manaToTransfer) internal {
-        if (_credits.length == 0) {
-            revert("Invalid credits length");
-        }
-
-        uint256 totalManaToCredit;
-
-        uint256 manaToTransferAndTotalManaToCreditDiff;
-
+    /// @dev Computes how much MANA has to be credited to the user according to the credits and the amount of MANA to be transferred.
+    /// It will consume credit amount in the order of the credits array.
+    /// If the credits contain more MANA than the amount to be transferred, the excess MANA will not be credited and will remain available for future transfers.
+    function _computeTotalManaToCredit(Credit[] calldata _credits, uint256 _manaToTransfer) internal returns (uint256 totalManaToCredit) {
         for (uint256 i = 0; i < _credits.length; i++) {
             Credit calldata credit = _credits[i];
 
@@ -225,19 +219,13 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
                 revert("Credit has been spent");
             }
 
-            manaToTransferAndTotalManaToCreditDiff = _manaToTransfer - totalManaToCredit;
+            uint256 diff = _manaToTransfer - totalManaToCredit;
 
-            manaToCredit = manaToCredit > manaToTransferAndTotalManaToCreditDiff ? manaToTransferAndTotalManaToCreditDiff : manaToCredit;
+            manaToCredit = manaToCredit > diff ? diff : manaToCredit;
 
             totalManaToCredit += manaToCredit;
 
             spentCredits[sigHash] += manaToCredit;
-        }
-
-        mana.safeTransfer(_msgSender(), totalManaToCredit);
-
-        if (manaToTransferAndTotalManaToCreditDiff > 0) {
-            mana.safeTransferFrom(_msgSender(), address(this), manaToTransferAndTotalManaToCreditDiff);
         }
     }
 
