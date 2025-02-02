@@ -9,6 +9,7 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
     /// @notice The marketplace contract.
     IMarketplace public immutable marketplace;
 
+    /// @param _marketplace Address of the marketplace contract that handles on-chain orders.
     constructor(IMarketplace _marketplace) {
         marketplace = _marketplace;
     }
