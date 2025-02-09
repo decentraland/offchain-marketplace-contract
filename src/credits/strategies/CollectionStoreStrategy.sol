@@ -9,12 +9,12 @@ abstract contract CollectionStoreStrategy is CreditManagerBase {
     ICollectionStore public immutable collectionStore;
 
     /// @param _collectionStore The collection store contract.
-    struct CollectionStoreInit {
+    struct CollectionStoreStrategyInit {
         ICollectionStore collectionStore;
     }
 
     /// @param _init The initialization parameters for the contract.
-    constructor(CollectionStoreInit memory _init) {
+    constructor(CollectionStoreStrategyInit memory _init) {
         collectionStore = _init.collectionStore;
     }
 

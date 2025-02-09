@@ -13,16 +13,16 @@ import {IManaUsdRateProvider} from "src/credits/rates/interfaces/IManaUsdRatePro
 
 contract CreditManager is CollectionStoreStrategy, MarketplaceStrategy, OffchainMarketplaceStrategy, ArbitraryCallStrategy {
     constructor(
-        CollectionStoreInit memory _collectionStoreInit,
-        MarketplaceStrategyInit memory _marketplaceInit,
-        OffchainMarketplaceStrategyInit memory _offchainMarketplaceInit,
-        ArbitraryCallInit memory _arbitraryCallInit,
+        CollectionStoreStrategyInit memory _collectionStoreStrategyInit,
+        MarketplaceStrategyInit memory _marketplaceStrategyInit,
+        OffchainMarketplaceStrategyInit memory _offchainMarketplaceStrategyInit,
+        ArbitraryCallStrategyInit memory _arbitraryCallStrategyInit,
         CreditManagerBaseInit memory _baseConstructorParams
     )
-        CollectionStoreStrategy(_collectionStoreInit)
-        MarketplaceStrategy(_marketplaceInit)
-        OffchainMarketplaceStrategy(_offchainMarketplaceInit)
-        ArbitraryCallStrategy(_arbitraryCallInit)
+        CollectionStoreStrategy(_collectionStoreStrategyInit)
+        MarketplaceStrategy(_marketplaceStrategyInit)
+        OffchainMarketplaceStrategy(_offchainMarketplaceStrategyInit)
+        ArbitraryCallStrategy(_arbitraryCallStrategyInit)
         CreditManagerBase(_baseConstructorParams)
     {}
 }

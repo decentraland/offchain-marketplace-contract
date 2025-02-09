@@ -21,7 +21,7 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
 
     /// @param _arbitraryCallSigner The address that can sign arbitrary call data.
     /// @param _arbitraryCallRevoker The address that can revoke arbitrary call signatures.
-    struct ArbitraryCallInit {
+    struct ArbitraryCallStrategyInit {
         address arbitraryCallSigner;
         address arbitraryCallRevoker;
     }
@@ -39,7 +39,7 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
     }
 
     /// @param _init The initialization parameters for the contract.
-    constructor(ArbitraryCallInit memory _init) {
+    constructor(ArbitraryCallStrategyInit memory _init) {
         _grantRole(ARBITRARY_CALL_SIGNER_ROLE, _init.arbitraryCallSigner);
         _grantRole(ARBITRARY_CALL_REVOKER_ROLE, _init.arbitraryCallRevoker);
     }
