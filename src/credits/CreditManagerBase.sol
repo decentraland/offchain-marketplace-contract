@@ -100,7 +100,6 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     /// @notice The hour of the last MANA transfer.
     uint256 public hourOfLastManaTransfer;
 
-    event FactoriesUpdated(address _sender, ICollectionFactory[] _factories);
     event AllowedSalesUpdated(address _sender, bool _primary, bool _secondary);
     event MaxManaTransferPerHourUpdated(address _sender, uint256 _maxManaTransferPerHour);
     event DenyListUpdated(address _sender, address _user, bool _value);
@@ -217,7 +216,7 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
             if (
                 !hasRole(
                     SIGNER_ROLE,
-                    keccak256(abi.encode(_msgSender(), credit.amount, credit.expiration, credit.salt, address(this), block.chainid)).recover(
+                    keccak256(abi.encode(_msgSender(), address(this), block.chainid, credit.amount, credit.expiration, credit.salt)).recover(
                         credit.signature
                     )
                 )
