@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {CreditManagerBase} from "src/credits/CreditManagerBase.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
 
 /// @notice Strategy to handle credits for marketplace order execution.
 abstract contract MarketplaceStrategy is CreditManagerBase {
+    using SafeERC20 for IERC20;
+
     /// @notice The marketplace contract.
     IMarketplace public immutable marketplace;
 
@@ -31,7 +36,7 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
 
         uint256 manaToCredit = _computeTotalManaToCredit(_credits, _price);
 
-        mana.approve(address(marketplace), _price);
+        mana.forceApprove(address(marketplace), _price);
 
         uint256 balanceBefore = mana.balanceOf(address(this));
 

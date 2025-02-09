@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {CreditManagerBase} from "src/credits/CreditManagerBase.sol";
 import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
@@ -8,6 +11,8 @@ import {IManaUsdRateProvider} from "src/credits/rates/interfaces/IManaUsdRatePro
 import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 
 abstract contract OffchainMarketplaceStrategy is CreditManagerBase, DecentralandMarketplacePolygonAssetTypes {
+    using SafeERC20 for IERC20;
+
     MarketplaceWithCouponManager public immutable offchainMarketplace;
     IManaUsdRateProvider public immutable manaUsdRateProvider;
 
@@ -37,7 +42,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
 
         uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
 
-        mana.approve(address(offchainMarketplace), totalManaToTransfer);
+        mana.forceApprove(address(offchainMarketplace), totalManaToTransfer);
 
         uint256 balanceBefore = mana.balanceOf(address(this));
 
@@ -78,7 +83,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
 
         uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
 
-        mana.approve(address(offchainMarketplace), totalManaToTransfer);
+        mana.forceApprove(address(offchainMarketplace), totalManaToTransfer);
 
         uint256 balanceBefore = mana.balanceOf(address(this));
 

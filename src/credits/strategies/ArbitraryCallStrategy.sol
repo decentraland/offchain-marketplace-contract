@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {CreditManagerBase} from "src/credits/CreditManagerBase.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
+import {CreditManagerBase} from "src/credits/CreditManagerBase.sol";
+
 abstract contract ArbitraryCallStrategy is CreditManagerBase {
+    using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
     /// @notice The role that can sign arbitrary call data.
@@ -113,7 +117,7 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
 
         uint256 manaToCredit = _computeTotalManaToCredit(_credits, _call.expectedManaTransfer);
 
-        mana.approve(address(this), _call.expectedManaTransfer);
+        mana.forceApprove(address(this), _call.expectedManaTransfer);
 
         uint256 balanceBefore = mana.balanceOf(address(this));
 
