@@ -14,6 +14,7 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
         IMarketplace marketplace;
     }
 
+    /// @param _init The initialization parameters for the contract.
     constructor(MarketplaceStrategyInit memory _init) {
         marketplace = _init.marketplace;
     }
