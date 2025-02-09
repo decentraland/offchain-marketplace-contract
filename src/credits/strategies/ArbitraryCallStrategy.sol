@@ -21,9 +21,13 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
 
     /// @param _arbitraryCallSigner The address that can sign arbitrary call data.
     /// @param _arbitraryCallRevoker The address that can revoke arbitrary call signatures.
+    /// @param _allowedTargets The list of targets that are allowed to be called.
+    /// @param _allowedSelectors The list of selectors that are allowed to be called for the allowed targets.
     struct ArbitraryCallStrategyInit {
         address arbitraryCallSigner;
         address arbitraryCallRevoker;
+        address[] allowedTargets;
+        bytes4[] allowedSelectors;
     }
 
     /// @param _target The contract address to call.
@@ -38,17 +42,44 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
         bytes32 salt;
     }
 
+    event TargetSelectorAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
+    event ArbitraryCallRevoked(address indexed _sender, bytes32 indexed _hashedArbitraryCall);
+    
     /// @param _init The initialization parameters for the contract.
     constructor(ArbitraryCallStrategyInit memory _init) {
         _grantRole(ARBITRARY_CALL_SIGNER_ROLE, _init.arbitraryCallSigner);
         _grantRole(ARBITRARY_CALL_REVOKER_ROLE, _init.arbitraryCallRevoker);
+
+        address[] memory allowedTargets = _init.allowedTargets;
+        bytes4[] memory allowedSelectors = _init.allowedSelectors;
+        uint256 allowedTargetsLength = allowedTargets.length;
+
+        if (allowedTargetsLength == 0 || allowedTargetsLength != allowedSelectors.length) {
+            revert("Invalid allowed targets or selectors");
+        }
+
+        for (uint256 i = 0; i < allowedTargetsLength; i++) {
+            _allowTargetSelector(allowedTargets[i], allowedSelectors[i], true);
+        }
+    }
+
+    /// @notice Allows the owner to allow a target and selector.
+    /// @param _target The address of the contract being called.
+    /// @param _selector The selector of the function being called.
+    /// @param _allowed Whether the selector for a given target is allowed.
+    function allowTargetSelector(address _target, bytes4 _selector, bool _allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _allowTargetSelector(_target, _selector, _allowed);
     }
 
     /// @notice Allows the arbitrary call revoker to revoke arbitrary calls.
     /// @param _hashedArbitraryCalls The list of hashed arbitrary calls to revoke.
-    function cancelArbitraryCalls(bytes32[] calldata _hashedArbitraryCalls) external onlyRole(ARBITRARY_CALL_REVOKER_ROLE) {
+    function revokeArbitraryCalls(bytes32[] calldata _hashedArbitraryCalls) external onlyRole(ARBITRARY_CALL_REVOKER_ROLE) {
         for (uint256 i = 0; i < _hashedArbitraryCalls.length; i++) {
-            usedArbitraryCalls[_hashedArbitraryCalls[i]] = true;
+            bytes32 hashedArbitraryCall = _hashedArbitraryCalls[i];
+
+            usedArbitraryCalls[hashedArbitraryCall] = true;
+
+            emit ArbitraryCallRevoked(_msgSender(), hashedArbitraryCall);
         }
     }
 
@@ -95,5 +126,11 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
         _validateResultingBalance(balanceBefore, _call.expectedManaTransfer);
 
         _executeManaTransfers(manaToCredit, _call.expectedManaTransfer);
+    }
+
+    function _allowTargetSelector(address _target, bytes4 _selector, bool _allowed) internal {
+        isTargetSelectorAllowed[_target][_selector] = _allowed;
+
+        emit TargetSelectorAllowed(_msgSender(), _target, _selector, _allowed);
     }
 }
