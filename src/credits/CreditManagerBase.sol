@@ -26,8 +26,21 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     /// @notice The role that can deny users from using credits.
     bytes32 public constant DENIER_ROLE = keccak256("DENIER_ROLE");
 
-    /// @notice The initialization parameters for the contract.
-    struct BaseConstructorParams {
+    /// @param owner The owner of the contract.
+    /// @param signer The address that can sign credits.
+    /// @param pauser The address that can pause the contract.
+    /// @param denier The address that can deny users from using credits.
+    /// @param isPolygon Whether the contract is being deployed on Polygon or Polygon Testnet, or Ethereum or Ethereum Testnet.
+    /// @param collectionFactory The collection factory used to check that a contract address is a Decentraland Item/NFT.
+    /// @param collectionFactoryV3 The other collection factory used to check that a contract address is a Decentraland Item/NFT.
+    /// @param land The contract address of the LAND NFT used to validate that the traded NFT is a LAND.
+    /// @param estate The contract address of the ESTATE NFT used to validate that the traded NFT is an ESTATE.
+    /// @param nameRegistry The contract address of the NAME REGISTRY used to validate that the traded NFT is a NAME.
+    /// @param mana The MANA token contract.
+    /// @param primarySalesAllowed Whether using credits for primary sales is allowed.
+    /// @param secondarySalesAllowed Whether using credits for secondary sales is allowed.
+    /// @param maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
+    struct CreditManagerBaseInit {
         address owner;
         address signer;
         address pauser;
@@ -44,12 +57,15 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         uint256 maxManaTransferPerHour;
     }
 
-    /// @notice The schema of the Credit type.
+    /// @param amount The amount of MANA that the credit is worth.
+    /// @param expiration The expiration timestamp of the credit.
+    /// @param salt The salt used to generate a unique credit signature.
+    /// @param signature The signature of the credit.
     struct Credit {
-        uint256 amount; // The amount of MANA that the credit is worth.
-        uint256 expiration; // The expiration timestamp of the credit.
-        bytes32 salt; // The salt used to generate a unique credit signature.
-        bytes signature; // The signature of the credit.
+        uint256 amount;
+        uint256 expiration;
+        bytes32 salt;
+        bytes signature;
     }
 
     /// @notice Wheter the contract is being deployed on Polygon or Polygon Testnet, or Ethereum or Ethereum Testnet.
@@ -104,7 +120,7 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     event MaxManaTransferPerHourUpdated(address _sender, uint256 _maxManaTransferPerHour);
     event DenyListUpdated(address _sender, address _user, bool _value);
 
-    constructor(BaseConstructorParams memory _init) EIP712("CreditManager", "1.0.0") {
+    constructor(CreditManagerBaseInit memory _init) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _init.owner);
         _grantRole(SIGNER_ROLE, _init.signer);
         _grantRole(PAUSER_ROLE, _init.pauser);

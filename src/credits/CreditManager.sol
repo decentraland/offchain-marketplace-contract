@@ -10,20 +10,19 @@ import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
 import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
 import {IManaUsdRateProvider} from "src/credits/rates/interfaces/IManaUsdRateProvider.sol";
+
 contract CreditManager is CollectionStoreStrategy, MarketplaceStrategy, OffchainMarketplaceStrategy, ArbitraryCallStrategy {
     constructor(
-        ICollectionStore _collectionStore,
-        IMarketplace _marketplace,
-        MarketplaceWithCouponManager _offchainMarketplace,
-        IManaUsdRateProvider _manaUsdRateProvider,
-        address _arbitraryCallSigner,
-        address _arbitraryCallRevoker,
-        BaseConstructorParams memory _baseConstructorParams
+        CollectionStoreInit memory _collectionStoreInit,
+        MarketplaceStrategyInit memory _marketplaceInit,
+        OffchainMarketplaceStrategyInit memory _offchainMarketplaceInit,
+        ArbitraryCallInit memory _arbitraryCallInit,
+        CreditManagerBaseInit memory _baseConstructorParams
     )
-        CollectionStoreStrategy(ICollectionStore(_collectionStore))
-        MarketplaceStrategy(_marketplace)
-        OffchainMarketplaceStrategy(_offchainMarketplace, _manaUsdRateProvider)
-        ArbitraryCallStrategy(_arbitraryCallSigner, _arbitraryCallRevoker)
+        CollectionStoreStrategy(_collectionStoreInit)
+        MarketplaceStrategy(_marketplaceInit)
+        OffchainMarketplaceStrategy(_offchainMarketplaceInit)
+        ArbitraryCallStrategy(_arbitraryCallInit)
         CreditManagerBase(_baseConstructorParams)
     {}
 }

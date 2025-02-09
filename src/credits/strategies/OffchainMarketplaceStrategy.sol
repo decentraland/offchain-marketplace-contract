@@ -11,9 +11,17 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
     MarketplaceWithCouponManager public immutable offchainMarketplace;
     IManaUsdRateProvider public immutable manaUsdRateProvider;
 
-    constructor(MarketplaceWithCouponManager _offchainMarketplace, IManaUsdRateProvider _manaUsdRateProvider) {
-        offchainMarketplace = _offchainMarketplace;
-        manaUsdRateProvider = _manaUsdRateProvider;
+    /// @param _offchainMarketplace The offchain marketplace contract.
+    /// @param _manaUsdRateProvider The MANA/USD rate provider contract.
+    struct OffchainMarketplaceStrategyInit {
+        MarketplaceWithCouponManager offchainMarketplace;
+        IManaUsdRateProvider manaUsdRateProvider;
+    }
+
+    /// @param _init The initialization parameters for the contract.
+    constructor(OffchainMarketplaceStrategyInit memory _init) {
+        offchainMarketplace = _init.offchainMarketplace;
+        manaUsdRateProvider = _init.manaUsdRateProvider;
     }
 
     /// @dev _trades is defined in memory to allow _validateTrades to update the sent asset beneficiaries from address(0) to

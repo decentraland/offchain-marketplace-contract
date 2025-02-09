@@ -8,8 +8,14 @@ import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
 abstract contract CollectionStoreStrategy is CreditManagerBase {
     ICollectionStore public immutable collectionStore;
 
-    constructor(ICollectionStore _collectionStore) {
-        collectionStore = _collectionStore;
+    /// @param _collectionStore The collection store contract.
+    struct CollectionStoreInit {
+        ICollectionStore collectionStore;
+    }
+
+    /// @param _init The initialization parameters for the contract.
+    constructor(CollectionStoreInit memory _init) {
+        collectionStore = _init.collectionStore;
     }
 
     function executeCollectionStoreBuy(ICollectionStore.ItemToBuy[] calldata _itemsToBuy, Credit[] calldata _credits) external nonReentrant {
