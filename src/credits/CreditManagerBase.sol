@@ -116,9 +116,9 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     /// @notice The hour of the last MANA transfer.
     uint256 public hourOfLastManaTransfer;
 
-    event AllowedSalesUpdated(address _sender, bool _primary, bool _secondary);
-    event MaxManaTransferPerHourUpdated(address _sender, uint256 _maxManaTransferPerHour);
-    event DenyListUpdated(address _sender, address _user, bool _value);
+    event AllowedSalesUpdated(address indexed _sender, bool _primary, bool _secondary);
+    event MaxManaTransferPerHourUpdated(address indexed _sender, uint256 _maxManaTransferPerHour);
+    event DenyListUpdated(address indexed _sender, address indexed _user, bool _value);
 
     constructor(CreditManagerBaseInit memory _init) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _init.owner);
