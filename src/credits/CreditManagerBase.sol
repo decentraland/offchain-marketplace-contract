@@ -119,6 +119,7 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     event AllowedSalesUpdated(address indexed _sender, bool _primary, bool _secondary);
     event MaxManaTransferPerHourUpdated(address indexed _sender, uint256 _maxManaTransferPerHour);
     event DenyListUpdated(address indexed _sender, address indexed _user, bool _value);
+    event CreditConsumed(address indexed _sender, Credit _credit);
 
     constructor(CreditManagerBaseInit memory _init) EIP712("CreditManager", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _init.owner);
@@ -229,10 +230,12 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
                 revert("Credit has expired");
             }
 
+            address sender = _msgSender();
+
             if (
                 !hasRole(
                     SIGNER_ROLE,
-                    keccak256(abi.encode(_msgSender(), address(this), block.chainid, credit.amount, credit.expiration, credit.salt)).recover(
+                    keccak256(abi.encode(sender, address(this), block.chainid, credit.amount, credit.expiration, credit.salt)).recover(
                         credit.signature
                     )
                 )
@@ -255,6 +258,8 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
             totalManaToCredit += manaToCredit;
 
             spentCredits[sigHash] += manaToCredit;
+
+            emit CreditConsumed(sender, credit);
         }
     }
 
