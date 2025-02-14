@@ -29,19 +29,24 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         manaUsdRateProvider = _init.manaUsdRateProvider;
     }
 
-    function executeOffchainMarketplaceAcceptListing(
+    function executeOffchainMarketplaceAccept(
         MarketplaceWithCouponManager.Trade[] calldata _trades,
         MarketplaceWithCouponManager.Coupon[] calldata _coupons,
-        Credit[] calldata _credits
+        Credit[] calldata _credits,
+        bool _isListing
     ) external nonReentrant {
-        _validateListingTrades(_trades);
+        if (_isListing) {   
+            _validateListingTrades(_trades);
+        } else {
+            _validateBidTrades(_trades);
+        }
 
         uint256 couponsLength = _coupons.length;
         uint256 tradesLength = _trades.length;
         uint256 totalManaToTransfer;
 
         if (couponsLength == 0) {
-            totalManaToTransfer = _computeTotalManaToTransfer(_trades);
+            totalManaToTransfer = _computeTotalManaToTransfer(_trades, _isListing);
         } else {
             MarketplaceWithCouponManager.Trade[] memory tradesWithAppliedCoupons = _trades;
 
@@ -51,7 +56,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
                 tradesWithAppliedCoupons[i] = coupon.applyCoupon(tradesWithAppliedCoupons[i], _coupons[i]);
             }
 
-            totalManaToTransfer = _computeTotalManaToTransfer(tradesWithAppliedCoupons);
+            totalManaToTransfer = _computeTotalManaToTransfer(tradesWithAppliedCoupons, _isListing);
         }
 
         uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
@@ -59,16 +64,18 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         mana.forceApprove(address(offchainMarketplace), totalManaToTransfer);
 
         uint256 balanceBefore = mana.balanceOf(address(this));
-        MarketplaceWithCouponManager.Trade[] memory tradesWithUpdatedBeneficiaries = _trades;
+        MarketplaceWithCouponManager.Trade[] memory trades = _trades;
 
-        for (uint256 i = 0; i < tradesLength; i++) {
-            tradesWithUpdatedBeneficiaries[i].received[0].beneficiary = _msgSender();
+        if (_isListing) {
+            for (uint256 i = 0; i < tradesLength; i++) {
+                trades[i].received[0].beneficiary = _msgSender();
+            }
         }
 
         if (couponsLength == 0) {
-            offchainMarketplace.accept(tradesWithUpdatedBeneficiaries);
+            offchainMarketplace.accept(trades);
         } else {
-            offchainMarketplace.acceptWithCoupon(tradesWithUpdatedBeneficiaries, _coupons);
+            offchainMarketplace.acceptWithCoupon(trades, _coupons);
         }
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
@@ -144,16 +151,26 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         }
     }
 
-    function _computeTotalManaToTransfer(MarketplaceWithCouponManager.Trade[] memory _trades) private view returns (uint256 totalManaToTransfer) {
+    function _computeTotalManaToTransfer(MarketplaceWithCouponManager.Trade[] memory _trades, bool _isListing)
+        private
+        view
+        returns (uint256 totalManaToTransfer)
+    {
         uint256 manaUsdRate = manaUsdRateProvider.getManaUsdRate();
 
         for (uint256 i = 0; i < _trades.length; i++) {
-            MarketplaceWithCouponManager.Asset memory received = _trades[i].received[0];
+            MarketplaceWithCouponManager.Asset memory asset;
 
-            if (received.assetType == ASSET_TYPE_ERC20) {
-                totalManaToTransfer += received.value;
-            } else if (received.assetType == ASSET_TYPE_USD_PEGGED_MANA) {
-                totalManaToTransfer += received.value * 1e18 / manaUsdRate;
+            if (_isListing) {
+                asset = _trades[i].received[0];
+            } else {
+                asset = _trades[i].sent[0];
+            }
+
+            if (asset.assetType == ASSET_TYPE_ERC20) {
+                totalManaToTransfer += asset.value;
+            } else if (asset.assetType == ASSET_TYPE_USD_PEGGED_MANA) {
+                totalManaToTransfer += asset.value * 1e18 / manaUsdRate;
             }
         }
     }
