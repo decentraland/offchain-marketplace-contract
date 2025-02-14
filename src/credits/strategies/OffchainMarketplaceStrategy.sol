@@ -31,7 +31,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
 
     /// @dev _trades is defined in memory to allow _validateTrades to update the sent asset beneficiaries from address(0) to
     /// the caller and prevent this contract from receiving the assets.
-    function executeOffchainMarketplaceAccept(MarketplaceWithCouponManager.Trade[] memory _trades, Credit[] calldata _credits)
+    function executeOffchainMarketplaceAcceptListing(MarketplaceWithCouponManager.Trade[] memory _trades, Credit[] calldata _credits)
         external
         nonReentrant
     {
@@ -53,7 +53,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         _executeManaTransfers(manaToCredit, totalManaToTransfer);
     }
 
-    function executeOffchainMarketplaceAcceptWithCoupon(
+    function executeOffchainMarketplaceAcceptListingWithCoupon(
         MarketplaceWithCouponManager.Trade[] calldata _trades,
         MarketplaceWithCouponManager.Coupon[] calldata _coupons,
         Credit[] calldata _credits
