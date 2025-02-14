@@ -16,6 +16,8 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
     MarketplaceWithCouponManager public immutable offchainMarketplace;
     IManaUsdRateProvider public immutable manaUsdRateProvider;
 
+    bytes32 private externalCheckCreditsHash;
+
     /// @param _offchainMarketplace The offchain marketplace contract.
     /// @param _manaUsdRateProvider The MANA/USD rate provider contract.
     struct OffchainMarketplaceStrategyInit {
@@ -39,6 +41,14 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
             _validateListingTrades(_trades);
         } else {
             _validateBidTrades(_trades);
+
+            bytes[] memory creditSignatures = new bytes[](_credits.length);
+
+            for (uint256 i = 0; i < _credits.length; i++) {
+                creditSignatures[i] = _credits[i].signature;
+            }
+
+            externalCheckCreditsHash = keccak256(abi.encode(creditSignatures));
         }
 
         uint256 couponsLength = _coupons.length;
@@ -78,9 +88,23 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
             offchainMarketplace.acceptWithCoupon(trades, _coupons);
         }
 
+        if (!_isListing) {
+            delete externalCheckCreditsHash;
+        }
+
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
 
         _executeManaTransfers(manaToCredit, totalManaToTransfer);
+    }
+
+    function bidsExternalCheck(address _marketplaceCaller, bytes calldata _data) external view returns (bool) {
+        if (_marketplaceCaller != address(this)) {
+            return false;
+        }
+
+        bytes32 creditsHash = abi.decode(_data, (bytes32));
+
+        return externalCheckCreditsHash == creditsHash;
     }
 
     function _validateListingTrades(MarketplaceWithCouponManager.Trade[] calldata _trades) private view {
