@@ -35,7 +35,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         external
         nonReentrant
     {
-        _validateTrades(_trades);
+        _validateListingTrades(_trades);
 
         // Calculates how much mana will be transferred after the trades are accepted.
         uint256 totalManaToTransfer = _computeTotalManaToTransfer(_trades);
@@ -62,7 +62,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         // the caller and prevent this contract from receiving the assets.
         MarketplaceWithCouponManager.Trade[] memory tradesWithUpdatedBeneficiaries = _trades;
 
-        _validateTrades(tradesWithUpdatedBeneficiaries);
+        _validateListingTrades(tradesWithUpdatedBeneficiaries);
 
         // Copy the trades to memory again so the trades used in acceptWithCoupon are not affected by the next coupon
         // application used only to calculate total mana to transfer.
@@ -94,48 +94,94 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         _executeManaTransfers(manaToCredit, totalManaToTransfer);
     }
 
-    function _validateTrades(MarketplaceWithCouponManager.Trade[] memory _trades) private view {
-        if (_trades.length == 0) {
+    function executeOffchainMarketplaceAcceptBid(MarketplaceWithCouponManager.Trade[] calldata _trades, Credit[] calldata _credits)
+        external
+        nonReentrant
+    {
+        _validateBidTrades(_trades);
+
+        // Calculates how much mana will be transferred after the trades are accepted.
+        uint256 totalManaToTransfer = _computeTotalManaToTransfer(_trades);
+
+        uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
+
+        mana.forceApprove(address(offchainMarketplace), totalManaToTransfer);
+
+        uint256 balanceBefore = mana.balanceOf(address(this));
+
+        offchainMarketplace.accept(_trades);
+
+        _validateResultingBalance(balanceBefore, totalManaToTransfer);
+
+        _executeManaTransfers(manaToCredit, totalManaToTransfer);
+    }
+
+    function _validateListingTrades(MarketplaceWithCouponManager.Trade[] memory _trades) private view {
+        uint256 tradesLength = _trades.length;
+
+        if (tradesLength == 0) {
             revert("Invalid Trades Length");
         }
 
-        for (uint256 i = 0; i < _trades.length; i++) {
-            MarketplaceWithCouponManager.Asset[] memory received = _trades[i].received;
+        for (uint256 i = 0; i < tradesLength; i++) {
+            MarketplaceWithCouponManager.Trade memory trade = _trades[i];
 
-            if (received.length != 1) {
-                revert("Invalid Received Length");
+            _validateManaAssets(trade.received);
+            _validateNonManaAssets(trade.sent, true);
+        }
+    }
+
+    function _validateBidTrades(MarketplaceWithCouponManager.Trade[] calldata _trades) private view {
+        uint256 tradesLength = _trades.length;
+
+        if (tradesLength == 0) {
+            revert("Invalid Trades Length");
+        }
+
+        for (uint256 i = 0; i < tradesLength; i++) {
+            MarketplaceWithCouponManager.Trade calldata trade = _trades[i];
+
+            _validateManaAssets(trade.sent);
+            _validateNonManaAssets(trade.received, false);
+        }
+    }
+
+    function _validateManaAssets(MarketplaceWithCouponManager.Asset[] memory _assets) private view {
+        if (_assets.length != 1) {
+            revert("Invalid Assets Length");
+        }
+
+        MarketplaceWithCouponManager.Asset memory asset = _assets[0];
+
+        if (asset.contractAddress != address(mana)) {
+            revert("Invalid Contract Address");
+        }
+
+        if (asset.assetType != ASSET_TYPE_ERC20 && asset.assetType != ASSET_TYPE_USD_PEGGED_MANA) {
+            revert("Invalid Asset Type");
+        }
+    }
+
+    function _validateNonManaAssets(MarketplaceWithCouponManager.Asset[] memory _assets, bool _tryUpdateBeneficiary) private view {
+        if (_assets.length == 0) {
+            revert("Invalid Received Length");
+        }
+
+        for (uint256 j = 0; j < _assets.length; j++) {
+            MarketplaceWithCouponManager.Asset memory asset = _assets[j];
+
+            _validateContractAddress(asset.contractAddress);
+
+            if (asset.assetType == ASSET_TYPE_ERC721) {
+                _validateSecondarySalesAllowed();
+            } else if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM) {
+                _validatePrimarySalesAllowed();
+            } else {
+                revert("Invalid Received Asset Type");
             }
 
-            if (received[0].contractAddress != address(mana)) {
-                revert("Invalid Contract Address");
-            }
-
-            if (received[0].assetType != ASSET_TYPE_ERC20 && received[0].assetType != ASSET_TYPE_USD_PEGGED_MANA) {
-                revert("Invalid Asset Type");
-            }
-
-            MarketplaceWithCouponManager.Asset[] memory sent = _trades[i].sent;
-
-            if (sent.length == 0) {
-                revert("Invalid Sent Length");
-            }
-
-            for (uint256 j = 0; j < sent.length; j++) {
-                _validateContractAddress(sent[j].contractAddress);
-
-                if (sent[j].assetType == ASSET_TYPE_ERC721) {
-                    _validateSecondarySalesAllowed();
-                } else if (sent[j].assetType == ASSET_TYPE_COLLECTION_ITEM) {
-                    _validatePrimarySalesAllowed();
-                } else {
-                    revert("Invalid Sent Asset Type");
-                }
-
-                // If the beneficiary is address(0), it is updated to the caller to prevent this contract from receiving the assets.
-                // This can be done because the sent asset beneficiary is not part of the Trade signature.
-                if (sent[j].beneficiary == address(0)) {
-                    sent[j].beneficiary = _msgSender();
-                }
+            if (_tryUpdateBeneficiary && asset.beneficiary == address(0)) {
+                asset.beneficiary = _msgSender();
             }
         }
     }
