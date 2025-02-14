@@ -29,94 +29,54 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         manaUsdRateProvider = _init.manaUsdRateProvider;
     }
 
-    /// @dev _trades is defined in memory to allow _validateTrades to update the sent asset beneficiaries from address(0) to
-    /// the caller and prevent this contract from receiving the assets.
-    function executeOffchainMarketplaceAcceptListing(MarketplaceWithCouponManager.Trade[] memory _trades, Credit[] calldata _credits)
-        external
-        nonReentrant
-    {
-        _validateListingTrades(_trades);
-
-        // Calculates how much mana will be transferred after the trades are accepted.
-        uint256 totalManaToTransfer = _computeTotalManaToTransfer(_trades);
-
-        uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
-
-        mana.forceApprove(address(offchainMarketplace), totalManaToTransfer);
-
-        uint256 balanceBefore = mana.balanceOf(address(this));
-
-        offchainMarketplace.accept(_trades);
-
-        _validateResultingBalance(balanceBefore, totalManaToTransfer);
-
-        _executeManaTransfers(manaToCredit, totalManaToTransfer);
-    }
-
-    function executeOffchainMarketplaceAcceptListingWithCoupon(
+    function executeOffchainMarketplaceAcceptListing(
         MarketplaceWithCouponManager.Trade[] calldata _trades,
         MarketplaceWithCouponManager.Coupon[] calldata _coupons,
         Credit[] calldata _credits
-    ) external {
-        // Copy the trades to memory so _validateTrades can update the sent asset beneficiaries from address(0) to
-        // the caller and prevent this contract from receiving the assets.
-        MarketplaceWithCouponManager.Trade[] memory tradesWithUpdatedBeneficiaries = _trades;
+    ) external nonReentrant {
+        _validateListingTrades(_trades);
 
-        _validateListingTrades(tradesWithUpdatedBeneficiaries);
+        uint256 couponsLength = _coupons.length;
+        uint256 tradesLength = _trades.length;
+        uint256 totalManaToTransfer;
 
-        // Copy the trades to memory again so the trades used in acceptWithCoupon are not affected by the next coupon
-        // application used only to calculate total mana to transfer.
-        MarketplaceWithCouponManager.Trade[] memory tradesWithCoupons = _trades;
+        if (couponsLength == 0) {
+            totalManaToTransfer = _computeTotalManaToTransfer(_trades);
+        } else {
+            MarketplaceWithCouponManager.Trade[] memory tradesWithAppliedCoupons = _trades;
 
-        for (uint256 i = 0; i < _trades.length; i++) {
-            address couponAddress = _coupons[i].couponAddress;
+            for (uint256 i = 0; i < tradesLength; i++) {
+                address couponAddress = _coupons[i].couponAddress;
+                ICoupon coupon = ICoupon(couponAddress);
+                tradesWithAppliedCoupons[i] = coupon.applyCoupon(tradesWithAppliedCoupons[i], _coupons[i]);
+            }
 
-            // I don't need to check if the coupon address is valid because it is validated afterwards when calling
-            // the marketplace.acceptWithCoupon function.
-            ICoupon coupon = ICoupon(couponAddress);
-
-            // Apply the coupon to the trade so the values are updated and can be used to calculate the total mana to transfer.
-            tradesWithCoupons[i] = coupon.applyCoupon(tradesWithUpdatedBeneficiaries[i], _coupons[i]);
+            totalManaToTransfer = _computeTotalManaToTransfer(tradesWithAppliedCoupons);
         }
 
-        uint256 totalManaToTransfer = _computeTotalManaToTransfer(tradesWithCoupons);
-
         uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
 
         mana.forceApprove(address(offchainMarketplace), totalManaToTransfer);
 
         uint256 balanceBefore = mana.balanceOf(address(this));
+        MarketplaceWithCouponManager.Trade[] memory tradesWithUpdatedBeneficiaries = _trades;
 
-        offchainMarketplace.acceptWithCoupon(tradesWithUpdatedBeneficiaries, _coupons);
+        for (uint256 i = 0; i < tradesLength; i++) {
+            tradesWithUpdatedBeneficiaries[i].received[0].beneficiary = _msgSender();
+        }
+
+        if (couponsLength == 0) {
+            offchainMarketplace.accept(tradesWithUpdatedBeneficiaries);
+        } else {
+            offchainMarketplace.acceptWithCoupon(tradesWithUpdatedBeneficiaries, _coupons);
+        }
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
 
         _executeManaTransfers(manaToCredit, totalManaToTransfer);
     }
 
-    function executeOffchainMarketplaceAcceptBid(MarketplaceWithCouponManager.Trade[] calldata _trades, Credit[] calldata _credits)
-        external
-        nonReentrant
-    {
-        _validateBidTrades(_trades);
-
-        // Calculates how much mana will be transferred after the trades are accepted.
-        uint256 totalManaToTransfer = _computeTotalManaToTransfer(_trades);
-
-        uint256 manaToCredit = _computeTotalManaToCredit(_credits, totalManaToTransfer);
-
-        mana.forceApprove(address(offchainMarketplace), totalManaToTransfer);
-
-        uint256 balanceBefore = mana.balanceOf(address(this));
-
-        offchainMarketplace.accept(_trades);
-
-        _validateResultingBalance(balanceBefore, totalManaToTransfer);
-
-        _executeManaTransfers(manaToCredit, totalManaToTransfer);
-    }
-
-    function _validateListingTrades(MarketplaceWithCouponManager.Trade[] memory _trades) private view {
+    function _validateListingTrades(MarketplaceWithCouponManager.Trade[] calldata _trades) private view {
         uint256 tradesLength = _trades.length;
 
         if (tradesLength == 0) {
@@ -124,10 +84,11 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         }
 
         for (uint256 i = 0; i < tradesLength; i++) {
-            MarketplaceWithCouponManager.Trade memory trade = _trades[i];
+            MarketplaceWithCouponManager.Trade calldata trade = _trades[i];
 
             _validateManaAssets(trade.received);
-            _validateNonManaAssets(trade.sent, true);
+
+            _validateNonManaAssets(trade.sent);
         }
     }
 
@@ -142,16 +103,17 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
             MarketplaceWithCouponManager.Trade calldata trade = _trades[i];
 
             _validateManaAssets(trade.sent);
-            _validateNonManaAssets(trade.received, false);
+
+            _validateNonManaAssets(trade.received);
         }
     }
 
-    function _validateManaAssets(MarketplaceWithCouponManager.Asset[] memory _assets) private view {
+    function _validateManaAssets(MarketplaceWithCouponManager.Asset[] calldata _assets) private view {
         if (_assets.length != 1) {
             revert("Invalid Assets Length");
         }
 
-        MarketplaceWithCouponManager.Asset memory asset = _assets[0];
+        MarketplaceWithCouponManager.Asset calldata asset = _assets[0];
 
         if (asset.contractAddress != address(mana)) {
             revert("Invalid Contract Address");
@@ -162,13 +124,13 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
         }
     }
 
-    function _validateNonManaAssets(MarketplaceWithCouponManager.Asset[] memory _assets, bool _tryUpdateBeneficiary) private view {
+    function _validateNonManaAssets(MarketplaceWithCouponManager.Asset[] calldata _assets) private view {
         if (_assets.length == 0) {
             revert("Invalid Received Length");
         }
 
         for (uint256 j = 0; j < _assets.length; j++) {
-            MarketplaceWithCouponManager.Asset memory asset = _assets[j];
+            MarketplaceWithCouponManager.Asset calldata asset = _assets[j];
 
             _validateContractAddress(asset.contractAddress);
 
@@ -178,10 +140,6 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
                 _validatePrimarySalesAllowed();
             } else {
                 revert("Invalid Received Asset Type");
-            }
-
-            if (_tryUpdateBeneficiary && asset.beneficiary == address(0)) {
-                asset.beneficiary = _msgSender();
             }
         }
     }
