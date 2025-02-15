@@ -17,12 +17,12 @@ contract CreditManager is CollectionStoreStrategy, MarketplaceStrategy, Offchain
         MarketplaceStrategyInit memory _marketplaceStrategyInit,
         OffchainMarketplaceStrategyInit memory _offchainMarketplaceStrategyInit,
         ArbitraryCallStrategyInit memory _arbitraryCallStrategyInit,
-        CreditManagerBaseInit memory _baseConstructorParams
+        CreditManagerBaseInit memory _creditManagerBaseInit
     )
         CollectionStoreStrategy(_collectionStoreStrategyInit)
         MarketplaceStrategy(_marketplaceStrategyInit)
         OffchainMarketplaceStrategy(_offchainMarketplaceStrategyInit)
         ArbitraryCallStrategy(_arbitraryCallStrategyInit)
-        CreditManagerBase(_baseConstructorParams)
+        CreditManagerBase(_creditManagerBaseInit)
     {}
 }
