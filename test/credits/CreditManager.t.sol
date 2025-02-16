@@ -450,10 +450,18 @@ contract CreditManagerTest is Test, IERC721Receiver {
 
         vm.prank(addresses.mana);
         (success,) = address(address(creditManagerBaseInit.mana)).call(
-            abi.encodeWithSelector(bytes4(keccak256("transfer(address,uint256)")), address(creditManager), 100 ether)
+            abi.encodeWithSelector(bytes4(keccak256("transfer(address,uint256)")), address(creditManager), 1 ether)
         );
         require(success, "Failed to transfer mana");
 
+        uint256 creditManagerBalanceBefore = IERC20(addresses.mana).balanceOf(address(creditManager));
+        uint256 buyerBalanceBefore = IERC20(addresses.mana).balanceOf(address(this));
+        uint256 landSellerBalanceBefore = IERC20(addresses.mana).balanceOf(addresses.landSeller);
+
         creditManager.executeMarketplaceExecuteOrder(addresses.land, landTokenId, 1 ether, "", credits);
+
+        assertEq(IERC20(addresses.mana).balanceOf(address(creditManager)), creditManagerBalanceBefore - 1 ether);
+        assertEq(IERC20(addresses.mana).balanceOf(address(this)), buyerBalanceBefore);
+        assertEq(IERC20(addresses.mana).balanceOf(addresses.landSeller), landSellerBalanceBefore + 0.975 ether);
     }
 }

@@ -49,7 +49,7 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
 
         _validateResultingBalance(balanceBefore, _price);
 
-        _executeManaTransfers(manaToCredit, _price);
+        _transferDiffBackToContract(manaToCredit, _price);
 
         IERC721(_contractAddress).safeTransferFrom(address(this), _msgSender(), _tokenId);
     }

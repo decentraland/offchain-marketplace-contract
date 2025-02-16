@@ -125,7 +125,7 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
 
         _validateResultingBalance(balanceBefore, _call.expectedManaTransfer);
 
-        _executeManaTransfers(manaToCredit, _call.expectedManaTransfer);
+        _transferDiffBackToContract(manaToCredit, _call.expectedManaTransfer);
     }
 
     function _allowTargetSelector(address _target, bytes4 _selector, bool _allowed) internal {

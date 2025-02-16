@@ -53,6 +53,6 @@ abstract contract CollectionStoreStrategy is CreditManagerBase {
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
 
-        _executeManaTransfers(manaToCredit, totalManaToTransfer);
+        _transferDiffBackToContract(manaToCredit, totalManaToTransfer);
     }
 }

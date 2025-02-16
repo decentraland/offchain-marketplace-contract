@@ -315,17 +315,20 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         }
     }
 
-    /// @dev Transfers `_manaToCredit` to the caller and the difference between `_manaToTransfer` and `_manaToCredit`
-    /// from the caller to the contract.
-    function _executeManaTransfers(uint256 _manaToCredit, uint256 _manaToTransfer) internal {
-        address sender = _msgSender();
+    /// @dev Calculates the difference between the MANA required for the trade and the MANA credits.
+    /// Given that the contract transfers the full MANA required for the trade, it is required for the sender
+    /// to transfer any uncredited MANA back to the contract.
+    ///
+    /// Example:
+    ///   - Trade requires 100 MANA
+    ///   - User has a credit worth 75 MANA
+    ///   - Contract pays 100 MANA for the trade
+    ///   - User must transfer 25 MANA back to cover the uncredited amount
+    function _transferDiffBackToContract(uint256 _manaToCredit, uint256 _manaToTransfer) internal {
+        uint256 uncreditedMana = _manaToTransfer - _manaToCredit;
 
-        mana.safeTransfer(sender, _manaToCredit);
-
-        uint256 diff = _manaToTransfer - _manaToCredit;
-
-        if (diff > 0) {
-            mana.safeTransferFrom(sender, address(this), diff);
+        if (uncreditedMana > 0) {
+            mana.safeTransferFrom(_msgSender(), address(this), uncreditedMana);
         }
     }
 

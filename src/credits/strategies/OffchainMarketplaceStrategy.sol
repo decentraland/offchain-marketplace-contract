@@ -94,7 +94,7 @@ abstract contract OffchainMarketplaceStrategy is CreditManagerBase, Decentraland
 
         _validateResultingBalance(balanceBefore, totalManaToTransfer);
 
-        _executeManaTransfers(manaToCredit, totalManaToTransfer);
+        _transferDiffBackToContract(manaToCredit, totalManaToTransfer);
     }
 
     function bidsExternalCheck(address _marketplaceCaller, bytes calldata _data) external view returns (bool) {
