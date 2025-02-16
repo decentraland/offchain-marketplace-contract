@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/interfaces/IERC721Receiver.sol";
+
 import {CreditManager} from "src/credits/CreditManager.sol";
 import {CollectionStoreStrategy} from "src/credits/strategies/CollectionStoreStrategy.sol";
 import {MarketplaceStrategy} from "src/credits/strategies/MarketplaceStrategy.sol";
@@ -33,48 +37,411 @@ contract CreditManagerHarness is CreditManager {
     {}
 }
 
-contract CreditManagerEthereumTest is Test {
-    CreditManagerHarness private creditManager;
-
+contract CreditManagerTest is Test, IERC721Receiver {
     function setUp() public {
-        CollectionStoreStrategy.CollectionStoreStrategyInit memory collectionStoreStrategyInit =
-            CollectionStoreStrategy.CollectionStoreStrategyInit({collectionStore: ICollectionStore(address(0))});
+        uint256 mainnetFork = vm.createFork("https://rpc.decentraland.org/mainnet", 21855460); // Feb-16-2025 12:45:59 AM +UTC
+        vm.selectFork(mainnetFork);
+    }
 
-        MarketplaceStrategy.MarketplaceStrategyInit memory marketplaceStrategyInit =
-            MarketplaceStrategy.MarketplaceStrategyInit({marketplace: IMarketplace(address(0))});
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
 
-        OffchainMarketplaceStrategy.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit = OffchainMarketplaceStrategy
-            .OffchainMarketplaceStrategyInit({
-            offchainMarketplace: MarketplaceWithCouponManager(address(0)),
-            manaUsdRateProvider: IManaUsdRateProvider(address(0))
-        });
+    function test_executeMarketplaceExecuteOrder_RevertsIfSecondarySalesAreNotAllowed() public {
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
 
-        ArbitraryCallStrategy.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit = ArbitraryCallStrategy.ArbitraryCallStrategyInit({
-            arbitraryCallSigner: address(0),
-            arbitraryCallRevoker: address(0),
-            allowedTargets: new address[](0),
-            allowedSelectors: new bytes4[](0)
-        });
-
-        CreditManagerBase.CreditManagerBaseInit memory creditManagerBaseInit = CreditManagerBase.CreditManagerBaseInit({
-            owner: address(0),
-            signer: address(0),
-            pauser: address(0),
-            denier: address(0),
-            isPolygon: false,
-            collectionFactory: ICollectionFactory(address(0)),
-            collectionFactoryV3: ICollectionFactory(address(0)),
-            land: address(0),
-            estate: address(0),
-            nameRegistry: address(0),
-            mana: IERC20(address(0)),
-            primarySalesAllowed: false,
-            secondarySalesAllowed: false,
-            maxManaTransferPerHour: 0
-        });
-
-        creditManager = new CreditManagerHarness(
+        CreditManagerHarness creditManager = new CreditManagerHarness(
             collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        vm.expectRevert("Secondary sales are not allowed");
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", new CreditManagerHarness.Credit[](0));
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfNoCreditsWereProvided() public {
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        vm.expectRevert("No credits provided");
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", new CreditManagerHarness.Credit[](0));
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfCreditIsExpired() public {
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        vm.expectRevert("Credit has expired");
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", new CreditManagerHarness.Credit[](1));
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfSignatureIsEmpty() public {
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+
+        vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignatureLength.selector, 0));
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", credits);
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfSignatureIsInvalid() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, bytes32(0));
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.expectRevert("Invalid credit signature");
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", credits);
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfCreditHasAlreadyBeenSpent() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+
+        creditManagerBaseInit.signer = creditSigner.addr;
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.expectRevert("Credit has been spent");
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", credits);
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfManaAddressIsZero() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+        creditManagerBaseInit.signer = creditSigner.addr;
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        credits[0].amount = 1 ether;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.expectRevert(abi.encodeWithSelector(Address.AddressEmptyCode.selector, address(0)));
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", credits);
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfMarketplaceAddressIsZero() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+        creditManagerBaseInit.signer = creditSigner.addr;
+        creditManagerBaseInit.mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        credits[0].amount = 1 ether;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.expectRevert();
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", credits);
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfTheProvidedAddressIsNotAContract() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        marketplaceStrategyInit.marketplace = IMarketplace(0x8e5660b4Ab70168b5a6fEeA0e0315cb49c8Cd539);
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+        creditManagerBaseInit.signer = creditSigner.addr;
+        creditManagerBaseInit.mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        credits[0].amount = 1 ether;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.expectRevert("The NFT Address should be a contract");
+        creditManager.executeMarketplaceExecuteOrder(address(0), 0, 0, "", credits);
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfTheAssetWasNotPublished() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        marketplaceStrategyInit.marketplace = IMarketplace(0x8e5660b4Ab70168b5a6fEeA0e0315cb49c8Cd539);
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+        creditManagerBaseInit.signer = creditSigner.addr;
+        creditManagerBaseInit.mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        credits[0].amount = 1 ether;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.expectRevert("Asset not published");
+        creditManager.executeMarketplaceExecuteOrder(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d, 0, 0, "", credits);
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfThePriceIsNotCorrect() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        marketplaceStrategyInit.marketplace = IMarketplace(0x8e5660b4Ab70168b5a6fEeA0e0315cb49c8Cd539);
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+        creditManagerBaseInit.signer = creditSigner.addr;
+        creditManagerBaseInit.mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        credits[0].amount = 1 ether;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        (bool success,) = address(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d).call(
+            abi.encodeWithSelector(bytes4(keccak256("setApprovalForAll(address,bool)")), address(marketplaceStrategyInit.marketplace), true)
+        );
+        require(success, "Failed to set approval for all");
+
+        vm.prank(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        (success,) = address(marketplaceStrategyInit.marketplace).call(
+            abi.encodeWithSelector(
+                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
+                0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d,
+                55466025808112969544530061011378218467468,
+                1 ether,
+                type(uint256).max
+            )
+        );
+        require(success, "Failed to create order");
+
+        vm.expectRevert("The price is not correct");
+        creditManager.executeMarketplaceExecuteOrder(
+            0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d, 55466025808112969544530061011378218467468, 0, "", credits
+        );
+    }
+
+    function test_executeMarketplaceExecuteOrder_RevertsIfNotEnoughManaBalanceInContract() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        marketplaceStrategyInit.marketplace = IMarketplace(0x8e5660b4Ab70168b5a6fEeA0e0315cb49c8Cd539);
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+        creditManagerBaseInit.signer = creditSigner.addr;
+        creditManagerBaseInit.mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        credits[0].amount = 1 ether;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        (bool success,) = address(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d).call(
+            abi.encodeWithSelector(bytes4(keccak256("setApprovalForAll(address,bool)")), address(marketplaceStrategyInit.marketplace), true)
+        );
+        require(success, "Failed to set approval for all");
+
+        vm.prank(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        (success,) = address(marketplaceStrategyInit.marketplace).call(
+            abi.encodeWithSelector(
+                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
+                0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d,
+                55466025808112969544530061011378218467468,
+                1 ether,
+                type(uint256).max
+            )
+        );
+        require(success, "Failed to create order");
+
+        vm.expectRevert();
+        creditManager.executeMarketplaceExecuteOrder(
+            0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d, 55466025808112969544530061011378218467468, 1 ether, "", credits
+        );
+    }
+
+    function test_executeMarketplaceExecuteOrder_Success() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        marketplaceStrategyInit.marketplace = IMarketplace(0x8e5660b4Ab70168b5a6fEeA0e0315cb49c8Cd539);
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+        creditManagerBaseInit.signer = creditSigner.addr;
+        creditManagerBaseInit.mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        credits[0].amount = 1 ether;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        (bool success,) = address(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d).call(
+            abi.encodeWithSelector(bytes4(keccak256("setApprovalForAll(address,bool)")), address(marketplaceStrategyInit.marketplace), true)
+        );
+        require(success, "Failed to set approval for all");
+
+        vm.prank(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        (success,) = address(marketplaceStrategyInit.marketplace).call(
+            abi.encodeWithSelector(
+                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
+                0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d,
+                55466025808112969544530061011378218467468,
+                1 ether,
+                type(uint256).max
+            )
+        );
+        require(success, "Failed to create order");
+
+        vm.prank(0x67c231cF2B0E9518aBa46bDea6b10E0D0C5fEd1B);
+        (success,) = address(address(creditManagerBaseInit.mana)).call(
+            abi.encodeWithSelector(bytes4(keccak256("transfer(address,uint256)")), address(creditManager), 100 ether)
+        );
+        require(success, "Failed to transfer mana");
+
+        creditManager.executeMarketplaceExecuteOrder(
+            0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d, 55466025808112969544530061011378218467468, 1 ether, "", credits
         );
     }
 }
