@@ -352,6 +352,51 @@ contract CreditManagerTest is Test, IERC721Receiver {
         creditManager.executeMarketplaceExecuteOrder(addresses.land, landTokenId, 0, "", credits);
     }
 
+    function test_executeMarketplaceExecuteOrder_RevertsIfMaxManaTransferPerHourIsExceeded() public {
+        Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
+
+        CreditManagerHarness.CollectionStoreStrategyInit memory collectionStoreStrategyInit;
+        CreditManagerHarness.MarketplaceStrategyInit memory marketplaceStrategyInit;
+        CreditManagerHarness.OffchainMarketplaceStrategyInit memory offchainMarketplaceStrategyInit;
+        CreditManagerHarness.ArbitraryCallStrategyInit memory arbitraryCallStrategyInit;
+        CreditManagerHarness.CreditManagerBaseInit memory creditManagerBaseInit;
+
+        marketplaceStrategyInit.marketplace = IMarketplace(addresses.marketplace);
+
+        creditManagerBaseInit.secondarySalesAllowed = true;
+        creditManagerBaseInit.signer = creditSigner.addr;
+        creditManagerBaseInit.mana = IERC20(addresses.mana);
+
+        CreditManagerHarness creditManager = new CreditManagerHarness(
+            collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
+        );
+
+        CreditManagerHarness.Credit[] memory credits = new CreditManagerHarness.Credit[](1);
+        credits[0].expiration = type(uint256).max;
+        credits[0].amount = 1 ether;
+        bytes32 digest =
+            keccak256(abi.encode(address(this), address(creditManager), block.chainid, credits[0].amount, credits[0].expiration, credits[0].salt));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditSigner.privateKey, digest);
+        credits[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(addresses.landSeller);
+        (bool success,) = address(addresses.land).call(
+            abi.encodeWithSelector(bytes4(keccak256("setApprovalForAll(address,bool)")), address(marketplaceStrategyInit.marketplace), true)
+        );
+        require(success, "Failed to set approval for all");
+
+        vm.prank(addresses.landSeller);
+        (success,) = address(marketplaceStrategyInit.marketplace).call(
+            abi.encodeWithSelector(
+                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")), addresses.land, landTokenId, 1 ether, type(uint256).max
+            )
+        );
+        require(success, "Failed to create order");
+
+        vm.expectRevert("Max MANA transfer per hour exceeded");
+        creditManager.executeMarketplaceExecuteOrder(addresses.land, landTokenId, 1, "", credits);
+    }
+
     function test_executeMarketplaceExecuteOrder_RevertsIfNotEnoughManaBalanceInContract() public {
         Vm.Wallet memory creditSigner = vm.createWallet("creditSigner");
 
@@ -366,6 +411,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
         creditManagerBaseInit.secondarySalesAllowed = true;
         creditManagerBaseInit.signer = creditSigner.addr;
         creditManagerBaseInit.mana = IERC20(addresses.mana);
+        creditManagerBaseInit.maxManaTransferPerHour = 1 ether;
 
         CreditManagerHarness creditManager = new CreditManagerHarness(
             collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
@@ -411,6 +457,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
         creditManagerBaseInit.secondarySalesAllowed = true;
         creditManagerBaseInit.signer = creditSigner.addr;
         creditManagerBaseInit.mana = IERC20(addresses.mana);
+        creditManagerBaseInit.maxManaTransferPerHour = 1 ether;
 
         CreditManagerHarness creditManager = new CreditManagerHarness(
             collectionStoreStrategyInit, marketplaceStrategyInit, offchainMarketplaceStrategyInit, arbitraryCallStrategyInit, creditManagerBaseInit
@@ -448,6 +495,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
         uint256 buyerBalanceBefore = IERC20(addresses.mana).balanceOf(address(this));
         uint256 landSellerBalanceBefore = IERC20(addresses.mana).balanceOf(addresses.landSeller);
         uint256 spentCreditsBefore = creditManager.spentCredits(keccak256(credits[0].signature));
+        uint256 manaTransferredThisHourBefore = creditManager.manaTransferredThisHour();
 
         vm.expectEmit(address(creditManager));
         emit CreditConsumed(address(this), credits[0]);
@@ -457,5 +505,6 @@ contract CreditManagerTest is Test, IERC721Receiver {
         assertEq(IERC20(addresses.mana).balanceOf(address(this)), buyerBalanceBefore);
         assertEq(IERC20(addresses.mana).balanceOf(addresses.landSeller), landSellerBalanceBefore + 0.975 ether);
         assertEq(creditManager.spentCredits(keccak256(credits[0].signature)), spentCreditsBefore + 1 ether);
+        assertEq(creditManager.manaTransferredThisHour(), manaTransferredThisHourBefore + 1 ether);
     }
 }
