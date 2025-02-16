@@ -40,6 +40,8 @@ contract CreditManagerHarness is CreditManager {
 contract CreditManagerTest is Test, IERC721Receiver {
     Addresses private addresses;
 
+    uint256 landTokenId;
+
     struct Addresses {
         address mana;
         address marketplace;
@@ -55,6 +57,8 @@ contract CreditManagerTest is Test, IERC721Receiver {
         addresses.marketplace = 0x8e5660b4Ab70168b5a6fEeA0e0315cb49c8Cd539;
         addresses.landSeller = 0x959e104E1a4dB6317fA58F8295F586e1A978c297;
         addresses.land = 0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d;
+
+        landTokenId = 55466025808112969544530061011378218467468;
     }
 
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
@@ -339,7 +343,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
             abi.encodeWithSelector(
                 bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
                 addresses.land,
-                55466025808112969544530061011378218467468,
+                landTokenId,
                 1 ether,
                 type(uint256).max
             )
@@ -347,7 +351,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
         require(success, "Failed to create order");
 
         vm.expectRevert("The price is not correct");
-        creditManager.executeMarketplaceExecuteOrder(addresses.land, 55466025808112969544530061011378218467468, 0, "", credits);
+        creditManager.executeMarketplaceExecuteOrder(addresses.land, landTokenId, 0, "", credits);
     }
 
     function test_executeMarketplaceExecuteOrder_RevertsIfNotEnoughManaBalanceInContract() public {
@@ -388,7 +392,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
             abi.encodeWithSelector(
                 bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
                 addresses.land,
-                55466025808112969544530061011378218467468,
+                landTokenId,
                 1 ether,
                 type(uint256).max
             )
@@ -396,7 +400,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
         require(success, "Failed to create order");
 
         vm.expectRevert();
-        creditManager.executeMarketplaceExecuteOrder(addresses.land, 55466025808112969544530061011378218467468, 1 ether, "", credits);
+        creditManager.executeMarketplaceExecuteOrder(addresses.land, landTokenId, 1 ether, "", credits);
     }
 
     function test_executeMarketplaceExecuteOrder_Success() public {
@@ -437,7 +441,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
             abi.encodeWithSelector(
                 bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
                 addresses.land,
-                55466025808112969544530061011378218467468,
+                landTokenId,
                 1 ether,
                 type(uint256).max
             )
@@ -450,6 +454,6 @@ contract CreditManagerTest is Test, IERC721Receiver {
         );
         require(success, "Failed to transfer mana");
 
-        creditManager.executeMarketplaceExecuteOrder(addresses.land, 55466025808112969544530061011378218467468, 1 ether, "", credits);
+        creditManager.executeMarketplaceExecuteOrder(addresses.land, landTokenId, 1 ether, "", credits);
     }
 }
