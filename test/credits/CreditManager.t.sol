@@ -49,6 +49,8 @@ contract CreditManagerTest is Test, IERC721Receiver {
         address land;
     }
 
+    event CreditConsumed(address indexed _sender, CreditManagerHarness.Credit _credit);
+
     function setUp() public {
         uint256 mainnetFork = vm.createFork("https://rpc.decentraland.org/mainnet", 21855460); // Feb-16-2025 12:45:59 AM +UTC
         vm.selectFork(mainnetFork);
@@ -341,11 +343,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
         vm.prank(addresses.landSeller);
         (success,) = address(marketplaceStrategyInit.marketplace).call(
             abi.encodeWithSelector(
-                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
-                addresses.land,
-                landTokenId,
-                1 ether,
-                type(uint256).max
+                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")), addresses.land, landTokenId, 1 ether, type(uint256).max
             )
         );
         require(success, "Failed to create order");
@@ -390,11 +388,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
         vm.prank(addresses.landSeller);
         (success,) = address(marketplaceStrategyInit.marketplace).call(
             abi.encodeWithSelector(
-                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
-                addresses.land,
-                landTokenId,
-                1 ether,
-                type(uint256).max
+                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")), addresses.land, landTokenId, 1 ether, type(uint256).max
             )
         );
         require(success, "Failed to create order");
@@ -439,11 +433,7 @@ contract CreditManagerTest is Test, IERC721Receiver {
         vm.prank(addresses.landSeller);
         (success,) = address(marketplaceStrategyInit.marketplace).call(
             abi.encodeWithSelector(
-                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")),
-                addresses.land,
-                landTokenId,
-                1 ether,
-                type(uint256).max
+                bytes4(keccak256("createOrder(address,uint256,uint256,uint256)")), addresses.land, landTokenId, 1 ether, type(uint256).max
             )
         );
         require(success, "Failed to create order");
@@ -457,11 +447,15 @@ contract CreditManagerTest is Test, IERC721Receiver {
         uint256 creditManagerBalanceBefore = IERC20(addresses.mana).balanceOf(address(creditManager));
         uint256 buyerBalanceBefore = IERC20(addresses.mana).balanceOf(address(this));
         uint256 landSellerBalanceBefore = IERC20(addresses.mana).balanceOf(addresses.landSeller);
+        uint256 spentCreditsBefore = creditManager.spentCredits(keccak256(credits[0].signature));
 
+        vm.expectEmit(address(creditManager));
+        emit CreditConsumed(address(this), credits[0]);
         creditManager.executeMarketplaceExecuteOrder(addresses.land, landTokenId, 1 ether, "", credits);
 
         assertEq(IERC20(addresses.mana).balanceOf(address(creditManager)), creditManagerBalanceBefore - 1 ether);
         assertEq(IERC20(addresses.mana).balanceOf(address(this)), buyerBalanceBefore);
         assertEq(IERC20(addresses.mana).balanceOf(addresses.landSeller), landSellerBalanceBefore + 0.975 ether);
+        assertEq(creditManager.spentCredits(keccak256(credits[0].signature)), spentCreditsBefore + 1 ether);
     }
 }
