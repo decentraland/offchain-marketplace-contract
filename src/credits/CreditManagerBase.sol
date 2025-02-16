@@ -7,13 +7,15 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/interfaces/IERC721Receiver.sol";
 
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
 import {EIP712} from "src/common/EIP712.sol";
 
 /// @notice Enables users to use off-chain signed credits for marketplace trades.
-abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransaction, ReentrancyGuard {
+abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransaction, ReentrancyGuard, IERC721Receiver {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
@@ -184,6 +186,11 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     /// @notice Allows the owner to withdraw any ERC721 token from the contract.
     function withdrawErc721(IERC721 _token, uint256 _tokenId, address _beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _token.safeTransferFrom(address(this), _beneficiary, _tokenId);
+    }
+
+    /// @notice Allows the contract to receive ERC721 tokens.
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 
     /// @dev Updates if primary or secondary sales are allowed and emits an event.
