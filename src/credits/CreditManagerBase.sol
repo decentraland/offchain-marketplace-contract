@@ -223,6 +223,10 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     /// It will consume credit amount in the order of the credits array.
     /// If the credits contain more MANA than the amount to be transferred, the excess MANA will not be credited and will remain available for future transfers.
     function _computeTotalManaToCredit(Credit[] calldata _credits, uint256 _manaToTransfer) internal returns (uint256 totalManaToCredit) {
+        if (_credits.length == 0) {
+            revert("No credits provided");
+        }
+
         for (uint256 i = 0; i < _credits.length; i++) {
             Credit calldata credit = _credits[i];
 
