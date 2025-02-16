@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {CreditManagerBase} from "src/credits/CreditManagerBase.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
@@ -49,5 +50,7 @@ abstract contract MarketplaceStrategy is CreditManagerBase {
         _validateResultingBalance(balanceBefore, _price);
 
         _executeManaTransfers(manaToCredit, _price);
+
+        IERC721(_contractAddress).safeTransferFrom(address(this), _msgSender(), _tokenId);
     }
 }
