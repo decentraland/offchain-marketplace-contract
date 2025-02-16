@@ -177,8 +177,13 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
     }
 
     /// @notice Allows the owner to withdraw any ERC20 token from the contract.
-    function withdraw(IERC20 _token, uint256 _amount, address _beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function withdrawErc20(IERC20 _token, uint256 _amount, address _beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _token.safeTransfer(_beneficiary, _amount);
+    }
+
+    /// @notice Allows the owner to withdraw any ERC721 token from the contract.
+    function withdrawErc721(IERC721 _token, uint256 _tokenId, address _beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _token.safeTransferFrom(address(this), _beneficiary, _tokenId);
     }
 
     /// @dev Updates if primary or secondary sales are allowed and emits an event.
