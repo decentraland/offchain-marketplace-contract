@@ -215,26 +215,12 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
         emit DenyListUpdated(_msgSender(), _user, _value);
     }
 
-    /// @dev Validates that the MANA transferred does not exceed the limit per hour.
-    function _validateManaTransferLimit(uint256 _manaTransferred) internal {
-        uint256 currentHour = block.timestamp / 1 hours;
-
-        if (currentHour != hourOfLastManaTransfer) {
-            manaTransferredThisHour = 0;
-            hourOfLastManaTransfer = currentHour;
-        }
-
-        if (manaTransferredThisHour + _manaTransferred > maxManaTransferPerHour) {
-            revert("Max MANA transfer per hour exceeded");
-        }
-
-        manaTransferredThisHour += _manaTransferred;
-    }
-
     /// @dev Computes how much MANA has to be credited to the user according to the credits and the amount of MANA to be transferred.
     /// It will consume credit amount in the order of the credits array.
     /// If the credits contain more MANA than the amount to be transferred, the excess MANA will not be credited and will remain available for future transfers.
     function _computeTotalManaToCredit(Credit[] calldata _credits, uint256 _manaToTransfer) internal returns (uint256 totalManaToCredit) {
+        _validateManaTransferLimit(_manaToTransfer);
+
         if (_credits.length == 0) {
             revert("No credits provided");
         }
@@ -277,6 +263,22 @@ abstract contract CreditManagerBase is Pausable, AccessControl, NativeMetaTransa
 
             emit CreditConsumed(sender, credit);
         }
+    }
+
+    /// @dev Validates that the MANA transferred does not exceed the limit per hour.
+    function _validateManaTransferLimit(uint256 _manaToTransfer) private {
+        uint256 currentHour = block.timestamp / 1 hours;
+
+        if (currentHour != hourOfLastManaTransfer) {
+            manaTransferredThisHour = 0;
+            hourOfLastManaTransfer = currentHour;
+        }
+
+        if (manaTransferredThisHour + _manaToTransfer > maxManaTransferPerHour) {
+            revert("Max MANA transfer per hour exceeded");
+        }
+
+        manaTransferredThisHour += _manaToTransfer;
     }
 
     /// @dev Validates that a contract address is a Decentraland Item/NFT.
