@@ -48,7 +48,7 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
 
     event TargetSelectorAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
     event ArbitraryCallRevoked(address indexed _sender, bytes32 indexed _hashedArbitraryCall);
-    
+
     /// @param _init The initialization parameters for the contract.
     constructor(ArbitraryCallStrategyInit memory _init) {
         _grantRole(ARBITRARY_CALL_SIGNER_ROLE, _init.arbitraryCallSigner);
@@ -57,10 +57,6 @@ abstract contract ArbitraryCallStrategy is CreditManagerBase {
         address[] memory allowedTargets = _init.allowedTargets;
         bytes4[] memory allowedSelectors = _init.allowedSelectors;
         uint256 allowedTargetsLength = allowedTargets.length;
-
-        if (allowedTargetsLength == 0 || allowedTargetsLength != allowedSelectors.length) {
-            revert("Invalid allowed targets or selectors");
-        }
 
         for (uint256 i = 0; i < allowedTargetsLength; i++) {
             _allowTargetSelector(allowedTargets[i], allowedSelectors[i], true);
