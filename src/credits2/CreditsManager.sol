@@ -38,6 +38,15 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @dev The key is the hash of the credit signature.
     mapping(bytes32 => uint256) spentValue;
 
+    /// @notice Maximum amount of MANA that can be transferred out of the contract per hour.
+    uint256 public maxManaTransferPerHour;
+
+    /// @notice How much MANA has been transferred out of the contract this hour.
+    uint256 public manaTransferredThisHour;
+
+    /// @notice The hour of the last MANA transfer.
+    uint256 public hourOfLastManaTransfer;
+
     /// @param _value How much ERC20 the credit is worth.
     /// @param _expiresAt The timestamp when the credit expires.
     struct Credit {
@@ -50,6 +59,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     event CreditRevoked(bytes32 indexed _creditId);
     event CreditUsed(bytes32 indexed _creditId, Credit _credit, uint256 _value);
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
+    event MaxManaTransferPerHourUpdated(uint256 _maxManaTransferPerHour);
 
     error CreditExpired(bytes32 _creditId);
     error DeniedUser(address _user);
@@ -57,6 +67,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     error InvalidSignature(bytes32 _creditId, address _recoveredSigner);
     error SpentCredit(bytes32 _creditId);
     error NoMANATransfer();
+    error MaxMANATransferExceeded();
 
     /// @param _owner The owner of the contract.
     /// @param _signer The address that can sign credits.
@@ -64,8 +75,8 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @param _denier The address that can deny users from using credits.
     /// @param _revoker The address that can revoke credits.
     /// @param _mana The address of the MANA token.
-
-    constructor(address _owner, address _signer, address _pauser, address _denier, address _revoker, IERC20 _mana) {
+    /// @param _maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
+    constructor(address _owner, address _signer, address _pauser, address _denier, address _revoker, IERC20 _mana, uint256 _maxManaTransferPerHour) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
 
         _grantRole(SIGNER_ROLE, _signer);
@@ -80,6 +91,8 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         _grantRole(REVOKER_ROLE, _owner);
 
         mana = _mana;
+
+        _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
     }
 
     /// @notice Pauses the contract.
@@ -119,6 +132,12 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         emit CreditRevoked(_credit);
     }
 
+    /// @notice Update the maximum amount of MANA that can be transferred out of the contract per hour.
+    /// @param _maxManaTransferPerHour The new maximum amount of MANA that can be transferred out of the contract per hour.
+    function updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+    }
+
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @notice Credits will be spent until the MANA transferred is equal to the credited value.
     /// @notice Any unused credit value can be used on a future call.
@@ -137,6 +156,20 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
 
         uint256 balanceBefore = mana.balanceOf(self);
 
+        uint256 currentHour = block.timestamp / 1 hours;
+
+        if (currentHour != hourOfLastManaTransfer) {
+            // Resets the values for the new hour.
+            manaTransferredThisHour = 0;
+            hourOfLastManaTransfer = currentHour;
+
+            // If the hour is different, approve the maximum amount of MANA that can be transferred out of the contract per hour.
+            mana.forceApprove(self, maxManaTransferPerHour);
+        } else {
+            // If the hour is the same, approve the remaining amount of MANA that can be transferred out of the contract.
+            mana.forceApprove(self, maxManaTransferPerHour - manaTransferredThisHour);
+        }
+
         // Perform the external call, which is handled by the inheriting contract.
         _externalCall();
 
@@ -146,6 +179,12 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         if (manaTransferred == 0) {
             revert NoMANATransfer();
         }
+
+        // Reset the approval to 0.
+        mana.forceApprove(self, 0);
+
+        // Update the amount of MANA transferred this hour.
+        manaTransferredThisHour += manaTransferred;
 
         // Track how much has been credited to cover the MANA transferred.
         uint256 creditedValue = 0;
@@ -208,4 +247,10 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     }
 
     function _externalCall() internal virtual;
+
+    function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) internal {
+        maxManaTransferPerHour = _maxManaTransferPerHour;
+
+        emit MaxManaTransferPerHourUpdated(_maxManaTransferPerHour);
+    }
 }
