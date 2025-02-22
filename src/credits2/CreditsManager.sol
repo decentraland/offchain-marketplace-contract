@@ -292,6 +292,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         emit CreditsUsed(manaTransferred, creditedValue);
     }
 
+    /// @dev Must be implemented by inheriting contracts
     function _executeExternalCall(ExternalCall calldata _externalCall) internal virtual;
 
     function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) internal {
