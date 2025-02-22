@@ -47,11 +47,21 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @notice The hour of the last MANA transfer.
     uint256 public hourOfLastManaTransfer;
 
+    /// @notice Whether an external call is allowed to be made.
+    /// @dev Contract address => selector => isAllowed
+    mapping(address => mapping(bytes4 => bool)) public isAllowedCall;
+
     /// @param _value How much ERC20 the credit is worth.
     /// @param _expiresAt The timestamp when the credit expires.
     struct Credit {
         uint256 value;
         uint256 expiresAt;
+    }
+
+    struct ExternalCall {
+        address target;
+        bytes4 selector;
+        bytes data;
     }
 
     event UserDenied(address indexed _user);
@@ -60,6 +70,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     event CreditUsed(bytes32 indexed _creditId, Credit _credit, uint256 _value);
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
     event MaxManaTransferPerHourUpdated(uint256 _maxManaTransferPerHour);
+    event CallAllowed(address indexed _target, bytes4 _selector, bool _value);
 
     error CreditExpired(bytes32 _creditId);
     error DeniedUser(address _user);
@@ -68,6 +79,8 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     error SpentCredit(bytes32 _creditId);
     error NoMANATransfer();
     error MaxMANATransferExceeded();
+    error InvalidAllowedTargetsAndSelectorsLength();
+    error CallNotAllowed(address _target, bytes4 _selector);
 
     /// @param _owner The owner of the contract.
     /// @param _signer The address that can sign credits.
@@ -76,7 +89,19 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @param _revoker The address that can revoke credits.
     /// @param _mana The address of the MANA token.
     /// @param _maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
-    constructor(address _owner, address _signer, address _pauser, address _denier, address _revoker, IERC20 _mana, uint256 _maxManaTransferPerHour) {
+    /// @param _allowedTargets The targets of the external calls that are allowed.
+    /// @param _allowedSelectors The selectors of the targets that are allowed.
+    constructor(
+        address _owner,
+        address _signer,
+        address _pauser,
+        address _denier,
+        address _revoker,
+        IERC20 _mana,
+        uint256 _maxManaTransferPerHour,
+        address[] memory _allowedTargets,
+        bytes4[] memory _allowedSelectors
+    ) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
 
         _grantRole(SIGNER_ROLE, _signer);
@@ -93,6 +118,14 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         mana = _mana;
 
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+
+        if (_allowedTargets.length != _allowedSelectors.length) {
+            revert InvalidAllowedTargetsAndSelectorsLength();
+        }
+
+        for (uint256 i = 0; i < _allowedTargets.length; i++) {
+            _allowCall(_allowedTargets[i], _allowedSelectors[i], true);
+        }
     }
 
     /// @notice Pauses the contract.
@@ -138,13 +171,26 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
     }
 
+    /// @notice Allows or disallows an external call.
+    /// @param _target The contract address of the external call.
+    /// @param _selector The selector of the external call.
+    /// @param _value Whether the call is allowed.
+    function allowCall(address _target, bytes4 _selector, bool _value) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _allowCall(_target, _selector, _value);
+    }
+
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @notice Credits will be spent until the MANA transferred is equal to the credited value.
     /// @notice Any unused credit value can be used on a future call.
     /// @dev The signatures must have been signed by the signer role.
     /// @param _credits The credits to use.
     /// @param _signatures The signatures of the credits.
-    function useCredits(Credit[] calldata _credits, bytes[] calldata _signatures) external nonReentrant {
+    /// @param _externalCall The external call to make.
+    function useCredits(Credit[] calldata _credits, bytes[] calldata _signatures, ExternalCall calldata _externalCall) external nonReentrant {
+        if (!isAllowedCall[_externalCall.target][_externalCall.selector]) {
+            revert CallNotAllowed(_externalCall.target, _externalCall.selector);
+        }
+
         address sender = _msgSender();
 
         // Check if the user is denied from using credits.
@@ -171,7 +217,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         }
 
         // Perform the external call, which is handled by the inheriting contract.
-        _externalCall();
+        _executeExternalCall(_externalCall);
 
         uint256 manaTransferred = mana.balanceOf(self) - balanceBefore;
 
@@ -246,11 +292,17 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         emit CreditsUsed(manaTransferred, creditedValue);
     }
 
-    function _externalCall() internal virtual;
+    function _executeExternalCall(ExternalCall calldata _externalCall) internal virtual;
 
     function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) internal {
         maxManaTransferPerHour = _maxManaTransferPerHour;
 
         emit MaxManaTransferPerHourUpdated(_maxManaTransferPerHour);
+    }
+
+    function _allowCall(address _target, bytes4 _selector, bool _value) internal {
+        isAllowedCall[_target][_selector] = _value;
+
+        emit CallAllowed(_target, _selector, _value);
     }
 }
