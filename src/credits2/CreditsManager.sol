@@ -49,6 +49,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     event UserAllowed(address indexed _user);
     event CreditRevoked(bytes32 indexed _creditId);
     event CreditUsed(bytes32 indexed _creditId, Credit _credit, uint256 _value);
+    event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
 
     error CreditExpired(bytes32 _creditId);
     error DeniedUser(address _user);
@@ -202,6 +203,8 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         if (manaTransferred > creditedValue) {
             mana.safeTransferFrom(sender, self, manaTransferred - creditedValue);
         }
+
+        emit CreditsUsed(manaTransferred, creditedValue);
     }
 
     function _externalCall() internal virtual;
