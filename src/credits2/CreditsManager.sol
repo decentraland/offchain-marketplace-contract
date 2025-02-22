@@ -3,8 +3,11 @@ pragma solidity 0.8.20;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract CreditsManager is AccessControl, Pausable {
+    using ECDSA for bytes32;
+
     /// @notice The role that can sign credits.
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
 
@@ -24,9 +27,29 @@ contract CreditsManager is AccessControl, Pausable {
     /// @dev The key is the hash of the credit signature.
     mapping(bytes32 => bool) public isRevoked;
 
-    event UserDenied(address indexed user);
-    event UserAllowed(address indexed user);
-    event CreditRevoked(bytes32 indexed credit);
+    /// @param _value How much ERC20 the credit is worth.
+    /// @param _expiresAt The timestamp when the credit expires.
+    struct Credit {
+        uint256 value;
+        uint256 expiresAt;
+    }
+
+    /// @notice Emitted when a user is denied from using credits.
+    /// @param _user The address of the user that was denied from using credits.
+    event UserDenied(address indexed _user);
+
+    /// @notice Emitted when a user is allowed to use credits.
+    /// @param _user The address of the user that was allowed to use credits.
+    event UserAllowed(address indexed _user);
+
+    /// @notice Emitted when a credit is revoked.
+    /// @param _credit The hash of the credit signature that was revoked.
+    event CreditRevoked(bytes32 indexed _credit);
+
+    error CreditExpired();
+    error DeniedUser(address _user);
+    error RevokedCredit(bytes32 _credit);
+    error InvalidSignature(bytes32 _credit, address _recoveredSigner);
 
     /// @param _owner The owner of the contract.
     /// @param _signer The address that can sign credits.
@@ -83,5 +106,35 @@ contract CreditsManager is AccessControl, Pausable {
         isRevoked[_credit] = true;
 
         emit CreditRevoked(_credit);
+    }
+
+    function useCredits(Credit[] calldata _credits, bytes[] calldata _signatures) external {
+        address sender = _msgSender();
+
+        for (uint256 i = 0; i < _credits.length; i++) {
+            Credit calldata credit = _credits[i];
+
+            if (block.timestamp > credit.expiresAt) {
+                revert CreditExpired();
+            }
+
+            if (isDenied[sender]) {
+                revert DeniedUser(sender);
+            }
+
+            bytes calldata signature = _signatures[i];
+
+            bytes32 signatureHash = keccak256(signature);
+
+            if (isRevoked[signatureHash]) {
+                revert RevokedCredit(signatureHash);
+            }
+
+            address recoveredSigner = keccak256(abi.encode(sender, block.chainid, credit)).recover(signature);
+
+            if (!hasRole(SIGNER_ROLE, recoveredSigner)) {
+                revert InvalidSignature(signatureHash, recoveredSigner);
+            }
+        }
     }
 }
