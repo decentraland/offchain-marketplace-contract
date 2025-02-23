@@ -230,10 +230,10 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
             hourOfLastManaTransfer = currentHour;
 
             // If the hour is different, approve the maximum amount of MANA that can be transferred out of the contract per hour.
-            mana.forceApprove(self, maxManaTransferPerHour);
+            mana.forceApprove(_externalCall.target, maxManaTransferPerHour);
         } else {
             // If the hour is the same, approve the remaining amount of MANA that can be transferred out of the contract.
-            mana.forceApprove(self, maxManaTransferPerHour - manaTransferredThisHour);
+            mana.forceApprove(_externalCall.target, maxManaTransferPerHour - manaTransferredThisHour);
         }
 
         // Perform the external call, which is handled by the inheriting contract.
@@ -247,7 +247,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         }
 
         // Reset the approval to 0.
-        mana.forceApprove(self, 0);
+        mana.forceApprove(_externalCall.target, 0);
 
         // Update the amount of MANA transferred this hour.
         manaTransferredThisHour += manaTransferred;
