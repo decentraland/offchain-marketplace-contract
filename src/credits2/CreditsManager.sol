@@ -7,6 +7,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     using ECDSA for bytes32;
@@ -95,6 +96,8 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
     event MaxManaTransferPerHourUpdated(uint256 _maxManaTransferPerHour);
     event CallAllowed(address indexed _target, bytes4 _selector, bool _value);
+    event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
+    event ERC721Withdrawn(address indexed _token, uint256 _tokenId, address indexed _to);
 
     error CreditExpired(bytes32 _creditId);
     error DeniedUser(address _user);
@@ -182,6 +185,18 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @param _value Whether the call is allowed.
     function allowCall(address _target, bytes4 _selector, bool _value) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _allowCall(_target, _selector, _value);
+    }
+
+    function withdrawERC20(address _token, uint256 _amount, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC20(_token).safeTransfer(_to, _amount);
+
+        emit ERC20Withdrawn(_token, _amount, _to);
+    }
+
+    function withdrawERC721(address _token, uint256 _tokenId, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC721(_token).safeTransferFrom(address(this), _to, _tokenId);
+
+        emit ERC721Withdrawn(_token, _tokenId, _to);
     }
 
     /// @notice Use credits to pay for external calls that transfer MANA.
