@@ -9,8 +9,9 @@ import {IMarketplace, Trade} from "./interfaces/IMarketplace.sol";
 import {ICollectionStore} from "./interfaces/ICollectionStore.sol";
 import {ILegacyMarketplace} from "./interfaces/ILegacyMarketplace.sol";
 import {ICollectionFactory} from "./interfaces/ICollectionFactory.sol";
+import {NativeMetaTransaction, EIP712} from "../common/NativeMetaTransaction.sol";
 
-contract CreditsManagerPolygon is CreditsManager {
+contract CreditsManagerPolygon is CreditsManager, NativeMetaTransaction {
     address public immutable marketplace;
     address public immutable legacyMarketplace;
     address public immutable collectionStore;
@@ -30,7 +31,7 @@ contract CreditsManagerPolygon is CreditsManager {
         address _collectionStore,
         ICollectionFactory _collectionFactory,
         ICollectionFactory _collectionFactoryV3
-    ) CreditsManager(_init) {
+    ) CreditsManager(_init) EIP712("CreditsManagerPolygon", "1.0.0") {
         marketplace = _marketplace;
         legacyMarketplace = _legacyMarketplace;
         collectionStore = _collectionStore;
@@ -88,5 +89,9 @@ contract CreditsManagerPolygon is CreditsManager {
         if (!collectionFactory.isCollectionFromFactory(_contractAddress) && !collectionFactoryV3.isCollectionFromFactory(_contractAddress)) {
             revert NotDecentralandCollection(_contractAddress);
         }
+    }
+
+    function _msgSender() internal view override returns (address) {
+        return _getMsgSender();
     }
 }
