@@ -51,6 +51,27 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @dev Contract address => selector => isAllowed
     mapping(address => mapping(bytes4 => bool)) public isAllowedCall;
 
+    /// @param owner The owner of the contract.
+    /// @param signer The address that can sign credits.
+    /// @param pauser The address that can pause the contract.
+    /// @param denier The address that can deny users from using credits.
+    /// @param revoker The address that can revoke credits.
+    /// @param mana The address of the MANA token.
+    /// @param maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
+    /// @param allowedTargets The targets of the external calls that are allowed.
+    /// @param allowedSelectors The selectors of the targets that are allowed.
+    struct Init {
+        address owner;
+        address signer;
+        address pauser;
+        address denier;
+        address revoker;
+        IERC20 mana;
+        uint256 maxManaTransferPerHour;
+        address[] allowedTargets;
+        bytes4[] allowedSelectors;
+    }
+
     /// @param _value How much ERC20 the credit is worth.
     /// @param _expiresAt The timestamp when the credit expires.
     struct Credit {
@@ -58,6 +79,9 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         uint256 expiresAt;
     }
 
+    /// @param target The contract address of the external call.
+    /// @param selector The selector of the external call.
+    /// @param data The data of the external call.
     struct ExternalCall {
         address target;
         bytes4 selector;
@@ -82,49 +106,30 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     error InvalidAllowedTargetsAndSelectorsLength();
     error CallNotAllowed(address _target, bytes4 _selector);
 
-    /// @param _owner The owner of the contract.
-    /// @param _signer The address that can sign credits.
-    /// @param _pauser The address that can pause the contract.
-    /// @param _denier The address that can deny users from using credits.
-    /// @param _revoker The address that can revoke credits.
-    /// @param _mana The address of the MANA token.
-    /// @param _maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
-    /// @param _allowedTargets The targets of the external calls that are allowed.
-    /// @param _allowedSelectors The selectors of the targets that are allowed.
-    constructor(
-        address _owner,
-        address _signer,
-        address _pauser,
-        address _denier,
-        address _revoker,
-        IERC20 _mana,
-        uint256 _maxManaTransferPerHour,
-        address[] memory _allowedTargets,
-        bytes4[] memory _allowedSelectors
-    ) {
-        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+    constructor(Init memory _init) {
+        _grantRole(DEFAULT_ADMIN_ROLE, _init.owner);
 
-        _grantRole(SIGNER_ROLE, _signer);
+        _grantRole(SIGNER_ROLE, _init.signer);
 
-        _grantRole(PAUSER_ROLE, _pauser);
-        _grantRole(PAUSER_ROLE, _owner);
+        _grantRole(PAUSER_ROLE, _init.pauser);
+        _grantRole(PAUSER_ROLE, _init.owner);
 
-        _grantRole(DENIER_ROLE, _denier);
-        _grantRole(DENIER_ROLE, _owner);
+        _grantRole(DENIER_ROLE, _init.denier);
+        _grantRole(DENIER_ROLE, _init.owner);
 
-        _grantRole(REVOKER_ROLE, _revoker);
-        _grantRole(REVOKER_ROLE, _owner);
+        _grantRole(REVOKER_ROLE, _init.revoker);
+        _grantRole(REVOKER_ROLE, _init.owner);
 
-        mana = _mana;
+        mana = _init.mana;
 
-        _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+        _updateMaxManaTransferPerHour(_init.maxManaTransferPerHour);
 
-        if (_allowedTargets.length != _allowedSelectors.length) {
+        if (_init.allowedTargets.length != _init.allowedSelectors.length) {
             revert InvalidAllowedTargetsAndSelectorsLength();
         }
 
-        for (uint256 i = 0; i < _allowedTargets.length; i++) {
-            _allowCall(_allowedTargets[i], _allowedSelectors[i], true);
+        for (uint256 i = 0; i < _init.allowedTargets.length; i++) {
+            _allowCall(_init.allowedTargets[i], _init.allowedSelectors[i], true);
         }
     }
 
