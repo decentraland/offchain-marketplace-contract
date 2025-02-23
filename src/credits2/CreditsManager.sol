@@ -206,7 +206,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @param _credits The credits to use.
     /// @param _signatures The signatures of the credits.
     /// @param _externalCall The external call to make.
-    function useCredits(Credit[] calldata _credits, bytes[] calldata _signatures, ExternalCall calldata _externalCall) external nonReentrant {
+    function useCredits(Credit[] calldata _credits, bytes[] calldata _signatures, ExternalCall calldata _externalCall) external nonReentrant whenNotPaused {
         if (!isAllowedCall[_externalCall.target][_externalCall.selector]) {
             revert CallNotAllowed(_externalCall.target, _externalCall.selector);
         }
