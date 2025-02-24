@@ -208,9 +208,9 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @notice Any unused credit value can be used on a future call.
     /// @dev The signatures must have been signed by the signer role.
     /// @param _credits The credits to use.
-    /// @param _signatures The signatures of the credits.
+    /// @param _creditsSignatures The signatures of the credits.
     /// @param _externalCall The external call to make.
-    function useCredits(Credit[] calldata _credits, bytes[] calldata _signatures, ExternalCall calldata _externalCall) external nonReentrant whenNotPaused {
+    function useCredits(Credit[] calldata _credits, bytes[] calldata _creditsSignatures, ExternalCall calldata _externalCall) external nonReentrant whenNotPaused {
         // Why use this contract if you don't provide any credits?
         if (_credits.length == 0) {
             revert NoCredits();
@@ -240,7 +240,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         }
 
         // Perform the external call, which is handled by the inheriting contract.
-        address creditsConsumer = _executeExternalCall(_externalCall, _signatures);
+        address creditsConsumer = _executeExternalCall(_externalCall, _creditsSignatures);
 
         // Check if the user is denied from using credits.
         if (isDenied[creditsConsumer]) {
@@ -270,7 +270,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
                 revert InvalidCreditValue();
             }
 
-            bytes calldata signature = _signatures[i];
+            bytes calldata signature = _creditsSignatures[i];
 
             bytes32 signatureHash = keccak256(signature);
 
@@ -327,7 +327,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @dev Must be implemented by inheriting contracts
     /// Returns the address of the user that is consuming the credits.
     /// This is used in cases such as bids in which the one consuming the credits is not the caller but the signer of the bid.
-    function _executeExternalCall(ExternalCall calldata _externalCall, bytes[] calldata _signatures) internal virtual returns (address creditsConsumer);
+    function _executeExternalCall(ExternalCall calldata _externalCall, bytes[] calldata _creditsSignatures) internal virtual returns (address creditsConsumer);
 
     function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) internal {
         maxManaTransferPerHour = _maxManaTransferPerHour;

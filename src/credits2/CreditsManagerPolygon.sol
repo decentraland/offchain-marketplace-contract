@@ -64,7 +64,7 @@ contract CreditsManagerPolygon is CreditsManager, NativeMetaTransaction {
     }
 
     /// @dev Implementation of the external call that will transfer mana for Decentraland Polygon Marketplaces.
-    function _executeExternalCall(ExternalCall calldata _externalCall, bytes[] calldata _signatures)
+    function _executeExternalCall(ExternalCall calldata _externalCall, bytes[] calldata _creditsSignatures)
         internal
         override
         returns (address creditsConsumer)
@@ -107,7 +107,7 @@ contract CreditsManagerPolygon is CreditsManager, NativeMetaTransaction {
                 // The one who is using credits on bids is the one who signed the bid given that it is the one paying with mana.
                 creditsConsumer = trade.signer;
 
-                tempBidCreditsSignaturesHash = keccak256(abi.encode(_signatures));
+                tempBidCreditsSignaturesHash = keccak256(abi.encode(_creditsSignatures));
             } else {
                 revert InvalidTrade(trade);
             }
