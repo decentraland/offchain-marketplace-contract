@@ -75,9 +75,11 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
 
     /// @param _value How much ERC20 the credit is worth.
     /// @param _expiresAt The timestamp when the credit expires.
+    /// @param _salt Value used to generate unique credits.
     struct Credit {
         uint256 value;
         uint256 expiresAt;
+        bytes32 salt;
     }
 
     /// @param target The contract address of the external call.
@@ -109,6 +111,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     error InvalidAllowedTargetsAndSelectorsLength();
     error CallNotAllowed(address _target, bytes4 _selector);
     error NoCredits();
+    error InvalidCreditValue();
 
     constructor(Init memory _init) {
         _grantRole(DEFAULT_ADMIN_ROLE, _init.owner);
@@ -262,6 +265,10 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
 
         for (uint256 i = 0; i < _credits.length; i++) {
             Credit calldata credit = _credits[i];
+
+            if (credit.value == 0) {
+                revert InvalidCreditValue();
+            }
 
             bytes calldata signature = _signatures[i];
 
