@@ -108,6 +108,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     error MaxMANATransferExceeded();
     error InvalidAllowedTargetsAndSelectorsLength();
     error CallNotAllowed(address _target, bytes4 _selector);
+    error NoCredits();
 
     constructor(Init memory _init) {
         _grantRole(DEFAULT_ADMIN_ROLE, _init.owner);
@@ -207,15 +208,14 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
     /// @param _signatures The signatures of the credits.
     /// @param _externalCall The external call to make.
     function useCredits(Credit[] calldata _credits, bytes[] calldata _signatures, ExternalCall calldata _externalCall) external nonReentrant whenNotPaused {
-        if (!isAllowedCall[_externalCall.target][_externalCall.selector]) {
-            revert CallNotAllowed(_externalCall.target, _externalCall.selector);
+        // Why use this contract if you don't provide any credits?
+        if (_credits.length == 0) {
+            revert NoCredits();
         }
 
-        address sender = _msgSender();
-
-        // Check if the user is denied from using credits.
-        if (isDenied[sender]) {
-            revert DeniedUser(sender);
+        // Checks if the external call has been allowed.
+        if (!isAllowedCall[_externalCall.target][_externalCall.selector]) {
+            revert CallNotAllowed(_externalCall.target, _externalCall.selector);
         }
 
         address self = address(this);
@@ -237,7 +237,12 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         }
 
         // Perform the external call, which is handled by the inheriting contract.
-        _executeExternalCall(_externalCall);
+        address creditsConsumer = _executeExternalCall(_externalCall, _signatures);
+
+        // Check if the user is denied from using credits.
+        if (isDenied[creditsConsumer]) {
+            revert DeniedUser(creditsConsumer);
+        }
 
         uint256 manaTransferred = mana.balanceOf(self) - balanceBefore;
 
@@ -272,7 +277,7 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
                 revert RevokedCredit(signatureHash);
             }
 
-            address recoveredSigner = keccak256(abi.encode(sender, block.chainid, self, credit)).recover(signature);
+            address recoveredSigner = keccak256(abi.encode(creditsConsumer, block.chainid, self, credit)).recover(signature);
 
             // Check that the signature has been signed by the signer role.
             if (!hasRole(SIGNER_ROLE, recoveredSigner)) {
@@ -306,14 +311,16 @@ abstract contract CreditsManager is AccessControl, Pausable, ReentrancyGuard {
         }
 
         if (manaTransferred > creditedValue) {
-            mana.safeTransferFrom(sender, self, manaTransferred - creditedValue);
+            mana.safeTransferFrom(creditsConsumer, self, manaTransferred - creditedValue);
         }
 
         emit CreditsUsed(manaTransferred, creditedValue);
     }
 
     /// @dev Must be implemented by inheriting contracts
-    function _executeExternalCall(ExternalCall calldata _externalCall) internal virtual;
+    /// Returns the address of the user that is consuming the credits.
+    /// This is used in cases such as bids in which the one consuming the credits is not the caller but the signer of the bid.
+    function _executeExternalCall(ExternalCall calldata _externalCall, bytes[] calldata _signatures) internal virtual returns (address creditsConsumer);
 
     function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) internal {
         maxManaTransferPerHour = _maxManaTransferPerHour;
