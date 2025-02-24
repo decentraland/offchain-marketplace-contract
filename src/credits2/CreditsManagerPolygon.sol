@@ -10,9 +10,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {NativeMetaTransaction, EIP712} from "../common/NativeMetaTransaction.sol";
-import {IMarketplace, Trade} from "./interfaces/IMarketplace.sol";
+import {IMarketplace, Trade, ExternalCheck} from "./interfaces/IMarketplace.sol";
 import {ILegacyMarketplace} from "./interfaces/ILegacyMarketplace.sol";
 import {ICollectionFactory} from "./interfaces/ICollectionFactory.sol";
+import {ICollectionStore} from "./interfaces/ICollectionStore.sol";
 
 contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction {
     using ECDSA for bytes32;
@@ -95,7 +96,6 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     event CreditUsed(bytes32 indexed _creditId, Credit _credit, uint256 _value);
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
     event MaxManaTransferPerHourUpdated(uint256 _maxManaTransferPerHour);
-    event CallAllowed(address indexed _target, bytes4 _selector, bool _value);
     event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _token, uint256 _tokenId, address indexed _to);
 
@@ -105,9 +105,6 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     error InvalidSignature(bytes32 _creditId, address _recoveredSigner);
     error SpentCredit(bytes32 _creditId);
     error NoMANATransfer();
-    error MaxMANATransferExceeded();
-    error InvalidAllowedTargetsAndSelectorsLength();
-    error CallNotAllowed(address _target, bytes4 _selector);
     error NoCredits();
     error InvalidCreditValue();
     error InvalidExternalCallTarget(address _target);
@@ -117,6 +114,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     error InvalidBeneficiary();
     error InvalidTrade(Trade _trade);
     error ExternalCallFailed(ExternalCall _externalCall);
+    error ExternalCheckNotFound();
 
     /// @param _owner The address that acts as default admin.
     /// @param _signer The address that can sign credits.
@@ -211,12 +209,20 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
     }
 
+    /// @notice Withdraw ERC20 tokens from the contract.
+    /// @param _token The address of the ERC20 token.
+    /// @param _amount The amount of ERC20 tokens to withdraw.
+    /// @param _to The address to send the ERC20 tokens to.
     function withdrawERC20(address _token, uint256 _amount, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_token).safeTransfer(_to, _amount);
 
         emit ERC20Withdrawn(_token, _amount, _to);
     }
 
+    /// @notice Withdraw ERC721 tokens from the contract.
+    /// @param _token The address of the ERC721 token.
+    /// @param _tokenId The ID of the ERC721 token.
+    /// @param _to The address to send the ERC721 token to.
     function withdrawERC721(address _token, uint256 _tokenId, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC721(_token).safeTransferFrom(address(this), _to, _tokenId);
 
@@ -242,10 +248,12 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
 
         address self = address(this);
 
+        // After the external call is made, it will be used to calculate how much MANA was transferred out of the contract.
         uint256 balanceBefore = mana.balanceOf(self);
 
         uint256 currentHour = block.timestamp / 1 hours;
 
+        // Checks how much can be transferred out of the contract in the current hour to define how much is allowed to be transferred out of the contract.
         if (currentHour != hourOfLastManaTransfer) {
             // Resets the values for the new hour.
             manaTransferredThisHour = 0;
@@ -258,6 +266,8 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
             mana.forceApprove(_externalCall.target, maxManaTransferPerHour - manaTransferredThisHour);
         }
 
+        // By default the consumer of the credits is the caller of the function.
+        // It changes in the case of bids in which the consumer is the signer of the bid.
         address creditsConsumer = _msgSender();
 
         {
@@ -300,14 +310,38 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                         _verifyDecentralandCollection(trade.received[j].contractAddress);
                     }
 
+                    // Bids must have an external check with this contract to verify that the credits provided are the same as the ones the consumer wants used.
+                    bool hasExternalCheck = false;
+
+                    for (uint256 j = 0; j < trade.checks.externalChecks.length; j++) {
+                        ExternalCheck memory externalCheck = trade.checks.externalChecks[j];
+
+                        if (
+                            externalCheck.contractAddress == address(this) && externalCheck.selector == this.bidExternalCheck.selector
+                                && externalCheck.required
+                        ) {
+                            hasExternalCheck = true;
+                        }
+                    }
+
+                    if (!hasExternalCheck) {
+                        revert ExternalCheckNotFound();
+                    }
+
                     // The one who is using credits on bids is the one who signed the bid given that it is the one paying with mana.
                     creditsConsumer = trade.signer;
 
+                    // Stores the hash of the signatures of the credits to be used for bids.
+                    // Checked afterwards by the trade external check.
                     tempBidCreditsSignaturesHash = keccak256(abi.encode(_creditsSignatures));
                 } else {
                     revert InvalidTrade(trade);
                 }
-            } else if (_externalCall.target != collectionStore) {
+            } else if (_externalCall.target == collectionStore) {
+                if (_externalCall.selector != ICollectionStore.buy.selector) {
+                    revert InvalidExternalCallSelector(_externalCall.target, _externalCall.selector);
+                }
+            } else {
                 revert InvalidExternalCallTarget(_externalCall.target);
             }
 
@@ -421,6 +455,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         return _caller == address(this) && abi.decode(_data, (bytes32)) == tempBidCreditsSignaturesHash;
     }
 
+    /// @dev This is to update the maximum amount of MANA that can be transferred out of the contract per hour.
     function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) internal {
         maxManaTransferPerHour = _maxManaTransferPerHour;
 
@@ -432,5 +467,10 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         if (!collectionFactory.isCollectionFromFactory(_contractAddress) && !collectionFactoryV3.isCollectionFromFactory(_contractAddress)) {
             revert NotDecentralandCollection(_contractAddress);
         }
+    }
+
+    /// @dev This is to support meta-transactions.
+    function _msgSender() internal view override returns (address) {
+        return _getMsgSender();
     }
 }
