@@ -13,7 +13,7 @@ import {NativeMetaTransaction, EIP712} from "../common/NativeMetaTransaction.sol
 import {IMarketplace, Trade, ExternalCheck} from "./interfaces/IMarketplace.sol";
 import {ILegacyMarketplace} from "./interfaces/ILegacyMarketplace.sol";
 import {ICollectionFactory} from "./interfaces/ICollectionFactory.sol";
-import {ICollectionStore} from "./interfaces/ICollectionStore.sol";
+import {ICollectionStore, ItemToBuy} from "./interfaces/ICollectionStore.sol";
 
 contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction {
     using ECDSA for bytes32;
@@ -115,6 +115,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     error InvalidTrade(Trade _trade);
     error ExternalCallFailed(ExternalCall _externalCall);
     error ExternalCheckNotFound();
+    error InvalidAssetsLength();
 
     /// @param _owner The address that acts as default admin.
     /// @param _signer The address that can sign credits.
@@ -246,76 +247,109 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
             revert NoCredits();
         }
 
-        address self = address(this);
-
-        // After the external call is made, it will be used to calculate how much MANA was transferred out of the contract.
-        uint256 balanceBefore = mana.balanceOf(self);
-
         uint256 currentHour = block.timestamp / 1 hours;
 
-        // Checks how much can be transferred out of the contract in the current hour to define how much is allowed to be transferred out of the contract.
+        // Checks how much can be transferred out of the contract in the current hour.
         if (currentHour != hourOfLastManaTransfer) {
-            // Resets the values for the new hour.
+            // Resets the values as it is a new hour.
             manaTransferredThisHour = 0;
             hourOfLastManaTransfer = currentHour;
 
-            // If the hour is different, approve the maximum amount of MANA that can be transferred out of the contract per hour.
+            // Approve for the maximum amount as it is a new hour.
             mana.forceApprove(_externalCall.target, maxManaTransferPerHour);
         } else {
-            // If the hour is the same, approve the remaining amount of MANA that can be transferred out of the contract.
+            // Given that a transfer happened in this same hour, the approval has to be for the remaining transferable amount.
             mana.forceApprove(_externalCall.target, maxManaTransferPerHour - manaTransferredThisHour);
         }
 
         // By default the consumer of the credits is the caller of the function.
-        // It changes in the case of bids in which the consumer is the signer of the bid.
+        // There is a special case for bids in which the consumer is the signer of the bid instead.
         address creditsConsumer = _msgSender();
 
         {
+            // Legacy Marketplace.
             if (_externalCall.target == legacyMarketplace) {
+                // Check that only executeOrder is being called.
+                // `safeExecuteOrder` is not used on Polygon given that the assets don't validate signatures like with Estates.
                 if (_externalCall.selector != ILegacyMarketplace.executeOrder.selector) {
                     revert InvalidExternalCallSelector(_externalCall.target, _externalCall.selector);
                 }
 
+                // Decode the contract address from the data
                 (address contractAddress) = abi.decode(_externalCall.data, (address));
 
+                // Check that the sent assets are decentraland collections items or nfts.
                 _verifyDecentralandCollection(contractAddress);
-            } else if (_externalCall.target == marketplace) {
+            }
+            // Offchain Marketplace.
+            else if (_externalCall.target == marketplace) {
+                // Check that only accept or acceptWithCoupon are being called.
                 if (_externalCall.selector != IMarketplace.accept.selector && _externalCall.selector != IMarketplace.acceptWithCoupon.selector) {
                     revert InvalidExternalCallSelector(_externalCall.target, _externalCall.selector);
                 }
 
+                // Decode the trades from the data.
                 Trade[] memory trades = abi.decode(_externalCall.data, (Trade[]));
 
+                // To avoid making this too complex, we only allow one trade per call.
                 if (trades.length != 1) {
                     revert OnlyOneTradeAllowed();
                 }
 
+                // Given that there is only one trade, we store the one in the first index.
                 Trade memory trade = trades[0];
 
+                // Now we have to check if the trade is a valid listing or a valid bid.
+                //
+                // Listing:
+                // - 1 mana asset received by the signer.
+                // - n amount of decentraland assets sent to the caller.
+                // Bid:
+                // - n amount of decentraland assets received by the signer.
+                // - 1 mana asset sent to the caller.
+                //
+                // First we verify if the trade is a listing by checking if the received assets contain only a mana asset.
                 if (trade.received.length == 1 && trade.received[0].contractAddress == address(mana)) {
-                    // Valid listings are composed of trades in which only mana is received by the signer and only decentraland collections items or nfts are sent.
-                    for (uint256 j = 0; j < trade.sent.length; j++) {
+                    uint256 sentLength = trade.sent.length;
+
+                    // We check that there is at least one sent asset.
+                    if (sentLength == 0) {
+                        revert InvalidAssetsLength();
+                    }
+
+                    for (uint256 j = 0; j < sentLength; j++) {
+                        // We check that the sent assets are decentraland collections items or nfts.
                         _verifyDecentralandCollection(trade.sent[j].contractAddress);
-                        // Address 0 is then converted to the address of the caller in the Marketplace contract for sent assets.
-                        // The caller in this case is this contract.
-                        // To prevent the asset to be received by this contract, we prevent callers from setting the beneficiary to address(0).
-                        // Given that the sent beneficiary is not signed, it is easy for the caller to just set its own address to the beneficiary.
+
+                        // We check that the beneficiary of the decentraland assets is not 0 so they are not received by this contract.
                         if (trade.sent[j].beneficiary == address(0)) {
                             revert InvalidBeneficiary();
                         }
                     }
-                } else if (trade.sent.length == 1 && trade.sent[0].contractAddress == address(mana)) {
-                    // Valid bids are composed of trades in which only decentraland collections items or nfts are received by the signer and only mana is sent.
-                    for (uint256 j = 0; j < trade.received.length; j++) {
+                }
+                // If it is not a listing, we verify that it is a bid by checking if the sent assets contain only a mana asset.
+                else if (trade.sent.length == 1 && trade.sent[0].contractAddress == address(mana)) {
+                    uint256 receivedLength = trade.received.length;
+
+                    // We check that there is at least one received asset.
+                    if (receivedLength == 0) {
+                        revert InvalidAssetsLength();
+                    }
+
+                    for (uint256 j = 0; j < receivedLength; j++) {
+                        // We check that the received assets are decentraland collections items or nfts.
+                        // There is no need to check that the beneficiary is not 0 because the signer (bidder) address will be used in that case.
                         _verifyDecentralandCollection(trade.received[j].contractAddress);
                     }
 
-                    // Bids must have an external check with this contract to verify that the credits provided are the same as the ones the consumer wants used.
+                    // We check that the bid has an external check with this contract to verify that the credits provided are
+                    // the same as the ones the bidder wants to use.
                     bool hasExternalCheck = false;
 
                     for (uint256 j = 0; j < trade.checks.externalChecks.length; j++) {
                         ExternalCheck memory externalCheck = trade.checks.externalChecks[j];
 
+                        // We check that at least one required external check has this contract as target and is calling the bidExternalCheck function.
                         if (
                             externalCheck.contractAddress == address(this) && externalCheck.selector == this.bidExternalCheck.selector
                                 && externalCheck.required
@@ -324,53 +358,81 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                         }
                     }
 
+                    // If we can't find the external check, we revert.
                     if (!hasExternalCheck) {
                         revert ExternalCheckNotFound();
                     }
 
-                    // The one who is using credits on bids is the one who signed the bid given that it is the one paying with mana.
-                    creditsConsumer = trade.signer;
-
-                    // Stores the hash of the signatures of the credits to be used for bids.
-                    // Checked afterwards by the trade external check.
+                    // Stores the hash of the credits to be consumed on the bid so it can be verified on the external check.
                     tempBidCreditsSignaturesHash = keccak256(abi.encode(_creditsSignatures));
+
+                    // For bids, the consumer of the credits is the bidder, as it will be the signer of the bid the one paying with mana.
+                    creditsConsumer = trade.signer;
                 } else {
                     revert InvalidTrade(trade);
                 }
-            } else if (_externalCall.target == collectionStore) {
+            }
+            // CollectionStore.
+            else if (_externalCall.target == collectionStore) {
+                // Check that only buy is being called.
                 if (_externalCall.selector != ICollectionStore.buy.selector) {
                     revert InvalidExternalCallSelector(_externalCall.target, _externalCall.selector);
                 }
+
+                // Decode the items to buy from the data.
+                ItemToBuy[] memory itemsToBuy = abi.decode(_externalCall.data, (ItemToBuy[]));
+
+                // We check that there is at least one item to buy.
+                if (itemsToBuy.length == 0) {
+                    revert InvalidAssetsLength();
+                }
+
+                for (uint256 i = 0; i < itemsToBuy.length; i++) {
+                    ItemToBuy memory itemToBuy = itemsToBuy[i];
+
+                    // We check that the collection has been created by a CollectionFactory and has not been deployed randomly by a malicious actor.
+                    _verifyDecentralandCollection(itemToBuy.collection);
+                }
             } else {
+                // TODO: Signed external calls.
                 revert InvalidExternalCallTarget(_externalCall.target);
-            }
-
-            // Check if the user is denied from using credits.
-            if (isDenied[creditsConsumer]) {
-                revert DeniedUser(creditsConsumer);
-            }
-
-            // Execute the external call.
-            (bool success,) = _externalCall.target.call(abi.encodeWithSelector(_externalCall.selector, _externalCall.data));
-
-            if (!success) {
-                revert ExternalCallFailed(_externalCall);
-            }
-
-            if (_externalCall.target == legacyMarketplace) {
-                (address contractAddress, uint256 tokenId) = abi.decode(_externalCall.data, (address, uint256));
-
-                // When an order is executed, the asset is transferred to the caller, which in this case is this contract.
-                // We need to transfer the asset back to the user that is using the credits.
-                IERC721(contractAddress).safeTransferFrom(address(this), creditsConsumer, tokenId);
-            }
-
-            if (_externalCall.target == marketplace && tempBidCreditsSignaturesHash != bytes32(0)) {
-                // To recover some gas after the bid has been executed, we reset the value back to default.
-                delete tempBidCreditsSignaturesHash;
             }
         }
 
+        // Check if the consumer has been denied from using credits.
+        if (isDenied[creditsConsumer]) {
+            revert DeniedUser(creditsConsumer);
+        }
+
+        address self = address(this);
+
+        // Store the mana balance before the external call.
+        uint256 balanceBefore = mana.balanceOf(self);
+
+        // Execute the external call.
+        (bool success,) = _externalCall.target.call(abi.encodeWithSelector(_externalCall.selector, _externalCall.data));
+
+        if (!success) {
+            revert ExternalCallFailed(_externalCall);
+        }
+
+        // Handle post execution logic for different targets.
+        //
+        // Legacy Marketplace.
+        if (_externalCall.target == legacyMarketplace) {
+            (address contractAddress, uint256 tokenId) = abi.decode(_externalCall.data, (address, uint256));
+
+            // When an order is executed, the asset is transferred to the caller, which in this case is this contract.
+            // We need to transfer the asset back to the user that is using the credits.
+            IERC721(contractAddress).safeTransferFrom(address(this), creditsConsumer, tokenId);
+        } 
+        // Offchain Marketplace.
+        else if (_externalCall.target == marketplace && tempBidCreditsSignaturesHash != bytes32(0)) {
+            // To recover some gas after the bid has been executed, we reset the value back to default.
+            delete tempBidCreditsSignaturesHash;
+        }
+
+        // Store how much MANA was transferred out of the contract after the external call.
         uint256 manaTransferred = mana.balanceOf(self) - balanceBefore;
 
         // Check that mana was transferred out of the contract.
@@ -378,13 +440,13 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
             revert NoMANATransfer();
         }
 
-        // Reset the approval to 0.
+        // Reset the approval back to 0 in case the amount allowed this hour was more than required.
         mana.forceApprove(_externalCall.target, 0);
 
-        // Update the amount of MANA transferred this hour.
+        // Increment the amount of MANA transferred this hour.
         manaTransferredThisHour += manaTransferred;
 
-        // Track how much has been credited to cover the MANA transferred.
+        // Keeps track of how much MANA is credited by the credits.
         uint256 creditedValue = 0;
 
         for (uint256 i = 0; i < _credits.length; i++) {
@@ -415,6 +477,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                 revert InvalidSignature(signatureHash, recoveredSigner);
             }
 
+            // Calculate how much of the credit is left to be spent.
             uint256 creditRemainingValue = credit.value - spentValue[signatureHash];
 
             // Check that the credit has not been completely spent.
@@ -422,15 +485,17 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                 revert SpentCredit(signatureHash);
             }
 
-            // Calculate how much MANA is left to be credited.
+            // Calculate how much MANA is left to be credited from the total MANA transferred in the external call.
             uint256 uncreditedValue = manaTransferred - creditedValue;
 
-            // Determine how much of the credit to spend.
+            // Calculate how much of the credit to spend.
             // If the value of the credit is higher than the required amount, only spend the required amount and leave the rest for future calls.
             uint256 creditValueToSpend = uncreditedValue < creditRemainingValue ? uncreditedValue : creditRemainingValue;
 
+            // Increment the amount consumed from the credit.
             spentValue[signatureHash] += creditValueToSpend;
 
+            // Increment the amount of MANA credited.
             creditedValue += creditValueToSpend;
 
             emit CreditUsed(signatureHash, credit, creditValueToSpend);
@@ -441,6 +506,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
             }
         }
 
+        // If the credits could not amount to the total MANA transferred, the user has to pay back the difference to the contract.
         if (manaTransferred > creditedValue) {
             mana.safeTransferFrom(creditsConsumer, self, manaTransferred - creditedValue);
         }
