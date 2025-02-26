@@ -15,7 +15,7 @@ import {ILegacyMarketplace} from "./interfaces/ILegacyMarketplace.sol";
 import {ICollectionFactory} from "./interfaces/ICollectionFactory.sol";
 import {ICollectionStore, ItemToBuy} from "./interfaces/ICollectionStore.sol";
 
-contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction {
+contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction {
     using ECDSA for bytes32;
     using SafeERC20 for IERC20;
 
