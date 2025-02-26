@@ -305,9 +305,6 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     }
 
     /// @notice Use credits to pay for external calls that transfer MANA.
-    /// @notice Credits will be spent until the MANA transferred is equal to the credited value.
-    /// @notice Any unused credit value can be used on a future call.
-    /// @dev The signatures must have been signed by the signer role.
     /// @param _args The arguments for the useCredits function.
     function useCredits(UseCreditsArgs calldata _args) external nonReentrant whenNotPaused {
         // Why use this contract if you don't provide any credits?
