@@ -171,7 +171,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     error NotDecentralandCollection(address _contractAddress);
     error OnlyOneTradeAllowed();
     error InvalidBeneficiary();
-    error InvalidTrade(Trade _trade);
+    error InvalidTrade(IMarketplace.Trade _trade);
     error ExternalCallFailed(ExternalCall _externalCall);
     error ExternalCheckNotFound();
     error InvalidAssetsLength();
@@ -361,7 +361,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
                 }
 
                 // Decode the trades from the data.
-                Trade[] memory trades = abi.decode(_args.externalCall.data, (Trade[]));
+                IMarketplace.Trade[] memory trades = abi.decode(_args.externalCall.data, (IMarketplace.Trade[]));
 
                 // To avoid making this too complex, we only allow one trade per call.
                 if (trades.length != 1) {
@@ -369,7 +369,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
                 }
 
                 // Given that there is only one trade, we store the one in the first index.
-                Trade memory trade = trades[0];
+                IMarketplace.Trade memory trade = trades[0];
 
                 // Now we have to check if the trade is a valid listing or a valid bid.
                 //
@@ -419,7 +419,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
                     bool hasExternalCheck = false;
 
                     for (uint256 j = 0; j < trade.checks.externalChecks.length; j++) {
-                        ExternalCheck memory externalCheck = trade.checks.externalChecks[j];
+                        IMarketplace.ExternalCheck memory externalCheck = trade.checks.externalChecks[j];
 
                         // We check that at least one required external check has this contract as target and is calling the bidExternalCheck function.
                         if (
@@ -455,7 +455,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
                 }
 
                 // Decode the items to buy from the data.
-                ItemToBuy[] memory itemsToBuy = abi.decode(_args.externalCall.data, (ItemToBuy[]));
+                ICollectionStore.ItemToBuy[] memory itemsToBuy = abi.decode(_args.externalCall.data, (ICollectionStore.ItemToBuy[]));
 
                 // We check that there is at least one item to buy.
                 if (itemsToBuy.length == 0) {
@@ -463,7 +463,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
                 }
 
                 for (uint256 i = 0; i < itemsToBuy.length; i++) {
-                    ItemToBuy memory itemToBuy = itemsToBuy[i];
+                    ICollectionStore.ItemToBuy memory itemToBuy = itemsToBuy[i];
 
                     // We check that the collection has been created by a CollectionFactory and has not been deployed randomly by a malicious actor.
                     _verifyDecentralandCollection(itemToBuy.collection);
