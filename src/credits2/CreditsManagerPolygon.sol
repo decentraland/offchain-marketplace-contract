@@ -84,6 +84,9 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @notice Tracks the used external call signatures.
     mapping(bytes32 => bool) public usedCustomExternalCallSignature;
 
+    /// @notice The maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
+    uint256 public tempMaxUncreditedValue;
+
     /// @notice The roles to initialize the contract with.
     /// @dev Mainly used to decrease the number of arguments in the constructor.
     /// @param owner The address that acts as default admin.
@@ -435,6 +438,9 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                     // Stores the hash of the credits to be consumed on the bid so it can be verified on the external check.
                     tempBidCreditsSignaturesHash = keccak256(abi.encode(_args.creditsSignatures));
 
+                    // Stores the maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
+                    tempMaxUncreditedValue = _args.maxUncreditedValue;
+
                     // For bids, the consumer of the credits is the bidder, as it will be the signer of the bid the one paying with mana.
                     creditsConsumer = trade.signer;
                 } else {
@@ -613,6 +619,11 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                 revert MaxUncreditedValueExceeded(uncredited, _args.maxUncreditedValue);
             }
 
+            if (tempMaxUncreditedValue != 0) {
+                // Resets the value back to default to optimize gas.
+                delete tempMaxUncreditedValue;
+            }
+
             mana.safeTransferFrom(creditsConsumer, self, uncredited);
         }
 
@@ -621,9 +632,11 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
 
     /// @notice Function used by the Marketplace to verify that the credits being used have been validated by the bid signer.
     /// @param _caller The address of the user that has called the Marketplace (Has to be this contract).
-    /// @param _data The data of the external check (The hash of the signatures of the Credits to be used).
+    /// @param _data The data of the external check (The hash of the signatures of the Credits to be used and the maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost).
     function bidExternalCheck(address _caller, bytes calldata _data) external view returns (bool) {
-        return _caller == address(this) && abi.decode(_data, (bytes32)) == tempBidCreditsSignaturesHash;
+        (bytes32 bidCreditsSignaturesHash, uint256 maxUncreditedValue) = abi.decode(_data, (bytes32, uint256));
+
+        return _caller == address(this) && bidCreditsSignaturesHash == tempBidCreditsSignaturesHash && maxUncreditedValue == tempMaxUncreditedValue;
     }
 
     /// @dev This is to update the maximum amount of MANA that can be transferred out of the contract per hour.
