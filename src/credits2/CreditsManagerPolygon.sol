@@ -107,9 +107,11 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @dev This is used to avoid stack too deep errors.
     /// @param credits The credits to use.
     /// @param creditsSignatures The signatures of the credits.
+    /// Has to be signed by a wallet that has the signer role.
     /// @param externalCall The external call to make.
     /// @param customExternalCallSignature The signature of the external call.
     /// Only used for custom external calls.
+    /// Has to be signed by a wallet that has the customExternalCallSigner role.
     /// @param maxUncreditedValue The maximum amount of MANA the user is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
     struct UseCreditsArgs {
         Credit[] credits;
