@@ -103,6 +103,22 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         address customExternalCallRevoker;
     }
 
+    /// @notice The arguments for the useCredits function.
+    /// @dev This is used to avoid stack too deep errors.
+    /// @param credits The credits to use.
+    /// @param creditsSignatures The signatures of the credits.
+    /// @param externalCall The external call to make.
+    /// @param customExternalCallSignature The signature of the external call.
+    /// Only used for custom external calls.
+    /// @param maxUncreditedValue The maximum amount of MANA the user is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
+    struct UseCreditsArgs {
+        Credit[] credits;
+        bytes[] creditsSignatures;
+        ExternalCall externalCall;
+        bytes customExternalCallSignature;
+        uint256 maxUncreditedValue;
+    }
+
     /// @param _value How much ERC20 the credit is worth.
     /// @param _expiresAt The timestamp when the credit expires.
     /// @param _salt Value used to generate unique credits.
@@ -158,6 +174,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     error InvalidCustomExternalCallSignature(address _recoveredSigner);
     error UsedCustomExternalCallSignature(bytes32 _hashedCustomExternalCallSignature);
     error CustomExternalCallExpired(uint256 _expiresAt);
+    error MaxUncreditedValueExceeded(uint256 _uncreditedValue, uint256 _maxUncreditedValue);
 
     /// @param _roles The roles to initialize the contract with.
     /// @param _mana The MANA token.
@@ -291,19 +308,10 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @notice Credits will be spent until the MANA transferred is equal to the credited value.
     /// @notice Any unused credit value can be used on a future call.
     /// @dev The signatures must have been signed by the signer role.
-    /// @param _credits The credits to use.
-    /// @param _creditsSignatures The signatures of the credits.
-    /// @param _externalCall The external call to make.
-    /// @param _customExternalCallSignature The signature of the external call.
-    /// Only used for custom external calls.
-    function useCredits(
-        Credit[] calldata _credits,
-        bytes[] calldata _creditsSignatures,
-        ExternalCall calldata _externalCall,
-        bytes calldata _customExternalCallSignature
-    ) external nonReentrant whenNotPaused {
+    /// @param _args The arguments for the useCredits function.
+    function useCredits(UseCreditsArgs calldata _args) external nonReentrant whenNotPaused {
         // Why use this contract if you don't provide any credits?
-        if (_credits.length == 0) {
+        if (_args.credits.length == 0) {
             revert NoCredits();
         }
 
@@ -316,10 +324,10 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
             hourOfLastManaTransfer = currentHour;
 
             // Approve for the maximum amount as it is a new hour.
-            mana.forceApprove(_externalCall.target, maxManaTransferPerHour);
+            mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue);
         } else {
             // Given that a transfer happened in this same hour, the approval has to be for the remaining transferable amount.
-            mana.forceApprove(_externalCall.target, maxManaTransferPerHour - manaTransferredThisHour);
+            mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue - manaTransferredThisHour);
         }
 
         address self = address(this);
@@ -330,28 +338,28 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
 
         {
             // Legacy Marketplace.
-            if (_externalCall.target == legacyMarketplace) {
+            if (_args.externalCall.target == legacyMarketplace) {
                 // Check that only executeOrder is being called.
                 // `safeExecuteOrder` is not used on Polygon given that the assets don't validate signatures like with Estates.
-                if (_externalCall.selector != ILegacyMarketplace.executeOrder.selector) {
-                    revert InvalidExternalCallSelector(_externalCall.target, _externalCall.selector);
+                if (_args.externalCall.selector != ILegacyMarketplace.executeOrder.selector) {
+                    revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
                 }
 
                 // Decode the contract address from the data
-                (address contractAddress) = abi.decode(_externalCall.data, (address));
+                (address contractAddress) = abi.decode(_args.externalCall.data, (address));
 
                 // Check that the sent assets are decentraland collections items or nfts.
                 _verifyDecentralandCollection(contractAddress);
             }
             // Offchain Marketplace.
-            else if (_externalCall.target == marketplace) {
+            else if (_args.externalCall.target == marketplace) {
                 // Check that only accept or acceptWithCoupon are being called.
-                if (_externalCall.selector != IMarketplace.accept.selector && _externalCall.selector != IMarketplace.acceptWithCoupon.selector) {
-                    revert InvalidExternalCallSelector(_externalCall.target, _externalCall.selector);
+                if (_args.externalCall.selector != IMarketplace.accept.selector && _args.externalCall.selector != IMarketplace.acceptWithCoupon.selector) {
+                    revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
                 }
 
                 // Decode the trades from the data.
-                Trade[] memory trades = abi.decode(_externalCall.data, (Trade[]));
+                Trade[] memory trades = abi.decode(_args.externalCall.data, (Trade[]));
 
                 // To avoid making this too complex, we only allow one trade per call.
                 if (trades.length != 1) {
@@ -426,7 +434,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                     }
 
                     // Stores the hash of the credits to be consumed on the bid so it can be verified on the external check.
-                    tempBidCreditsSignaturesHash = keccak256(abi.encode(_creditsSignatures));
+                    tempBidCreditsSignaturesHash = keccak256(abi.encode(_args.creditsSignatures));
 
                     // For bids, the consumer of the credits is the bidder, as it will be the signer of the bid the one paying with mana.
                     creditsConsumer = trade.signer;
@@ -435,14 +443,14 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                 }
             }
             // CollectionStore.
-            else if (_externalCall.target == collectionStore) {
+            else if (_args.externalCall.target == collectionStore) {
                 // Check that only buy is being called.
-                if (_externalCall.selector != ICollectionStore.buy.selector) {
-                    revert InvalidExternalCallSelector(_externalCall.target, _externalCall.selector);
+                if (_args.externalCall.selector != ICollectionStore.buy.selector) {
+                    revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
                 }
 
                 // Decode the items to buy from the data.
-                ItemToBuy[] memory itemsToBuy = abi.decode(_externalCall.data, (ItemToBuy[]));
+                ItemToBuy[] memory itemsToBuy = abi.decode(_args.externalCall.data, (ItemToBuy[]));
 
                 // We check that there is at least one item to buy.
                 if (itemsToBuy.length == 0) {
@@ -455,22 +463,22 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                     // We check that the collection has been created by a CollectionFactory and has not been deployed randomly by a malicious actor.
                     _verifyDecentralandCollection(itemToBuy.collection);
                 }
-            } 
+            }
             // Custom external call.
             // If the target does not match with any of the coded targets, it is considered a custom external call.
             // These calls can only be performed if they have been allowed by the owner beforehand and have to be signed by a special address.
             else {
                 // Check that the external call has been allowed.
-                if (!allowedCustomExternalCalls[_externalCall.target][_externalCall.selector]) {
-                    revert CustomExternalCallNotAllowed(_externalCall.target, _externalCall.selector);
+                if (!allowedCustomExternalCalls[_args.externalCall.target][_args.externalCall.selector]) {
+                    revert CustomExternalCallNotAllowed(_args.externalCall.target, _args.externalCall.selector);
                 }
 
                 // Check that the external call has not expired.
-                if (_externalCall.expiresAt != 0 && block.timestamp > _externalCall.expiresAt) {
-                    revert CustomExternalCallExpired(_externalCall.expiresAt);
+                if (_args.externalCall.expiresAt != 0 && block.timestamp > _args.externalCall.expiresAt) {
+                    revert CustomExternalCallExpired(_args.externalCall.expiresAt);
                 }
 
-                bytes32 hashedCustomExternalCallSignature = keccak256(_customExternalCallSignature);
+                bytes32 hashedCustomExternalCallSignature = keccak256(_args.customExternalCallSignature);
 
                 // Check that the external call has not been used yet.
                 if (usedCustomExternalCallSignature[hashedCustomExternalCallSignature]) {
@@ -481,7 +489,8 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                 usedCustomExternalCallSignature[hashedCustomExternalCallSignature] = true;
 
                 // Recover the signer of the external call.
-                address recoveredSigner = keccak256(abi.encode(creditsConsumer, block.chainid, self, _externalCall)).recover(_customExternalCallSignature);
+                address recoveredSigner =
+                    keccak256(abi.encode(creditsConsumer, block.chainid, self, _args.externalCall)).recover(_args.customExternalCallSignature);
 
                 // Check that the signer of the external call has the external call signer role.
                 if (!hasRole(EXTERNAL_CALL_SIGNER_ROLE, recoveredSigner)) {
@@ -499,24 +508,24 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         uint256 balanceBefore = mana.balanceOf(self);
 
         // Execute the external call.
-        (bool success,) = _externalCall.target.call(abi.encodeWithSelector(_externalCall.selector, _externalCall.data));
+        (bool success,) = _args.externalCall.target.call(abi.encodeWithSelector(_args.externalCall.selector, _args.externalCall.data));
 
         if (!success) {
-            revert ExternalCallFailed(_externalCall);
+            revert ExternalCallFailed(_args.externalCall);
         }
 
         // Handle post execution logic for different targets.
         //
         // Legacy Marketplace.
-        if (_externalCall.target == legacyMarketplace) {
-            (address contractAddress, uint256 tokenId) = abi.decode(_externalCall.data, (address, uint256));
+        if (_args.externalCall.target == legacyMarketplace) {
+            (address contractAddress, uint256 tokenId) = abi.decode(_args.externalCall.data, (address, uint256));
 
             // When an order is executed, the asset is transferred to the caller, which in this case is this contract.
             // We need to transfer the asset back to the user that is using the credits.
             IERC721(contractAddress).safeTransferFrom(address(this), creditsConsumer, tokenId);
         }
         // Offchain Marketplace.
-        else if (_externalCall.target == marketplace && tempBidCreditsSignaturesHash != bytes32(0)) {
+        else if (_args.externalCall.target == marketplace && tempBidCreditsSignaturesHash != bytes32(0)) {
             // To recover some gas after the bid has been executed, we reset the value back to default.
             delete tempBidCreditsSignaturesHash;
         }
@@ -530,7 +539,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         }
 
         // Reset the approval back to 0 in case the amount allowed this hour was more than required.
-        mana.forceApprove(_externalCall.target, 0);
+        mana.forceApprove(_args.externalCall.target, 0);
 
         // Increment the amount of MANA transferred this hour.
         manaTransferredThisHour += manaTransferred;
@@ -538,14 +547,14 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         // Keeps track of how much MANA is credited by the credits.
         uint256 creditedValue = 0;
 
-        for (uint256 i = 0; i < _credits.length; i++) {
-            Credit calldata credit = _credits[i];
+        for (uint256 i = 0; i < _args.credits.length; i++) {
+            Credit calldata credit = _args.credits[i];
 
             if (credit.value == 0) {
                 revert InvalidCreditValue();
             }
 
-            bytes calldata signature = _creditsSignatures[i];
+            bytes calldata signature = _args.creditsSignatures[i];
 
             bytes32 signatureHash = keccak256(signature);
 
@@ -595,9 +604,17 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
             }
         }
 
+        // Calculate how much mana was not covered by credits.
+        uint256 uncredited = manaTransferred - creditedValue;
+
         // If the credits could not amount to the total MANA transferred, the user has to pay back the difference to the contract.
-        if (manaTransferred > creditedValue) {
-            mana.safeTransferFrom(creditsConsumer, self, manaTransferred - creditedValue);
+        if (uncredited > 0) {
+            // The transaction reverts if the amount defined by the user is lower than the amount that couldn't be credited.
+            if (uncredited > _args.maxUncreditedValue) {
+                revert MaxUncreditedValueExceeded(uncredited, _args.maxUncreditedValue);
+            }
+
+            mana.safeTransferFrom(creditsConsumer, self, uncredited);
         }
 
         emit CreditsUsed(manaTransferred, creditedValue);
