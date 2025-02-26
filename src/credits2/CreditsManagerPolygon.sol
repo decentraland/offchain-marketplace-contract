@@ -31,6 +31,12 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @notice The role that can revoke credits.
     bytes32 public constant REVOKER_ROLE = keccak256("REVOKER_ROLE");
 
+    /// @notice The role that can sign external calls.
+    bytes32 public constant EXTERNAL_CALL_SIGNER_ROLE = keccak256("EXTERNAL_CALL_SIGNER_ROLE");
+
+    /// @notice The role that can revoke external calls.
+    bytes32 public constant EXTERNAL_CALL_REVOKER_ROLE = keccak256("EXTERNAL_CALL_REVOKER_ROLE");
+
     /// @notice Whether a user is denied from using credits.
     mapping(address => bool) public isDenied;
 
@@ -72,6 +78,31 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @notice The hash of the signatures of the Credits to be used for bids.
     bytes32 internal tempBidCreditsSignaturesHash;
 
+    /// @notice Tracks the allowed custom external calls.
+    mapping(address => mapping(bytes4 => bool)) public allowedCustomExternalCalls;
+
+    /// @notice Tracks the used external call signatures.
+    mapping(bytes32 => bool) public usedCustomExternalCallSignature;
+
+    /// @notice The roles to initialize the contract with.
+    /// @dev Mainly used to decrease the number of arguments in the constructor.
+    /// @param owner The address that acts as default admin.
+    /// @param signer The address that can sign credits.
+    /// @param pauser The address that can pause the contract.
+    /// @param denier The address that can deny users from using credits.
+    /// @param revoker The address that can revoke credits.
+    /// @param customExternalCallSigner The address that can sign custom external calls.
+    /// @param customExternalCallRevoker The address that can revoke custom external calls.
+    struct Roles {
+        address owner;
+        address signer;
+        address pauser;
+        address denier;
+        address revoker;
+        address customExternalCallSigner;
+        address customExternalCallRevoker;
+    }
+
     /// @param _value How much ERC20 the credit is worth.
     /// @param _expiresAt The timestamp when the credit expires.
     /// @param _salt Value used to generate unique credits.
@@ -84,10 +115,16 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @param target The contract address of the external call.
     /// @param selector The selector of the external call.
     /// @param data The data of the external call.
+    /// @param expiresAt The timestamp when the external call expires.
+    /// Only used for custom external calls.
+    /// @param salt The salt of the external call.
+    /// Only used for custom external calls.
     struct ExternalCall {
         address target;
         bytes4 selector;
         bytes data;
+        uint256 expiresAt;
+        bytes32 salt;
     }
 
     event UserDenied(address indexed _user);
@@ -98,6 +135,8 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     event MaxManaTransferPerHourUpdated(uint256 _maxManaTransferPerHour);
     event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _token, uint256 _tokenId, address indexed _to);
+    event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
+    event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
 
     error CreditExpired(bytes32 _creditId);
     error DeniedUser(address _user);
@@ -107,7 +146,6 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     error NoMANATransfer();
     error NoCredits();
     error InvalidCreditValue();
-    error InvalidExternalCallTarget(address _target);
     error InvalidExternalCallSelector(address _target, bytes4 _selector);
     error NotDecentralandCollection(address _contractAddress);
     error OnlyOneTradeAllowed();
@@ -116,12 +154,12 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     error ExternalCallFailed(ExternalCall _externalCall);
     error ExternalCheckNotFound();
     error InvalidAssetsLength();
+    error CustomExternalCallNotAllowed(address _target, bytes4 _selector);
+    error InvalidCustomExternalCallSignature(address _recoveredSigner);
+    error UsedCustomExternalCallSignature(bytes32 _hashedCustomExternalCallSignature);
+    error CustomExternalCallExpired(uint256 _expiresAt);
 
-    /// @param _owner The address that acts as default admin.
-    /// @param _signer The address that can sign credits.
-    /// @param _pauser The address that can pause the contract.
-    /// @param _denier The address that can deny users from using credits.
-    /// @param _revoker The address that can revoke credits.
+    /// @param _roles The roles to initialize the contract with.
     /// @param _mana The MANA token.
     /// @param _maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
     /// @param _marketplace The Marketplace contract.
@@ -130,11 +168,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @param _collectionFactory The CollectionFactory contract.
     /// @param _collectionFactoryV3 The CollectionFactoryV3 contract.
     constructor(
-        address _owner,
-        address _signer,
-        address _pauser,
-        address _denier,
-        address _revoker,
+        Roles memory _roles,
         IERC20 _mana,
         uint256 _maxManaTransferPerHour,
         address _marketplace,
@@ -143,18 +177,23 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         ICollectionFactory _collectionFactory,
         ICollectionFactory _collectionFactoryV3
     ) EIP712("Decentraland Credits", "1.0.0") {
-        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(DEFAULT_ADMIN_ROLE, _roles.owner);
 
-        _grantRole(SIGNER_ROLE, _signer);
+        _grantRole(SIGNER_ROLE, _roles.signer);
 
-        _grantRole(PAUSER_ROLE, _pauser);
-        _grantRole(PAUSER_ROLE, _owner);
+        _grantRole(PAUSER_ROLE, _roles.pauser);
+        _grantRole(PAUSER_ROLE, _roles.owner);
 
-        _grantRole(DENIER_ROLE, _denier);
-        _grantRole(DENIER_ROLE, _owner);
+        _grantRole(DENIER_ROLE, _roles.denier);
+        _grantRole(DENIER_ROLE, _roles.owner);
 
-        _grantRole(REVOKER_ROLE, _revoker);
-        _grantRole(REVOKER_ROLE, _owner);
+        _grantRole(REVOKER_ROLE, _roles.revoker);
+        _grantRole(REVOKER_ROLE, _roles.owner);
+
+        _grantRole(EXTERNAL_CALL_SIGNER_ROLE, _roles.customExternalCallSigner);
+
+        _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.customExternalCallRevoker);
+        _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.owner);
 
         mana = _mana;
 
@@ -230,6 +269,24 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         emit ERC721Withdrawn(_token, _tokenId, _to);
     }
 
+    /// @notice Allows a custom external call.
+    /// @param _target The target of the external call.
+    /// @param _selector The selector of the external call.
+    /// @param _allowed Whether the external call is allowed.
+    function allowCustomExternalCall(address _target, bytes4 _selector, bool _allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        allowedCustomExternalCalls[_target][_selector] = _allowed;
+
+        emit CustomExternalCallAllowed(_target, _selector, _allowed);
+    }
+
+    /// @notice Revokes a custom external call.
+    /// @param _hashedCustomExternalCallSignature The hash of the custom external call signature.
+    function revokeCustomExternalCall(bytes32 _hashedCustomExternalCallSignature) external onlyRole(EXTERNAL_CALL_REVOKER_ROLE) {
+        usedCustomExternalCallSignature[_hashedCustomExternalCallSignature] = true;
+
+        emit CustomExternalCallRevoked(_hashedCustomExternalCallSignature);
+    }
+
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @notice Credits will be spent until the MANA transferred is equal to the credited value.
     /// @notice Any unused credit value can be used on a future call.
@@ -237,11 +294,14 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @param _credits The credits to use.
     /// @param _creditsSignatures The signatures of the credits.
     /// @param _externalCall The external call to make.
-    function useCredits(Credit[] calldata _credits, bytes[] calldata _creditsSignatures, ExternalCall calldata _externalCall)
-        external
-        nonReentrant
-        whenNotPaused
-    {
+    /// @param _customExternalCallSignature The signature of the external call.
+    /// Only used when the target is an unknown contract.
+    function useCredits(
+        Credit[] calldata _credits,
+        bytes[] calldata _creditsSignatures,
+        ExternalCall calldata _externalCall,
+        bytes calldata _customExternalCallSignature
+    ) external nonReentrant whenNotPaused {
         // Why use this contract if you don't provide any credits?
         if (_credits.length == 0) {
             revert NoCredits();
@@ -261,6 +321,8 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
             // Given that a transfer happened in this same hour, the approval has to be for the remaining transferable amount.
             mana.forceApprove(_externalCall.target, maxManaTransferPerHour - manaTransferredThisHour);
         }
+
+        address self = address(this);
 
         // By default the consumer of the credits is the caller of the function.
         // There is a special case for bids in which the consumer is the signer of the bid instead.
@@ -393,9 +455,38 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
                     // We check that the collection has been created by a CollectionFactory and has not been deployed randomly by a malicious actor.
                     _verifyDecentralandCollection(itemToBuy.collection);
                 }
-            } else {
-                // TODO: Signed external calls.
-                revert InvalidExternalCallTarget(_externalCall.target);
+            } 
+            // Custom external call.
+            // If the target does not match with any of the coded targets, it is considered a custom external call.
+            // These calls can only be performed if they have been allowed by the owner beforehand and have to be signed by a special address.
+            else {
+                // Check that the external call has been allowed.
+                if (!allowedCustomExternalCalls[_externalCall.target][_externalCall.selector]) {
+                    revert CustomExternalCallNotAllowed(_externalCall.target, _externalCall.selector);
+                }
+
+                // Check that the external call has not expired.
+                if (_externalCall.expiresAt != 0 && block.timestamp > _externalCall.expiresAt) {
+                    revert CustomExternalCallExpired(_externalCall.expiresAt);
+                }
+
+                bytes32 hashedCustomExternalCallSignature = keccak256(_customExternalCallSignature);
+
+                // Check that the external call has not been used yet.
+                if (usedCustomExternalCallSignature[hashedCustomExternalCallSignature]) {
+                    revert UsedCustomExternalCallSignature(hashedCustomExternalCallSignature);
+                }
+
+                // Mark the external call as used.
+                usedCustomExternalCallSignature[hashedCustomExternalCallSignature] = true;
+
+                // Recover the signer of the external call.
+                address recoveredSigner = keccak256(abi.encode(creditsConsumer, block.chainid, self, _externalCall)).recover(_customExternalCallSignature);
+
+                // Check that the signer of the external call has the external call signer role.
+                if (!hasRole(EXTERNAL_CALL_SIGNER_ROLE, recoveredSigner)) {
+                    revert InvalidCustomExternalCallSignature(recoveredSigner);
+                }
             }
         }
 
@@ -403,8 +494,6 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
         if (isDenied[creditsConsumer]) {
             revert DeniedUser(creditsConsumer);
         }
-
-        address self = address(this);
 
         // Store the mana balance before the external call.
         uint256 balanceBefore = mana.balanceOf(self);
@@ -425,7 +514,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
             // When an order is executed, the asset is transferred to the caller, which in this case is this contract.
             // We need to transfer the asset back to the user that is using the credits.
             IERC721(contractAddress).safeTransferFrom(address(this), creditsConsumer, tokenId);
-        } 
+        }
         // Offchain Marketplace.
         else if (_externalCall.target == marketplace && tempBidCreditsSignaturesHash != bytes32(0)) {
             // To recover some gas after the bid has been executed, we reset the value back to default.
