@@ -9,11 +9,11 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-import {NativeMetaTransaction, EIP712} from "../common/NativeMetaTransaction.sol";
-import {IMarketplace, Trade, ExternalCheck} from "./interfaces/IMarketplace.sol";
-import {ILegacyMarketplace} from "./interfaces/ILegacyMarketplace.sol";
-import {ICollectionFactory} from "./interfaces/ICollectionFactory.sol";
-import {ICollectionStore, ItemToBuy} from "./interfaces/ICollectionStore.sol";
+import {NativeMetaTransaction, EIP712} from "src/common/NativeMetaTransaction.sol";
+import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
+import {ILegacyMarketplace} from "src/credits/interfaces/ILegacyMarketplace.sol";
+import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
+import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
 
 contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction {
     using ECDSA for bytes32;
