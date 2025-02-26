@@ -14,78 +14,11 @@ import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
 import {ILegacyMarketplace} from "src/credits/interfaces/ILegacyMarketplace.sol";
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
+import {CreditsManagerPolygonStorage} from "src/credits/CreditsManagerPolygonStorage.sol";
 
-contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction {
+contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction {
     using ECDSA for bytes32;
     using SafeERC20 for IERC20;
-
-    /// @notice The role that can sign credits.
-    bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
-
-    /// @notice The role that can pause the contract.
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-
-    /// @notice The role that can deny users from using credits.
-    bytes32 public constant DENIER_ROLE = keccak256("DENIER_ROLE");
-
-    /// @notice The role that can revoke credits.
-    bytes32 public constant REVOKER_ROLE = keccak256("REVOKER_ROLE");
-
-    /// @notice The role that can sign external calls.
-    bytes32 public constant EXTERNAL_CALL_SIGNER_ROLE = keccak256("EXTERNAL_CALL_SIGNER_ROLE");
-
-    /// @notice The role that can revoke external calls.
-    bytes32 public constant EXTERNAL_CALL_REVOKER_ROLE = keccak256("EXTERNAL_CALL_REVOKER_ROLE");
-
-    /// @notice Whether a user is denied from using credits.
-    mapping(address => bool) public isDenied;
-
-    /// @notice Whether a credit has been revoked.
-    /// @dev The key is the hash of the credit signature.
-    mapping(bytes32 => bool) public isRevoked;
-
-    /// @notice The address of the MANA token.
-    IERC20 public immutable mana;
-
-    /// @notice The amount of MANA value used on each credit.
-    /// @dev The key is the hash of the credit signature.
-    mapping(bytes32 => uint256) spentValue;
-
-    /// @notice Maximum amount of MANA that can be transferred out of the contract per hour.
-    uint256 public maxManaTransferPerHour;
-
-    /// @notice How much MANA has been transferred out of the contract this hour.
-    uint256 public manaTransferredThisHour;
-
-    /// @notice The hour of the last MANA transfer.
-    uint256 public hourOfLastManaTransfer;
-
-    /// @notice The address of the Marketplace contract.
-    address public immutable marketplace;
-
-    /// @notice The address of the Legacy Marketplace contract.
-    address public immutable legacyMarketplace;
-
-    /// @notice The address of the CollectionStore contract.
-    address public immutable collectionStore;
-
-    /// @notice The address of the CollectionFactory contract.
-    ICollectionFactory public immutable collectionFactory;
-
-    /// @notice The address of the CollectionFactoryV3 contract.
-    ICollectionFactory public immutable collectionFactoryV3;
-
-    /// @notice The hash of the signatures of the Credits to be used for bids.
-    bytes32 internal tempBidCreditsSignaturesHash;
-
-    /// @notice Tracks the allowed custom external calls.
-    mapping(address => mapping(bytes4 => bool)) public allowedCustomExternalCalls;
-
-    /// @notice Tracks the used external call signatures.
-    mapping(bytes32 => bool) public usedCustomExternalCallSignature;
-
-    /// @notice The maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
-    uint256 public tempMaxUncreditedValue;
 
     /// @notice The roles to initialize the contract with.
     /// @dev Mainly used to decrease the number of arguments in the constructor.
@@ -198,7 +131,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         address _collectionStore,
         ICollectionFactory _collectionFactory,
         ICollectionFactory _collectionFactoryV3
-    ) EIP712("Decentraland Credits", "1.0.0") {
+    )
+        CreditsManagerPolygonStorage(_mana, _marketplace, _legacyMarketplace, _collectionStore, _collectionFactory, _collectionFactoryV3)
+        EIP712("Decentraland Credits", "1.0.0")
+    {
         _grantRole(DEFAULT_ADMIN_ROLE, _roles.owner);
 
         _grantRole(SIGNER_ROLE, _roles.signer);
@@ -217,15 +153,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.customExternalCallRevoker);
         _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.owner);
 
-        mana = _mana;
-
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
-
-        marketplace = _marketplace;
-        legacyMarketplace = _legacyMarketplace;
-        collectionStore = _collectionStore;
-        collectionFactory = _collectionFactory;
-        collectionFactoryV3 = _collectionFactoryV3;
     }
 
     /// @notice Pauses the contract.
@@ -356,7 +284,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             // Offchain Marketplace.
             else if (_args.externalCall.target == marketplace) {
                 // Check that only accept or acceptWithCoupon are being called.
-                if (_args.externalCall.selector != IMarketplace.accept.selector && _args.externalCall.selector != IMarketplace.acceptWithCoupon.selector) {
+                if (
+                    _args.externalCall.selector != IMarketplace.accept.selector
+                        && _args.externalCall.selector != IMarketplace.acceptWithCoupon.selector
+                ) {
                     revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
                 }
 
