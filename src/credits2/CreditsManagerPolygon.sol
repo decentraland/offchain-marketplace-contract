@@ -295,7 +295,7 @@ contract CreditsManager is AccessControl, Pausable, ReentrancyGuard, NativeMetaT
     /// @param _creditsSignatures The signatures of the credits.
     /// @param _externalCall The external call to make.
     /// @param _customExternalCallSignature The signature of the external call.
-    /// Only used when the target is an unknown contract.
+    /// Only used for custom external calls.
     function useCredits(
         Credit[] calldata _credits,
         bytes[] calldata _creditsSignatures,
