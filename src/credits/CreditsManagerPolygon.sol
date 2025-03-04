@@ -370,6 +370,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @param _args The arguments for the useCredits function.
+    ///
+    /// NOTE: There is a current issue with Marketplace bids where MANA is consumed from the bid signer
+    /// rather than the caller interacting with the contract. This creates accounting discrepancies
+    /// and requires special handling for bids. At present, the contract does not fully support
+    /// marketplace bids correctly.
     function useCredits(UseCreditsArgs calldata _args) external nonReentrant whenNotPaused {
         // Handle pre-execution checks for the different types of external calls.
         // Gets the address that will finally consume the credits.
