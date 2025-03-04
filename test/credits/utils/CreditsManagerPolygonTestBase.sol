@@ -35,7 +35,9 @@ contract CreditsManagerPolygonTestBase is Test {
 
     address internal collection;
     uint256 internal collectionTokenId;
-    address internal collectionOwner;
+    address internal collectionTokenOwner;
+    uint256 internal collectionItemId;
+    address internal collectionCreator;
 
     address internal other;
 
@@ -54,7 +56,7 @@ contract CreditsManagerPolygonTestBase is Test {
     event ERC721Withdrawn(address indexed _collection, uint256 _tokenId, address indexed _to);
 
     function setUp() public {
-        vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon"));
+        vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon", 68650527)); // Mar-04-2025 09:10:51 PM +UTC
 
         owner = makeAddr("owner");
         (signer, signerPk) = makeAddrAndKey("signer");
@@ -101,9 +103,11 @@ contract CreditsManagerPolygonTestBase is Test {
 
         manaHolder = 0xB08E3e7cc815213304d884C88cA476ebC50EaAB2;
 
-        collection = 0xdD30F60f92F0BE0920e4D6dC4f696E3F6eC3e9ae;
+        collection = 0x96054dc54939D3C632796DbCE4884705ed7C8977;
         collectionTokenId = 1;
-        collectionOwner = IERC721(collection).ownerOf(collectionTokenId);
+        collectionItemId = 0;
+        collectionTokenOwner = 0xFE705eaD02E849E78278C50de3d939bE23448F1a;
+        collectionCreator = 0xFE705eaD02E849E78278C50de3d939bE23448F1a;
 
         other = makeAddr("other");
     }

@@ -8,79 +8,6 @@ import {MockExternalCallTarget} from "test/credits/mocks/MockExternalCallTarget.
 import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPolygonTestBase.sol";
 
 contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManagerPolygonTestBase {
-    function test_useCredits_RevertsWhenNoCredits() public {
-        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](0);
-
-        bytes[] memory creditsSignatures = new bytes[](0);
-
-        CreditsManagerPolygon.ExternalCall memory externalCall =
-            CreditsManagerPolygon.ExternalCall({target: address(this), selector: bytes4(0), data: bytes(""), expiresAt: 0, salt: bytes32(0)});
-
-        bytes memory customExternalCallSignature = bytes("");
-
-        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
-            credits: credits,
-            creditsSignatures: creditsSignatures,
-            externalCall: externalCall,
-            customExternalCallSignature: customExternalCallSignature,
-            maxUncreditedValue: 0,
-            maxCreditedValue: 0
-        });
-
-        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.NoCredits.selector));
-        creditsManager.useCredits(args);
-    }
-
-    function test_useCredits_RevertsWhenCreditsSignaturesLengthIsDifferentFromCreditsLength() public {
-        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
-
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
-
-        bytes[] memory creditsSignatures = new bytes[](0);
-
-        CreditsManagerPolygon.ExternalCall memory externalCall =
-            CreditsManagerPolygon.ExternalCall({target: address(this), selector: bytes4(0), data: bytes(""), expiresAt: 0, salt: bytes32(0)});
-
-        bytes memory customExternalCallSignature = bytes("");
-
-        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
-            credits: credits,
-            creditsSignatures: creditsSignatures,
-            externalCall: externalCall,
-            customExternalCallSignature: customExternalCallSignature,
-            maxUncreditedValue: 0,
-            maxCreditedValue: 0
-        });
-
-        vm.expectRevert(CreditsManagerPolygon.InvalidCreditsSignaturesLength.selector);
-        creditsManager.useCredits(args);
-    }
-
-    function test_useCredits_RevertsWhenMaxCreditedValueZero() public {
-        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
-
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
-
-        bytes[] memory creditsSignatures = new bytes[](1);
-
-        CreditsManagerPolygon.ExternalCall memory externalCall =
-            CreditsManagerPolygon.ExternalCall({target: address(this), selector: bytes4(0), data: bytes(""), expiresAt: 0, salt: bytes32(0)});
-
-        bytes memory customExternalCallSignature = bytes("");
-
-        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
-            credits: credits,
-            creditsSignatures: creditsSignatures,
-            externalCall: externalCall,
-            customExternalCallSignature: customExternalCallSignature,
-            maxUncreditedValue: 0,
-            maxCreditedValue: 0
-        });
-
-        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.MaxCreditedValueZero.selector));
-        creditsManager.useCredits(args);
-    }
-
     function test_useCredits_RevertsWhenCustomExternalCallNotAllowed() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
@@ -1055,6 +982,154 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         IERC20(mana).transfer(address(creditsManager), 100 ether);
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.MaxUncreditedValueExceeded.selector, 50 ether, 0));
+        creditsManager.useCredits(args);
+    }
+
+    function test_useCredits_RevertsWhenNoCreditsAreProvided() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](0);
+
+        bytes[] memory creditsSignatures = new bytes[](0);
+
+        MockExternalCallTarget externalCallTarget = new MockExternalCallTarget(creditsManager, IERC20(mana), 100 ether);
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: address(externalCallTarget),
+            selector: externalCallTarget.someFunction.selector,
+            data: bytes(""),
+            expiresAt: type(uint256).max,
+            salt: bytes32(0)
+        });
+
+        externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+
+        bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: customExternalCallSignature,
+            maxUncreditedValue: 99 ether,
+            maxCreditedValue: 100 ether
+        });
+
+        vm.prank(owner);
+        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
+
+        vm.prank(address(this));
+        IERC20(mana).approve(address(creditsManager), 99 ether);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.NoCredits.selector));
+        creditsManager.useCredits(args);
+    }
+
+    function test_useCredits_RevertsWhenCreditsAndSignaturesLengthsDiffer() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+
+        bytes[] memory creditsSignatures = new bytes[](0);
+
+        MockExternalCallTarget externalCallTarget = new MockExternalCallTarget(creditsManager, IERC20(mana), 100 ether);
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: address(externalCallTarget),
+            selector: externalCallTarget.someFunction.selector,
+            data: bytes(""),
+            expiresAt: type(uint256).max,
+            salt: bytes32(0)
+        });
+
+        externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+
+        bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: customExternalCallSignature,
+            maxUncreditedValue: 99 ether,
+            maxCreditedValue: 100 ether
+        });
+
+        vm.prank(owner);
+        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
+
+        vm.prank(address(this));
+        IERC20(mana).approve(address(creditsManager), 99 ether);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.InvalidCreditsSignaturesLength.selector));
+        creditsManager.useCredits(args);
+    }
+
+    function test_useCredits_RevertsWhenMaxCreditedValueIsZero() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+
+        bytes[] memory creditsSignatures = new bytes[](1);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+
+        creditsSignatures[0] = abi.encodePacked(r, s, v);
+
+        MockExternalCallTarget externalCallTarget = new MockExternalCallTarget(creditsManager, IERC20(mana), 100 ether);
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: address(externalCallTarget),
+            selector: externalCallTarget.someFunction.selector,
+            data: bytes(""),
+            expiresAt: type(uint256).max,
+            salt: bytes32(0)
+        });
+
+        externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
+
+        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+
+        bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: customExternalCallSignature,
+            maxUncreditedValue: 100 ether,
+            maxCreditedValue: 0
+        });
+
+        vm.prank(owner);
+        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
+
+        vm.prank(address(this));
+        IERC20(mana).approve(address(creditsManager), 100 ether);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.MaxCreditedValueZero.selector));
         creditsManager.useCredits(args);
     }
 

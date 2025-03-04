@@ -349,8 +349,8 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     }
 
     function test_withdrawERC721_WhenOwner() public {
-        vm.prank(collectionOwner);
-        IERC721(collection).transferFrom(collectionOwner, address(creditsManager), collectionTokenId);
+        vm.prank(collectionTokenOwner);
+        IERC721(collection).transferFrom(collectionTokenOwner, address(creditsManager), collectionTokenId);
 
         assertEq(IERC721(collection).ownerOf(collectionTokenId), address(creditsManager));
 
