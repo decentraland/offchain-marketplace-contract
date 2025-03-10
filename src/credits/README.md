@@ -14,22 +14,22 @@ The CreditsManagerPolygon contract is a sophisticated credit management system d
 - [Usage Examples](#usage-examples)
 
 ## Key Features
-- **Credit System**: Allows users to use signed credits to pay for transactions
-- **Marketplace Integration**: Supports both primary and secondary sales in Decentraland's marketplace
-- **Access Control**: Comprehensive role-based access control for different operations
-- **Meta-transactions**: Supports meta-transactions for improved UX
-- **Rate Limiting**: Implements hourly credit consumption limits
-- **Custom External Calls**: Enables authorized external contract calls beyond standard marketplace operations
+- **Credit System**: Allows users to use signed credits to pay for transactions.
+- **Marketplace Integration**: Supports both primary and secondary sales in Decentraland's marketplace.
+- **Access Control**: Comprehensive role-based access control for different operations.
+- **Meta-transactions**: Supports meta-transactions for improved UX.
+- **Rate Limiting**: Implements hourly credit consumption limits.
+- **Custom External Calls**: Enables authorized external contract calls beyond standard marketplace operations.
 
 ## Roles and Permissions
 The contract implements a role-based access control system with the following roles:
-- **DEFAULT_ADMIN_ROLE**: Can grant/revoke roles and perform administrative functions
-- **SIGNER_ROLE**: Can sign credits that users can later redeem
-- **PAUSER_ROLE**: Can pause/unpause the contract functionality
-- **DENIER_ROLE**: Can deny specific users from using credits
-- **REVOKER_ROLE**: Can revoke previously issued credits
-- **EXTERNAL_CALL_SIGNER_ROLE**: Can sign custom external calls
-- **EXTERNAL_CALL_REVOKER_ROLE**: Can revoke custom external call signatures
+- **DEFAULT_ADMIN_ROLE**: Can grant/revoke roles and perform administrative functions.
+- **SIGNER_ROLE**: Can sign credits that users can later redeem.
+- **PAUSER_ROLE**: Can pause/unpause the contract functionality.
+- **DENIER_ROLE**: Can deny specific users from using credits.
+- **REVOKER_ROLE**: Can revoke previously issued credits.
+- **EXTERNAL_CALL_SIGNER_ROLE**: Can sign custom external calls.
+- **EXTERNAL_CALL_REVOKER_ROLE**: Can revoke custom external call signatures.
 
 ## Core Data Structures
 The contract uses several key data structures:
@@ -104,12 +104,11 @@ The contract supports four types of external calls:
 - **Denial Capability**: Ability to deny malicious users from using the system
 
 ## Usage Examples
-
 The following examples demonstrate how to use the `useCredits` function with different types of external calls. Each example follows the same basic pattern:
 
-1. Create and sign one or more credits
-2. Prepare the external call data
-3. Call the `useCredits` function
+1. Create and sign one or more credits.
+2. Prepare the external call data.
+3. Call the `useCredits` function.
 
 ### 1. Collection Store External Call
 
@@ -122,14 +121,7 @@ const credit = {
 };
 
 const message = ethers.utils.solidityKeccak256(
-  [
-    { name: "user", type: "address" },
-    { name: "chainId", type: "uint256" },
-    { name: "creditsManager", type: "address" },
-    { name: "value", type: "uint256" },
-    { name: "expiresAt", type: "uint256" },
-    { name: "salt", type: "bytes32" }
-  ],
+  ["address", "uint256", "address", "uint256", "uint256", "bytes32"],
   [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
 );
 const signature = await signer.signMessage(ethers.utils.arrayify(message));
@@ -185,22 +177,12 @@ const credit = {
 };
 
 const message = ethers.utils.solidityKeccak256(
-  [
-    { name: "user", type: "address" },
-    { name: "chainId", type: "uint256" },
-    { name: "creditsManager", type: "address" },
-    { name: "value", type: "uint256" },
-    { name: "expiresAt", type: "uint256" },
-    { name: "salt", type: "bytes32" }
-  ],
+  ["address", "uint256", "address", "uint256", "uint256", "bytes32"],
   [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
 );
 const signature = await signer.signMessage(ethers.utils.arrayify(message));
 
 // 2. Prepare Marketplace external call
-// Create a trade object following the IMarketplace.Trade structure
-// Note: In a real implementation, you would need to properly sign this trade
-// This example focuses only on the structure and encoding
 const trade = {
   signer: sellerAddress,
   signature: "0x...", // In a real implementation, this would be a valid signature
@@ -326,14 +308,7 @@ const credit = {
 };
 
 const message = ethers.utils.solidityKeccak256(
-  [
-    { name: "user", type: "address" },
-    { name: "chainId", type: "uint256" },
-    { name: "creditsManager", type: "address" },
-    { name: "value", type: "uint256" },
-    { name: "expiresAt", type: "uint256" },
-    { name: "salt", type: "bytes32" }
-  ],
+  ["address", "uint256", "address", "uint256", "uint256", "bytes32"],
   [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
 );
 const signature = await signer.signMessage(ethers.utils.arrayify(message));
@@ -389,14 +364,7 @@ const credit = {
 };
 
 const creditMessage = ethers.utils.solidityKeccak256(
-  [
-    { name: "user", type: "address" },
-    { name: "chainId", type: "uint256" },
-    { name: "creditsManager", type: "address" },
-    { name: "value", type: "uint256" },
-    { name: "expiresAt", type: "uint256" },
-    { name: "salt", type: "bytes32" }
-  ],
+  ["address", "uint256", "address", "uint256", "uint256", "bytes32"],
   [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
 );
 const creditSignature = await signer.signMessage(ethers.utils.arrayify(creditMessage));
@@ -418,16 +386,7 @@ const externalCall = {
 
 // 3. Get the external call signed by an authorized external call signer
 const externalCallMessage = ethers.utils.solidityKeccak256(
-  [
-    { name: "user", type: "address" },
-    { name: "chainId", type: "uint256" },
-    { name: "creditsManager", type: "address" },
-    { name: "target", type: "address" },
-    { name: "selector", type: "bytes4" },
-    { name: "data", type: "bytes" },
-    { name: "expiresAt", type: "uint256" },
-    { name: "salt", type: "bytes32" }
-  ],
+  ["address", "uint256", "address", "address", "bytes4", "bytes", "uint256", "bytes32"],
   [userAddress, chainId, creditsManagerAddress, externalCall.target, externalCall.selector, 
    externalCall.data, externalCall.expiresAt, externalCall.salt]
 );
