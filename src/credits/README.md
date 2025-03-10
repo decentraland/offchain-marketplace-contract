@@ -7,6 +7,7 @@ The CreditsManagerPolygon contract is a sophisticated credit management system d
 - [Key Features](#key-features)
 - [Roles and Permissions](#roles-and-permissions)
 - [Core Data Structures](#core-data-structures)
+- [Credit Flow Diagram](#credit-flow-diagram)
 - [Main Functionality](#main-functionality)
   - [Credit Management](#credit-management)
   - [External Call Handling](#external-call-handling)
@@ -76,6 +77,53 @@ struct UseCreditsArgs {
     uint256 maxUncreditedValue;         // Maximum MANA paid from wallet
     uint256 maxCreditedValue;           // Maximum MANA credited from provided credits
 }
+```
+
+## Credit Flow Diagram
+
+```
+┌───────────────┐                 ┌───────────────┐                 ┌────────────────┐
+│               │                 │               │                 │                │
+│    Signer     │                 │     User      │                 │ Credits Manager│
+│  (Backend)    │                 │  (Frontend)   │                 │   (Contract)   │
+│               │                 │               │                 │                │
+└───────┬───────┘                 └───────┬───────┘                 └───────┬────────┘
+        │                                 │                                 │
+        │  1. Generate Credit             │                                 │
+        │  (value, expiresAt, salt)       │                                 │
+        │                                 │                                 │
+        │  2. Sign Credit                 │                                 │
+        │  (SIGNER_ROLE)                  │                                 │
+        │                                 │                                 │
+        │                                 │                                 │
+        ├────────────────────────────────>│                                 │
+        │  3. Send Signed Credit          │                                 │
+        │                                 │                                 │
+        │                                 │  4. Prepare External Call       │
+        │                                 │  (target, selector, data)       │
+        │                                 │                                 │
+        │<────────────────────────────────┤                                 │
+        │  5. Request External Call       │                                 │
+        │  Signature (if custom call)     │                                 │
+        │                                 │                                 │
+        │  6. Sign External Call          │                                 │
+        │  (EXTERNAL_CALL_SIGNER_ROLE)    │                                 │
+        │                                 │                                 │
+        ├────────────────────────────────>│                                 │
+        │  7. Send Signed External Call   │                                 │
+        │                                 │                                 │
+        │                                 │  8. Call useCredits()           │
+        │                                 │  with Credits + External Call   │
+        │                                 ├────────────────────────────────>│
+        │                                 │                                 │  9. Verify Signatures
+        │                                 │                                 │     & Permissions
+        │                                 │                                 │
+        │                                 │                                 │  10. Execute External
+        │                                 │                                 │      Call
+        │                                 │                                 │
+        │                                 │                                 │  11. Track Credit
+        │                                 │                                 │      Consumption
+        │                                 │                                 │
 ```
 
 ## Main Functionality
