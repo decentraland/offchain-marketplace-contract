@@ -394,6 +394,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             revert DeniedUser(_sender);
         }
 
+        // Route to the appropriate pre-execution handler based on the target contract
         if (_args.externalCall.target == legacyMarketplace) {
             _handleLegacyMarketplacePreExecution(_args);
         } else if (_args.externalCall.target == marketplace) {
@@ -599,6 +600,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param _args The arguments for the useCredits function.
     /// @param _sender The caller of the useCredits function.
     function _handlePostExecution(UseCreditsArgs calldata _args, address _sender) internal {
+        // Only Legacy Marketplace requires post-execution handling
         if (_args.externalCall.target == legacyMarketplace) {
             _handleLegacyMarketplacePostExecution(_args, _sender);
         }
@@ -708,17 +710,18 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param _args The arguments for the useCredits function.
     /// @param _creditedValue The amount of MANA credited.
     function _validateCreditedValue(UseCreditsArgs calldata _args, uint256 _creditedValue) internal {
-        // Checks that the amount of MANA credited is not higher than the maximum amount allowed.
+        // Checks that the amount of MANA credited is not higher than the maximum amount allowed by caller.
         if (_creditedValue > _args.maxCreditedValue) {
             revert MaxCreditedValueExceeded(_creditedValue, _args.maxCreditedValue);
         }
 
+        // Check hourly rate limit
         uint256 currentHour = block.timestamp / 1 hours;
         uint256 creditableManaThisHour;
 
         // Calculates how much mana could be credited this hour.
         if (currentHour != hourOfLastManaCredit) {
-            // If the current hour is different than the one of the last execution, resets the values.
+            // If the current hour is different than the one of the last execution, reset the values.
             manaCreditedThisHour = 0;
             hourOfLastManaCredit = currentHour;
 
@@ -729,12 +732,12 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             creditableManaThisHour = maxManaCreditedPerHour - manaCreditedThisHour;
         }
 
-        // If the credited amount in this transaction is higher than the allowed this hour, it reverts.
+        // Checks that the amount of MANA credited is not higher than the maximum amount allowed by hour.
         if (_creditedValue > creditableManaThisHour) {
             revert MaxManaCreditedPerHourExceeded(creditableManaThisHour, _creditedValue);
         }
 
-        // Increase the amount of mana credited this hour.
+        // Increase the amount of mana credited this hour
         manaCreditedThisHour += _creditedValue;
     }
 
