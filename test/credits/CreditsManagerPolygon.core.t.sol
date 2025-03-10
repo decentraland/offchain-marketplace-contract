@@ -23,7 +23,6 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(creditsManager.maxManaCreditedPerHour(), maxManaCreditedPerHour);
         assertEq(creditsManager.primarySalesAllowed(), primarySalesAllowed);
         assertEq(creditsManager.secondarySalesAllowed(), secondarySalesAllowed);
-        assertEq(creditsManager.bidsAllowed(), bidsAllowed);
 
         assertEq(address(creditsManager.mana()), mana);
         assertEq(creditsManager.marketplace(), marketplace);
@@ -192,84 +191,6 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(creditsManager.secondarySalesAllowed(), true);
     }
 
-    function test_updateBidsAllowed_RevertsWhenNotOwner() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
-        );
-        creditsManager.updateBidsAllowed(bidsAllowed);
-    }
-
-    function test_updateBidsAllowed_WhenOwner() public {
-        vm.expectEmit(address(creditsManager));
-        emit BidsAllowedUpdated(false);
-        vm.prank(owner);
-        creditsManager.updateBidsAllowed(false);
-        assertEq(creditsManager.bidsAllowed(), false);
-
-        vm.expectEmit(address(creditsManager));
-        emit BidsAllowedUpdated(true);
-        vm.prank(owner);
-        creditsManager.updateBidsAllowed(true);
-        assertEq(creditsManager.bidsAllowed(), true);
-    }
-
-    function test_bidExternalCheck_ReturnsFalseWhenNotSelf() public view {
-        bytes memory data = abi.encode(bytes32(uint256(1)), uint256(2), uint256(3));
-        assertFalse(creditsManager.bidExternalCheck(address(this), data));
-    }
-
-    function test_bidExternalCheck_ReturnsFalseWhenCreditsSignaturesHashIsDifferent() public {
-        bytes32 bidCreditsSignaturesHash = bytes32(uint256(1));
-        uint256 maxUncreditedValue = 2;
-        uint256 maxCreditedValue = 3;
-
-        creditsManager.updateTempBidCreditsSignaturesHash(bidCreditsSignaturesHash);
-        creditsManager.updateTempMaxUncreditedValue(maxUncreditedValue);
-        creditsManager.updateTempMaxCreditedValue(maxCreditedValue);
-
-        bytes memory data = abi.encode(bytes32(uint256(0)), maxUncreditedValue, maxCreditedValue);
-        assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
-    }
-
-    function test_bidExternalCheck_ReturnsFalseWhenMaxUncreditedValueIsDifferent() public {
-        bytes32 bidCreditsSignaturesHash = bytes32(uint256(1));
-        uint256 maxUncreditedValue = 2;
-        uint256 maxCreditedValue = 3;
-
-        creditsManager.updateTempBidCreditsSignaturesHash(bidCreditsSignaturesHash);
-        creditsManager.updateTempMaxUncreditedValue(maxUncreditedValue);
-        creditsManager.updateTempMaxCreditedValue(maxCreditedValue);
-
-        bytes memory data = abi.encode(bidCreditsSignaturesHash, 0, maxCreditedValue);
-        assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
-    }
-
-    function test_bidExternalCheck_ReturnsFalseWhenMaxCreditedValueIsDifferent() public {
-        bytes32 bidCreditsSignaturesHash = bytes32(uint256(1));
-        uint256 maxUncreditedValue = 2;
-        uint256 maxCreditedValue = 3;
-
-        creditsManager.updateTempBidCreditsSignaturesHash(bidCreditsSignaturesHash);
-        creditsManager.updateTempMaxUncreditedValue(maxUncreditedValue);
-        creditsManager.updateTempMaxCreditedValue(maxCreditedValue);
-
-        bytes memory data = abi.encode(bidCreditsSignaturesHash, maxUncreditedValue, 0);
-        assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
-    }
-
-    function test_bidExternalCheck_ReturnsTrueWhenAllValuesAreSame() public {
-        bytes32 bidCreditsSignaturesHash = bytes32(uint256(1));
-        uint256 maxUncreditedValue = 2;
-        uint256 maxCreditedValue = 3;
-
-        creditsManager.updateTempBidCreditsSignaturesHash(bidCreditsSignaturesHash);
-        creditsManager.updateTempMaxUncreditedValue(maxUncreditedValue);
-        creditsManager.updateTempMaxCreditedValue(maxCreditedValue);
-
-        bytes memory data = abi.encode(bidCreditsSignaturesHash, maxUncreditedValue, maxCreditedValue);
-        assertTrue(creditsManager.bidExternalCheck(address(creditsManager), data));
-    }
-
     function test_allowCustomExternalCall_RevertsWhenNotOwner() public {
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
@@ -355,10 +276,10 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(IERC721(collection).ownerOf(collectionTokenId), address(creditsManager));
 
         vm.expectEmit(address(creditsManager));
-        emit ERC721Withdrawn(collection, collectionTokenId, other);
+        emit ERC721Withdrawn(collection, collectionTokenId, address(this));
         vm.prank(owner);
-        creditsManager.withdrawERC721(collection, collectionTokenId, other);
+        creditsManager.withdrawERC721(collection, collectionTokenId, address(this));
 
-        assertEq(IERC721(collection).ownerOf(collectionTokenId), other);
+        assertEq(IERC721(collection).ownerOf(collectionTokenId), address(this));
     }
 }
