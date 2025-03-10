@@ -563,9 +563,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param _sender The caller of the useCredits function.
     /// @return manaTransferred The amount of MANA transferred out of the contract after the external call.
     function _executeExternalCall(UseCreditsArgs calldata _args, address _sender) internal returns (uint256 manaTransferred) {
-        // Transfer the mana the caller is willing to pay from their wallet to this contract.
-        // The caller will be returned any exceeding amount that was not needed to cover the uncredited amount.
-        mana.safeTransferFrom(_sender, address(this), _args.maxUncreditedValue);
+        if (_args.maxUncreditedValue > 0) {
+            // Transfer the mana the caller is willing to pay from their wallet to this contract.
+            // The caller will be returned any exceeding amount that was not needed to cover the uncredited amount.
+            mana.safeTransferFrom(_sender, address(this), _args.maxUncreditedValue);
+        }
 
         // Approves the combined amount of credited and uncredited mana the caller is willing to pay.
         mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + _args.maxCreditedValue);
