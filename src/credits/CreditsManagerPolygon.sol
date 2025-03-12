@@ -402,7 +402,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         } else if (_args.externalCall.target == collectionStore) {
             _handleCollectionStorePreExecution(_args);
         } else {
-            _handleCustomExternalCallPreExecution(_args);
+            _handleCustomExternalCallPreExecution(_args, _sender);
         }
     }
 
@@ -523,7 +523,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @dev Handles all checks that need to be done before executing the external call for a custom external call.
     /// @param _args The arguments for the useCredits function.
-    function _handleCustomExternalCallPreExecution(UseCreditsArgs calldata _args) internal {
+    /// @param _sender The caller of the useCredits function.
+    function _handleCustomExternalCallPreExecution(UseCreditsArgs calldata _args, address _sender) internal {
         // Check that the external call has been allowed.
         if (!allowedCustomExternalCalls[_args.externalCall.target][_args.externalCall.selector]) {
             revert CustomExternalCallNotAllowed(_args.externalCall.target, _args.externalCall.selector);
@@ -546,7 +547,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
         // Recover the signer of the external call.
         address recoveredSigner =
-            keccak256(abi.encode(_msgSender(), block.chainid, address(this), _args.externalCall)).recover(_args.customExternalCallSignature);
+            keccak256(abi.encode(_sender, block.chainid, address(this), _args.externalCall)).recover(_args.customExternalCallSignature);
 
         // Check that the signer of the external call has the external call signer role.
         if (!hasRole(EXTERNAL_CALL_SIGNER_ROLE, recoveredSigner)) {
