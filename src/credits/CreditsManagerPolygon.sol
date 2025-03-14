@@ -161,18 +161,18 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         bytes32 salt;
     }
 
-    event UserDenied(address indexed _user);
-    event UserAllowed(address indexed _user);
-    event CreditRevoked(bytes32 indexed _creditId);
-    event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
-    event ERC721Withdrawn(address indexed _token, uint256 _tokenId, address indexed _to);
-    event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
-    event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
-    event CreditUsed(bytes32 indexed _creditId, Credit _credit, uint256 _value);
-    event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
-    event MaxManaCreditedPerHourUpdated(uint256 _maxManaCreditedPerHour);
-    event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
-    event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
+    event UserDenied(address indexed _sender, address indexed _user);
+    event UserAllowed(address indexed _sender, address indexed _user);
+    event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
+    event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
+    event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 _tokenId, address indexed _to);
+    event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
+    event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _hashedExternalCallSignature);
+    event CreditUsed(address indexed _sender, bytes32 indexed _creditId, Credit _credit, uint256 _value);
+    event CreditsUsed(address indexed _sender, uint256 _manaTransferred, uint256 _creditedValue);
+    event MaxManaCreditedPerHourUpdated(address indexed _sender, uint256 _maxManaCreditedPerHour);
+    event PrimarySalesAllowedUpdated(address indexed _sender, bool _primarySalesAllowed);
+    event SecondarySalesAllowedUpdated(address indexed _sender, bool _secondarySalesAllowed);
 
     error DeniedUser(address _user);
     error InvalidExternalCallSelector(address _target, bytes4 _selector);
@@ -270,7 +270,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function denyUser(address _user) external onlyRole(DENIER_ROLE) {
         isDenied[_user] = true;
 
-        emit UserDenied(_user);
+        emit UserDenied(_msgSender(), _user);
     }
 
     /// @notice Allows a user to use credits.
@@ -280,7 +280,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function allowUser(address _user) external onlyRole(DEFAULT_ADMIN_ROLE) {
         isDenied[_user] = false;
 
-        emit UserAllowed(_user);
+        emit UserAllowed(_msgSender(), _user);
     }
 
     /// @notice Revokes a credit.
@@ -288,7 +288,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function revokeCredit(bytes32 _credit) external onlyRole(REVOKER_ROLE) {
         isRevoked[_credit] = true;
 
-        emit CreditRevoked(_credit);
+        emit CreditRevoked(_msgSender(), _credit);
     }
 
     /// @notice Update the maximum amount of MANA that can be credited per hour.
@@ -316,7 +316,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function withdrawERC20(address _token, uint256 _amount, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_token).safeTransfer(_to, _amount);
 
-        emit ERC20Withdrawn(_token, _amount, _to);
+        emit ERC20Withdrawn(_msgSender(), _token, _amount, _to);
     }
 
     /// @notice Withdraw ERC721 tokens from the contract.
@@ -326,7 +326,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function withdrawERC721(address _token, uint256 _tokenId, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC721(_token).safeTransferFrom(address(this), _to, _tokenId);
 
-        emit ERC721Withdrawn(_token, _tokenId, _to);
+        emit ERC721Withdrawn(_msgSender(), _token, _tokenId, _to);
     }
 
     /// @notice Allows a custom external call.
@@ -336,7 +336,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function allowCustomExternalCall(address _target, bytes4 _selector, bool _allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         allowedCustomExternalCalls[_target][_selector] = _allowed;
 
-        emit CustomExternalCallAllowed(_target, _selector, _allowed);
+        emit CustomExternalCallAllowed(_msgSender(), _target, _selector, _allowed);
     }
 
     /// @notice Revokes a custom external call.
@@ -344,7 +344,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function revokeCustomExternalCall(bytes32 _hashedCustomExternalCallSignature) external onlyRole(EXTERNAL_CALL_REVOKER_ROLE) {
         usedCustomExternalCallSignature[_hashedCustomExternalCallSignature] = true;
 
-        emit CustomExternalCallRevoked(_hashedCustomExternalCallSignature);
+        emit CustomExternalCallRevoked(_msgSender(), _hashedCustomExternalCallSignature);
     }
 
     /// @notice Use credits to pay for external calls that transfer MANA.
@@ -698,7 +698,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             // Add the credited amount to the total credited amount.
             creditedValue += creditValueToSpend;
 
-            emit CreditUsed(signatureHash, credit, creditValueToSpend);
+            emit CreditUsed(_sender, signatureHash, credit, creditValueToSpend);
 
             // If enough credits have been spent, exit early to avoid unnecessary iterations.
             if (creditedValue == _manaTransferred) {
@@ -706,7 +706,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             }
         }
 
-        emit CreditsUsed(_manaTransferred, creditedValue);
+        emit CreditsUsed(_sender, _manaTransferred, creditedValue);
     }
 
     /// @dev Validates the amount of MANA credited.
@@ -768,7 +768,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function _updateMaxManaCreditedPerHour(uint256 _maxManaCreditedPerHour) internal {
         maxManaCreditedPerHour = _maxManaCreditedPerHour;
 
-        emit MaxManaCreditedPerHourUpdated(_maxManaCreditedPerHour);
+        emit MaxManaCreditedPerHourUpdated(_msgSender(), _maxManaCreditedPerHour);
     }
 
     /// @dev Updates whether primary sales are allowed.
@@ -776,7 +776,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function _updatePrimarySalesAllowed(bool _primarySalesAllowed) internal {
         primarySalesAllowed = _primarySalesAllowed;
 
-        emit PrimarySalesAllowedUpdated(_primarySalesAllowed);
+        emit PrimarySalesAllowedUpdated(_msgSender(), _primarySalesAllowed);
     }
 
     /// @dev Updates whether secondary sales are allowed.
@@ -784,7 +784,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     function _updateSecondarySalesAllowed(bool _secondarySalesAllowed) internal {
         secondarySalesAllowed = _secondarySalesAllowed;
 
-        emit SecondarySalesAllowedUpdated(_secondarySalesAllowed);
+        emit SecondarySalesAllowedUpdated(_msgSender(), _secondarySalesAllowed);
     }
 
     /// @dev This is used to prevent users from consuming credits on non-decentraland collections.

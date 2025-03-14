@@ -75,7 +75,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_denyUser_WhenDenier() public {
         vm.expectEmit(address(creditsManager));
-        emit UserDenied(address(this));
+        emit UserDenied(denier, address(this));
         vm.prank(denier);
         creditsManager.denyUser(address(this));
         assertTrue(creditsManager.isDenied(address(this)));
@@ -83,7 +83,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_denyUser_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit UserDenied(address(this));
+        emit UserDenied(owner, address(this));
         vm.prank(owner);
         creditsManager.denyUser(address(this));
         assertTrue(creditsManager.isDenied(address(this)));
@@ -105,7 +105,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_allowUser_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit UserAllowed(address(this));
+        emit UserAllowed(owner, address(this));
         vm.prank(owner);
         creditsManager.allowUser(address(this));
         assertFalse(creditsManager.isDenied(address(this)));
@@ -120,7 +120,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_revokeCredit_WhenRevoker() public {
         vm.expectEmit(address(creditsManager));
-        emit CreditRevoked(bytes32(0));
+        emit CreditRevoked(revoker, bytes32(0));
         vm.prank(revoker);
         creditsManager.revokeCredit(bytes32(0));
         assertTrue(creditsManager.isRevoked(bytes32(0)));
@@ -128,7 +128,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_revokeCredit_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit CreditRevoked(bytes32(0));
+        emit CreditRevoked(owner, bytes32(0));
         vm.prank(owner);
         creditsManager.revokeCredit(bytes32(0));
         assertTrue(creditsManager.isRevoked(bytes32(0)));
@@ -143,7 +143,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_updateMaxManaCreditedPerHour_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit MaxManaCreditedPerHourUpdated(1);
+        emit MaxManaCreditedPerHourUpdated(owner, 1);
         vm.prank(owner);
         creditsManager.updateMaxManaCreditedPerHour(1);
         assertEq(creditsManager.maxManaCreditedPerHour(), 1);
@@ -158,13 +158,13 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_updatePrimarySalesAllowed_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit PrimarySalesAllowedUpdated(false);
+        emit PrimarySalesAllowedUpdated(owner, false);
         vm.prank(owner);
         creditsManager.updatePrimarySalesAllowed(false);
         assertEq(creditsManager.primarySalesAllowed(), false);
 
         vm.expectEmit(address(creditsManager));
-        emit PrimarySalesAllowedUpdated(true);
+        emit PrimarySalesAllowedUpdated(owner, true);
         vm.prank(owner);
         creditsManager.updatePrimarySalesAllowed(true);
         assertEq(creditsManager.primarySalesAllowed(), true);
@@ -179,13 +179,13 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_updateSecondarySalesAllowed_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit SecondarySalesAllowedUpdated(false);
+        emit SecondarySalesAllowedUpdated(owner, false);
         vm.prank(owner);
         creditsManager.updateSecondarySalesAllowed(false);
         assertEq(creditsManager.secondarySalesAllowed(), false);
 
         vm.expectEmit(address(creditsManager));
-        emit SecondarySalesAllowedUpdated(true);
+        emit SecondarySalesAllowedUpdated(owner, true);
         vm.prank(owner);
         creditsManager.updateSecondarySalesAllowed(true);
         assertEq(creditsManager.secondarySalesAllowed(), true);
@@ -200,7 +200,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_allowCustomExternalCall_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit CustomExternalCallAllowed(address(this), bytes4(0), true);
+        emit CustomExternalCallAllowed(owner, address(this), bytes4(0), true);
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(this), bytes4(0), true);
     }
@@ -216,7 +216,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_revokeCustomExternalCall_WhenCustomExternalCallRevoker() public {
         vm.expectEmit(address(creditsManager));
-        emit CustomExternalCallRevoked(bytes32(0));
+        emit CustomExternalCallRevoked(customExternalCallRevoker, bytes32(0));
         vm.prank(customExternalCallRevoker);
         creditsManager.revokeCustomExternalCall(bytes32(0));
 
@@ -225,7 +225,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_revokeCustomExternalCall_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit CustomExternalCallRevoked(bytes32(0));
+        emit CustomExternalCallRevoked(owner, bytes32(0));
         vm.prank(owner);
         creditsManager.revokeCustomExternalCall(bytes32(0));
 
@@ -246,7 +246,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
 
         vm.expectEmit(address(creditsManager));
-        emit ERC20Withdrawn(address(mana), 1 ether, owner);
+        emit ERC20Withdrawn(owner, address(mana), 1 ether, owner);
         vm.prank(owner);
         creditsManager.withdrawERC20(address(mana), 1 ether, owner);
 
@@ -254,7 +254,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(IERC20(mana).balanceOf(owner), 1 ether);
 
         vm.expectEmit(address(creditsManager));
-        emit ERC20Withdrawn(address(mana), 1 ether, address(this));
+        emit ERC20Withdrawn(owner, address(mana), 1 ether, address(this));
         vm.prank(owner);
         creditsManager.withdrawERC20(address(mana), 1 ether, address(this));
 
@@ -276,7 +276,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(IERC721(collection).ownerOf(collectionTokenId), address(creditsManager));
 
         vm.expectEmit(address(creditsManager));
-        emit ERC721Withdrawn(collection, collectionTokenId, address(this));
+        emit ERC721Withdrawn(owner, collection, collectionTokenId, address(this));
         vm.prank(owner);
         creditsManager.withdrawERC721(collection, collectionTokenId, address(this));
 

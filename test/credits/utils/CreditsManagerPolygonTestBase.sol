@@ -43,19 +43,18 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
     address internal seller;
     uint256 internal sellerPk;
 
-    event UserDenied(address indexed _user);
-    event UserAllowed(address indexed _user);
-    event CreditRevoked(bytes32 indexed _creditId);
-    event MaxManaCreditedPerHourUpdated(uint256 _maxManaCreditedPerHour);
-    event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
-    event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
-    event BidsAllowedUpdated(bool _bidsAllowed);
-    event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
-    event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
-    event CreditUsed(bytes32 indexed _creditId, CreditsManagerPolygon.Credit _credit, uint256 _value);
-    event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
-    event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
-    event ERC721Withdrawn(address indexed _collection, uint256 _tokenId, address indexed _to);
+    event UserDenied(address indexed _sender, address indexed _user);
+    event UserAllowed(address indexed _sender, address indexed _user);
+    event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
+    event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
+    event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 _tokenId, address indexed _to);
+    event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
+    event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _hashedExternalCallSignature);
+    event CreditUsed(address indexed _sender, bytes32 indexed _creditId, CreditsManagerPolygon.Credit _credit, uint256 _value);
+    event CreditsUsed(address indexed _sender, uint256 _manaTransferred, uint256 _creditedValue);
+    event MaxManaCreditedPerHourUpdated(address indexed _sender, uint256 _maxManaCreditedPerHour);
+    event PrimarySalesAllowedUpdated(address indexed _sender, bool _primarySalesAllowed);
+    event SecondarySalesAllowedUpdated(address indexed _sender, bool _secondarySalesAllowed);
 
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
         return this.onERC721Received.selector;
