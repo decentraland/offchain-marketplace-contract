@@ -169,8 +169,8 @@ const credit = {
 };
 
 const message = ethers.utils.solidityKeccak256(
-  ["address", "uint256", "address", "uint256", "uint256", "bytes32"],
-  [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
+  ["address", "uint256", "address", "tuple(uint256,uint256,bytes32)"],
+  [userAddress, chainId, creditsManagerAddress, [credit.value, credit.expiresAt, credit.salt]]
 );
 const signature = await signer.signMessage(ethers.utils.arrayify(message));
 
@@ -225,8 +225,8 @@ const credit = {
 };
 
 const message = ethers.utils.solidityKeccak256(
-  ["address", "uint256", "address", "uint256", "uint256", "bytes32"],
-  [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
+  ["address", "uint256", "address", "tuple(uint256,uint256,bytes32)"],
+  [userAddress, chainId, creditsManagerAddress, [credit.value, credit.expiresAt, credit.salt]]
 );
 const signature = await signer.signMessage(ethers.utils.arrayify(message));
 
@@ -356,8 +356,8 @@ const credit = {
 };
 
 const message = ethers.utils.solidityKeccak256(
-  ["address", "uint256", "address", "uint256", "uint256", "bytes32"],
-  [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
+  ["address", "uint256", "address", "tuple(uint256,uint256,bytes32)"],
+  [userAddress, chainId, creditsManagerAddress, [credit.value, credit.expiresAt, credit.salt]]
 );
 const signature = await signer.signMessage(ethers.utils.arrayify(message));
 
@@ -412,8 +412,8 @@ const credit = {
 };
 
 const creditMessage = ethers.utils.solidityKeccak256(
-  ["address", "uint256", "address", "uint256", "uint256", "bytes32"],
-  [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
+  ["address", "uint256", "address", "tuple(uint256,uint256,bytes32)"],
+  [userAddress, chainId, creditsManagerAddress, [credit.value, credit.expiresAt, credit.salt]]
 );
 const creditSignature = await signer.signMessage(ethers.utils.arrayify(creditMessage));
 
