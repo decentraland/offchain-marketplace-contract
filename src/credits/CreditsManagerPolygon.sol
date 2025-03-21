@@ -21,16 +21,16 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     using SafeERC20 for IERC20;
 
     /// @notice The role that can sign credits.
-    bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
+    bytes32 public constant CREDITS_SIGNER_ROLE = keccak256("CREDITS_SIGNER_ROLE");
 
     /// @notice The role that can pause the contract.
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     /// @notice The role that can deny users from using credits.
-    bytes32 public constant DENIER_ROLE = keccak256("DENIER_ROLE");
+    bytes32 public constant USER_DENIER_ROLE = keccak256("USER_DENIER_ROLE");
 
     /// @notice The role that can revoke credits.
-    bytes32 public constant REVOKER_ROLE = keccak256("REVOKER_ROLE");
+    bytes32 public constant CREDITS_REVOKER_ROLE = keccak256("CREDITS_REVOKER_ROLE");
 
     /// @notice The role that can sign external calls.
     bytes32 public constant EXTERNAL_CALL_SIGNER_ROLE = keccak256("EXTERNAL_CALL_SIGNER_ROLE");
@@ -102,18 +102,18 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice The roles to initialize the contract with.
     /// @param owner The address that acts as default admin.
-    /// @param signer The address that can sign credits.
+    /// @param creditsSigner The address that can sign credits.
     /// @param pauser The address that can pause the contract.
-    /// @param denier The address that can deny users from using credits.
-    /// @param revoker The address that can revoke credits.
+    /// @param userDenier The address that can deny users from using credits.
+    /// @param creditsRevoker The address that can revoke credits.
     /// @param customExternalCallSigner The address that can sign custom external calls.
     /// @param customExternalCallRevoker The address that can revoke custom external calls.
     struct Roles {
         address owner;
-        address signer;
+        address creditsSigner;
         address pauser;
-        address denier;
-        address revoker;
+        address userDenier;
+        address creditsRevoker;
         address customExternalCallSigner;
         address customExternalCallRevoker;
     }
@@ -121,11 +121,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice The arguments for the useCredits function.
     /// @param credits The credits to use.
     /// @param creditsSignatures The signatures of the credits.
-    /// Has to be signed by a wallet that has the signer role.
+    /// Has to be signed by a wallet that has the credits signer role.
     /// @param externalCall The external call to make.
     /// @param customExternalCallSignature The signature of the external call.
     /// Only used for custom external calls.
-    /// Has to be signed by a wallet that has the customExternalCallSigner role.
+    /// Has to be signed by a wallet that has the custom external call signer role.
     /// @param maxUncreditedValue The maximum amount of MANA the user is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
     /// @param maxCreditedValue The maximum amount of MANA that can be credited from the provided credits.
     struct UseCreditsArgs {
@@ -187,6 +187,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     error UsedCustomExternalCallSignature(bytes32 _hashedCustomExternalCallSignature);
     error InvalidCustomExternalCallSignature(address _recoveredSigner);
     error ExternalCallFailed(ExternalCall _externalCall);
+    error SenderBalanceChanged();
     error NoMANATransfer();
     error NoCredits();
     error InvalidCreditsSignaturesLength();
@@ -225,16 +226,16 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     ) EIP712("Decentraland Credits", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _roles.owner);
 
-        _grantRole(SIGNER_ROLE, _roles.signer);
+        _grantRole(CREDITS_SIGNER_ROLE, _roles.creditsSigner);
 
         _grantRole(PAUSER_ROLE, _roles.pauser);
         _grantRole(PAUSER_ROLE, _roles.owner);
 
-        _grantRole(DENIER_ROLE, _roles.denier);
-        _grantRole(DENIER_ROLE, _roles.owner);
+        _grantRole(USER_DENIER_ROLE, _roles.userDenier);
+        _grantRole(USER_DENIER_ROLE, _roles.owner);
 
-        _grantRole(REVOKER_ROLE, _roles.revoker);
-        _grantRole(REVOKER_ROLE, _roles.owner);
+        _grantRole(CREDITS_REVOKER_ROLE, _roles.creditsRevoker);
+        _grantRole(CREDITS_REVOKER_ROLE, _roles.owner);
 
         _grantRole(EXTERNAL_CALL_SIGNER_ROLE, _roles.customExternalCallSigner);
 
@@ -267,7 +268,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice Denies a user from using credits.
     /// @param _user The user to deny.
-    function denyUser(address _user) external onlyRole(DENIER_ROLE) {
+    function denyUser(address _user) external onlyRole(USER_DENIER_ROLE) {
         isDenied[_user] = true;
 
         emit UserDenied(_msgSender(), _user);
@@ -285,7 +286,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice Revokes a credit.
     /// @param _credit The hash of the credit signature.
-    function revokeCredit(bytes32 _credit) external onlyRole(REVOKER_ROLE) {
+    function revokeCredit(bytes32 _credit) external onlyRole(CREDITS_REVOKER_ROLE) {
         isRevoked[_credit] = true;
 
         emit CreditRevoked(_msgSender(), _credit);
@@ -350,22 +351,25 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @param _args The arguments for the useCredits function.
     function useCredits(UseCreditsArgs calldata _args) external nonReentrant whenNotPaused {
+        // Get the sender of the transaction.
+        // Defined here to prevent calling _msgSender() multiple times for this transaction.
         address sender = _msgSender();
 
         // Handle pre-execution checks for the different types of external calls.
         _handlePreExecution(_args, sender);
 
+        // Calculate the amount of MANA that can be credited in the current hour.
+        // Defined here given that it will be used in multiple places.
+        uint256 currentHourCreditableManaAmount = _computeCurrentHourCreditableManaAmount();
+
         // Execute the external call and get the amount of MANA that was transferred out of the contract.
-        uint256 manaTransferred = _executeExternalCall(_args, sender);
+        uint256 manaTransferred = _executeExternalCall(_args, sender, currentHourCreditableManaAmount);
 
         // Handle post-execution checks.
         _handlePostExecution(_args, sender);
 
-        // Validate and get how much MANA will be credited by the credits.
-        uint256 creditedValue = _validateAndApplyCredits(_args, sender, manaTransferred);
-
-        // Perform different checks on the credited value obtained.
-        _validateCreditedValue(_args, creditedValue);
+        // Validate and apply credits to get how much MANA will be credited by the credits.
+        uint256 creditedValue = _validateAndApplyCredits(_args, sender, manaTransferred, currentHourCreditableManaAmount);
 
         // Calculate how much mana was not covered by credits.
         uint256 uncredited = manaTransferred - creditedValue;
@@ -562,25 +566,49 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @dev Executes the external call.
     /// @param _args The arguments for the useCredits function.
     /// @param _sender The caller of the useCredits function.
+    /// @param _currentHourCreditableManaAmount The amount of MANA that is creditable for the current hour.
     /// @return manaTransferred The amount of MANA transferred out of the contract after the external call.
-    function _executeExternalCall(UseCreditsArgs calldata _args, address _sender) internal returns (uint256 manaTransferred) {
+    function _executeExternalCall(UseCreditsArgs calldata _args, address _sender, uint256 _currentHourCreditableManaAmount)
+        internal
+        returns (uint256 manaTransferred)
+    {
         if (_args.maxUncreditedValue > 0) {
             // Transfer the mana the caller is willing to pay from their wallet to this contract.
             // The caller will be returned any exceeding amount that was not needed to cover the uncredited amount.
             mana.safeTransferFrom(_sender, address(this), _args.maxUncreditedValue);
         }
 
-        // Approves the combined amount of credited and uncredited mana the caller is willing to pay.
-        mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + _args.maxCreditedValue);
+        // The max amount to be credited is defined by the caller.
+        // However, if the max amount to be credited is higher than the amount of MANA that is creditable for the current hour,
+        // use the amount of MANA that is creditable for the current hour instead to avoid over approving.
+        uint256 maxCreditedValue = _args.maxCreditedValue;
+
+        if (maxCreditedValue > _currentHourCreditableManaAmount) {
+            maxCreditedValue = _currentHourCreditableManaAmount;
+        }
+
+        // Approves the maximum amount of MANA that can possibly be transferred out of the contract.
+        // This is the sum of the max amount the user is willing to pay out of pocket and the max amount to be credited.
+        mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + maxCreditedValue);
 
         // Store the mana balance before the external call.
         uint256 balanceBefore = mana.balanceOf(address(this));
+
+        // Store the sender's balance before the external call.
+        uint256 senderBalanceBefore = mana.balanceOf(_sender);
 
         // Execute the external call.
         (bool success,) = _args.externalCall.target.call(abi.encodePacked(_args.externalCall.selector, _args.externalCall.data));
 
         if (!success) {
             revert ExternalCallFailed(_args.externalCall);
+        }
+
+        // Check that the sender's balance has not changed.
+        // This is to prevent the sender from using a credit to obtain MANA directly by buying their own assets.
+        // Keep in mind that this prevents item creators from buying their creations in secondary sales because they will receive royalties, updating their mana balance.
+        if (senderBalanceBefore != mana.balanceOf(_sender)) {
+            revert SenderBalanceChanged();
         }
 
         // Store how much MANA was transferred out of the contract after the external call.
@@ -628,11 +656,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param _args The arguments for the useCredits function.
     /// @param _sender The caller of the useCredits function.
     /// @param _manaTransferred The amount of MANA transferred out of the contract after the external call.
+    /// @param _currentHourCreditableManaAmount The amount of MANA that can be credited this hour.
     /// @return creditedValue The amount of MANA credited from the credits.
-    function _validateAndApplyCredits(UseCreditsArgs calldata _args, address _sender, uint256 _manaTransferred)
-        internal
-        returns (uint256 creditedValue)
-    {
+    function _validateAndApplyCredits(
+        UseCreditsArgs calldata _args,
+        address _sender,
+        uint256 _manaTransferred,
+        uint256 _currentHourCreditableManaAmount
+    ) internal returns (uint256 creditedValue) {
         // Check that the number of credits is not 0.
         if (_args.credits.length == 0) {
             revert NoCredits();
@@ -672,8 +703,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             // Recover the signer of the signature.
             address recoveredSigner = keccak256(abi.encode(_sender, block.chainid, address(this), credit)).recover(_args.creditsSignatures[i]);
 
-            // Check that the signature has been signed by the signer role.
-            if (!hasRole(SIGNER_ROLE, recoveredSigner)) {
+            // Check that the signature has been signed by the credits signer role.
+            if (!hasRole(CREDITS_SIGNER_ROLE, recoveredSigner)) {
                 revert InvalidSignature(signatureHash, recoveredSigner);
             }
 
@@ -686,11 +717,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             }
 
             // Calculate how much MANA is left to be credited from the total MANA transferred in the external call.
-            uint256 uncreditedValue = _manaTransferred - creditedValue;
+            uint256 remainingValue = _manaTransferred - creditedValue;
 
             // Calculate how much of the credit to spend.
             // If the required amount is lower than the available amount, spend the required amount and leave some credit amount for future calls.
-            uint256 creditValueToSpend = uncreditedValue < creditRemainingValue ? uncreditedValue : creditRemainingValue;
+            uint256 creditValueToSpend = remainingValue < creditRemainingValue ? remainingValue : creditRemainingValue;
 
             // Increment the amount consumed from the credit.
             spentValue[signatureHash] += creditValueToSpend;
@@ -706,42 +737,20 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             }
         }
 
-        emit CreditsUsed(_sender, _manaTransferred, creditedValue);
-    }
-
-    /// @dev Validates the amount of MANA credited.
-    /// @param _args The arguments for the useCredits function.
-    /// @param _creditedValue The amount of MANA credited.
-    function _validateCreditedValue(UseCreditsArgs calldata _args, uint256 _creditedValue) internal {
         // Checks that the amount of MANA credited is not higher than the maximum amount allowed by caller.
-        if (_creditedValue > _args.maxCreditedValue) {
-            revert MaxCreditedValueExceeded(_creditedValue, _args.maxCreditedValue);
-        }
-
-        // Check hourly rate limit
-        uint256 currentHour = block.timestamp / 1 hours;
-        uint256 creditableManaThisHour;
-
-        // Calculates how much mana could be credited this hour.
-        if (currentHour != hourOfLastManaCredit) {
-            // If the current hour is different than the one of the last execution, reset the values.
-            manaCreditedThisHour = 0;
-            hourOfLastManaCredit = currentHour;
-
-            // This new hour allows the maximum amount to be credited.
-            creditableManaThisHour = maxManaCreditedPerHour;
-        } else {
-            // If it is the same hour, the max creditable amount has to consider the amount already credited.
-            creditableManaThisHour = maxManaCreditedPerHour - manaCreditedThisHour;
+        if (creditedValue > _args.maxCreditedValue) {
+            revert MaxCreditedValueExceeded(creditedValue, _args.maxCreditedValue);
         }
 
         // Checks that the amount of MANA credited is not higher than the maximum amount allowed by hour.
-        if (_creditedValue > creditableManaThisHour) {
-            revert MaxManaCreditedPerHourExceeded(creditableManaThisHour, _creditedValue);
+        if (creditedValue > _currentHourCreditableManaAmount) {
+            revert MaxManaCreditedPerHourExceeded(_currentHourCreditableManaAmount, creditedValue);
         }
 
         // Increase the amount of mana credited this hour
-        manaCreditedThisHour += _creditedValue;
+        manaCreditedThisHour += creditedValue;
+
+        emit CreditsUsed(_sender, _manaTransferred, creditedValue);
     }
 
     /// @dev Handles the uncredited value.
@@ -792,6 +801,25 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         if (!collectionFactory.isCollectionFromFactory(_contractAddress) && !collectionFactoryV3.isCollectionFromFactory(_contractAddress)) {
             revert NotDecentralandCollection(_contractAddress);
         }
+    }
+
+    /// @dev This is used to compute the amount of MANA that can be credited this hour.
+    /// @return The amount of MANA that can be credited this hour.
+    function _computeCurrentHourCreditableManaAmount() internal returns (uint256) {
+        // Calculate the current hour.
+        uint256 currentHour = block.timestamp / 1 hours;
+
+        if (currentHour != hourOfLastManaCredit) {
+            // If the current hour is different than the one of the last execution, reset the values.
+            manaCreditedThisHour = 0;
+            hourOfLastManaCredit = currentHour;
+
+            // This new hour allows the maximum amount to be credited.
+            return maxManaCreditedPerHour;
+        }
+
+        // If it is the same hour, the max creditable amount has to consider the amount already credited.
+        return maxManaCreditedPerHour - manaCreditedThisHour;
     }
 
     /// @dev This is to support meta-transactions.

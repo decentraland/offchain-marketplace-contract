@@ -17,10 +17,10 @@ contract DeployCreditsManagerPolygonScript is Script {
         // Create roles struct
         CreditsManagerPolygon.Roles memory roles = CreditsManagerPolygon.Roles({
             owner: vm.envAddress("OWNER"),
-            signer: vm.envAddress("SIGNER"),
+            creditsSigner: vm.envAddress("CREDITS_SIGNER"),
             pauser: vm.envAddress("PAUSER"),
-            denier: vm.envAddress("DENIER"),
-            revoker: vm.envAddress("REVOKER"),
+            userDenier: vm.envAddress("USER_DENIER"),
+            creditsRevoker: vm.envAddress("CREDITS_REVOKER"),
             customExternalCallSigner: vm.envAddress("EXTERNAL_CALL_SIGNER"),
             customExternalCallRevoker: vm.envAddress("EXTERNAL_CALL_REVOKER")
         });

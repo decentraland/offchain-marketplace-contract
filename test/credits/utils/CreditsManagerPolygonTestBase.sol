@@ -11,11 +11,11 @@ import {CreditsManagerPolygonHarness} from "test/credits/utils/CreditsManagerPol
 
 contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
     address internal owner;
-    address internal signer;
-    uint256 internal signerPk;
+    address internal creditsSigner;
+    uint256 internal creditsSignerPk;
     address internal pauser;
-    address internal denier;
-    address internal revoker;
+    address internal userDenier;
+    address internal creditsRevoker;
     address internal customExternalCallSigner;
     uint256 internal customExternalCallSignerPk;
     address internal customExternalCallRevoker;
@@ -64,19 +64,19 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
         vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon", 68650527)); // Mar-04-2025 09:10:51 PM +UTC
 
         owner = makeAddr("owner");
-        (signer, signerPk) = makeAddrAndKey("signer");
+        (creditsSigner, creditsSignerPk) = makeAddrAndKey("creditsSigner");
         pauser = makeAddr("pauser");
-        denier = makeAddr("denier");
-        revoker = makeAddr("revoker");
+        userDenier = makeAddr("userDenier");
+        creditsRevoker = makeAddr("creditsRevoker");
         (customExternalCallSigner, customExternalCallSignerPk) = makeAddrAndKey("customExternalCallSigner");
         customExternalCallRevoker = makeAddr("customExternalCallRevoker");
 
         CreditsManagerPolygon.Roles memory roles = CreditsManagerPolygon.Roles({
             owner: owner,
-            signer: signer,
+            creditsSigner: creditsSigner,
             pauser: pauser,
-            denier: denier,
-            revoker: revoker,
+            userDenier: userDenier,
+            creditsRevoker: creditsRevoker,
             customExternalCallSigner: customExternalCallSigner,
             customExternalCallRevoker: customExternalCallRevoker
         });

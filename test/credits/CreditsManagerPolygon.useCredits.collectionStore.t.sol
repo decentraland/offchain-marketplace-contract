@@ -15,7 +15,7 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -66,7 +66,7 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -106,7 +106,7 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -160,7 +160,7 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -204,6 +204,58 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
         creditsManager.useCredits(args);
     }
 
+    function test_useCredits_RevertsWhenTheCallerIsTheSameAsTheSeller() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 369 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+
+        bytes[] memory creditsSignatures = new bytes[](1);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(collectionCreator, block.chainid, address(creditsManager), credits[0])));
+
+        creditsSignatures[0] = abi.encodePacked(r, s, v);
+
+        ICollectionStore.ItemToBuy[] memory itemsToBuy = new ICollectionStore.ItemToBuy[](1);
+
+        itemsToBuy[0] = ICollectionStore.ItemToBuy({
+            collection: collection,
+            ids: new uint256[](1),
+            prices: new uint256[](1),
+            beneficiaries: new address[](1)
+        });
+
+        itemsToBuy[0].ids[0] = collectionItemId;
+        itemsToBuy[0].prices[0] = 369 ether;
+        itemsToBuy[0].beneficiaries[0] = collectionCreator;
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: collectionStore,
+            selector: ICollectionStore.buy.selector,
+            data: abi.encode(itemsToBuy),
+            expiresAt: 0,
+            salt: bytes32(0)
+        });
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: bytes(""),
+            maxUncreditedValue: 0,
+            maxCreditedValue: 369 ether
+        });
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 369 ether);
+
+        vm.prank(owner);
+        creditsManager.updateMaxManaCreditedPerHour(369 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.SenderBalanceChanged.selector));
+        vm.prank(collectionCreator);
+        creditsManager.useCredits(args);
+    }
+
     function test_useCredits_Success() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
@@ -211,7 +263,7 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
