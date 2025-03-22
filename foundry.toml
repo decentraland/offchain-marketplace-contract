@@ -6,5 +6,7 @@ solc = "0.8.20"
 
 [fmt]
 line_length = 150
+bytecode_size_limit = 100000 
+
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
