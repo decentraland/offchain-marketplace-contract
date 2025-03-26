@@ -161,8 +161,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         bytes32 salt;
     }
 
-    event UserDenied(address indexed _sender, address indexed _user);
-    event UserAllowed(address indexed _sender, address indexed _user);
+    event UserDenied(address indexed _sender, address indexed _user, bool _isDenied);
     event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 _tokenId, address indexed _to);
@@ -266,22 +265,23 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _unpause();
     }
 
-    /// @notice Denies a user from using credits.
-    /// @param _user The user to deny.
-    function denyUser(address _user) external onlyRole(USER_DENIER_ROLE) {
-        isDenied[_user] = true;
+    /// @notice Deny users from using credits.
+    /// @dev All users can consume credits unless denied.
+    /// @param _users The users to deny.
+    /// @param _areDenied Whether the user at the same index is denied from using credits.
+    /// True  - User cannot use credits.
+    /// False - User can continue using credits. 
+    function denyUsers(address[] calldata _users, bool[] calldata _areDenied) external onlyRole(USER_DENIER_ROLE) {
+        address sender = _msgSender();
 
-        emit UserDenied(_msgSender(), _user);
-    }
+        for (uint256 i = 0; i < _users.length; i++) {
+            address user = _users[i];
+            bool denied = _areDenied[i];
 
-    /// @notice Allows a user to use credits.
-    /// @dev Only the owner can allow a user to use credits.
-    /// @dev All users are allowed by default.
-    /// @param _user The user to allow.
-    function allowUser(address _user) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        isDenied[_user] = false;
+            isDenied[user] = denied;
 
-        emit UserAllowed(_msgSender(), _user);
+            emit UserDenied(sender, user, denied);
+        }
     }
 
     /// @notice Revokes a credit.

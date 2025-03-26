@@ -43,8 +43,7 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
     address internal seller;
     uint256 internal sellerPk;
 
-    event UserDenied(address indexed _sender, address indexed _user);
-    event UserAllowed(address indexed _sender, address indexed _user);
+    event UserDenied(address indexed _sender, address indexed _user, bool _isDenied);
     event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 _tokenId, address indexed _to);

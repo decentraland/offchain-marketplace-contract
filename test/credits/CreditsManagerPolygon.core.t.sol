@@ -70,45 +70,62 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_denyUser_RevertsWhenNotDenier() public {
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.USER_DENIER_ROLE()));
-        creditsManager.denyUser(address(this));
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        bool[] memory areDenied = new bool[](1);
+        areDenied[0] = true;
+        creditsManager.denyUsers(users, areDenied);
     }
 
     function test_denyUser_WhenDenier() public {
         vm.expectEmit(address(creditsManager));
-        emit UserDenied(userDenier, address(this));
+        emit UserDenied(userDenier, address(this), true);
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        bool[] memory areDenied = new bool[](1);
+        areDenied[0] = true;
         vm.prank(userDenier);
-        creditsManager.denyUser(address(this));
+        creditsManager.denyUsers(users, areDenied);
         assertTrue(creditsManager.isDenied(address(this)));
     }
 
     function test_denyUser_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit UserDenied(owner, address(this));
+        emit UserDenied(owner, address(this), true);
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        bool[] memory areDenied = new bool[](1);
+        areDenied[0] = true;
         vm.prank(owner);
-        creditsManager.denyUser(address(this));
+        creditsManager.denyUsers(users, areDenied);
         assertTrue(creditsManager.isDenied(address(this)));
     }
 
-    function test_allowUser_RevertsWhenNotOwner() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
-        );
-        creditsManager.allowUser(address(this));
-    }
-
-    function test_allowUser_RevertsWhenDenier() public {
-        vm.startPrank(userDenier);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, userDenier, creditsManager.DEFAULT_ADMIN_ROLE()));
-        creditsManager.allowUser(address(this));
-        vm.stopPrank();
-    }
-
-    function test_allowUser_WhenOwner() public {
-        vm.expectEmit(address(creditsManager));
-        emit UserAllowed(owner, address(this));
+    function test_denyUser_AllowsUser() public {
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        bool[] memory areDenied = new bool[](1);
+        areDenied[0] = true;
         vm.prank(owner);
-        creditsManager.allowUser(address(this));
+        creditsManager.denyUsers(users, areDenied);
+        assertTrue(creditsManager.isDenied(address(this)));
+        areDenied[0] = false;
+        vm.prank(owner);
+        creditsManager.denyUsers(users, areDenied);
         assertFalse(creditsManager.isDenied(address(this)));
+    }
+
+    function test_denyUser_DeniesMultipleUsers() public {
+        address[] memory users = new address[](2);
+        users[0] = address(1);
+        users[1] = address(2);
+        bool[] memory areDenied = new bool[](2);
+        areDenied[0] = true;
+        areDenied[1] = true;
+        vm.prank(owner);
+        creditsManager.denyUsers(users, areDenied);
+        assertTrue(creditsManager.isDenied(address(1)));
+        assertTrue(creditsManager.isDenied(address(2)));
     }
 
     function test_revokeCredit_RevertsWhenNotRevoker() public {
