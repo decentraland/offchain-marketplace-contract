@@ -285,11 +285,17 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     }
 
     /// @notice Revokes a credit.
-    /// @param _credit The hash of the credit signature.
-    function revokeCredit(bytes32 _credit) external onlyRole(CREDITS_REVOKER_ROLE) {
-        isRevoked[_credit] = true;
+    /// @param _credits The hash of the credit signatures to be revoked.
+    function revokeCredits(bytes32[] calldata _credits) external onlyRole(CREDITS_REVOKER_ROLE) {
+        address sender = _msgSender();
 
-        emit CreditRevoked(_msgSender(), _credit);
+        for (uint256 i = 0; i < _credits.length; i++) {
+            bytes32 credit = _credits[i];
+
+            isRevoked[credit] = true;
+
+            emit CreditRevoked(sender, credit);
+        }
     }
 
     /// @notice Update the maximum amount of MANA that can be credited per hour.

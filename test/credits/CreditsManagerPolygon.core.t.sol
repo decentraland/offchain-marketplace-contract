@@ -136,27 +136,47 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertTrue(creditsManager.isDenied(users[1]));
     }
 
-    function test_revokeCredit_RevertsWhenNotRevoker() public {
+    function test_revokeCredits_RevertsWhenNotRevoker() public {
+        bytes32[] memory credits = new bytes32[](1);
+        credits[0] = bytes32(0);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.CREDITS_REVOKER_ROLE())
         );
-        creditsManager.revokeCredit(bytes32(0));
+        creditsManager.revokeCredits(credits);
     }
 
-    function test_revokeCredit_WhenRevoker() public {
+    function test_revokeCredits_WhenRevoker() public {
+        bytes32[] memory credits = new bytes32[](1);
+        credits[0] = bytes32(0);
         vm.expectEmit(address(creditsManager));
-        emit CreditRevoked(creditsRevoker, bytes32(0));
+        emit CreditRevoked(creditsRevoker, credits[0]);
         vm.prank(creditsRevoker);
-        creditsManager.revokeCredit(bytes32(0));
-        assertTrue(creditsManager.isRevoked(bytes32(0)));
+        creditsManager.revokeCredits(credits);
+        assertTrue(creditsManager.isRevoked(credits[0]));
     }
 
-    function test_revokeCredit_WhenOwner() public {
+    function test_revokeCredits_WhenOwner() public {
+        bytes32[] memory credits = new bytes32[](1);
+        credits[0] = bytes32(0);
         vm.expectEmit(address(creditsManager));
-        emit CreditRevoked(owner, bytes32(0));
+        emit CreditRevoked(owner, credits[0]);
         vm.prank(owner);
-        creditsManager.revokeCredit(bytes32(0));
-        assertTrue(creditsManager.isRevoked(bytes32(0)));
+        creditsManager.revokeCredits(credits);
+        assertTrue(creditsManager.isRevoked(credits[0]));
+    }
+
+    function test_revokeCredits_RevokeMultiple() public {
+        bytes32[] memory credits = new bytes32[](2);
+        credits[0] = bytes32(0);
+        credits[1] = bytes32(uint256(1));
+        vm.expectEmit(address(creditsManager));
+        emit CreditRevoked(owner, credits[0]);
+        vm.expectEmit(address(creditsManager));
+        emit CreditRevoked(owner, credits[1]);
+        vm.prank(owner);
+        creditsManager.revokeCredits(credits);
+        assertTrue(creditsManager.isRevoked(credits[0]));
+        assertTrue(creditsManager.isRevoked(credits[1]));
     }
 
     function test_updateMaxManaCreditedPerHour_RevertsWhenNotOwner() public {
