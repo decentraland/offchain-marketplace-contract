@@ -346,12 +346,18 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit CustomExternalCallAllowed(_msgSender(), _target, _selector, _allowed);
     }
 
-    /// @notice Revokes a custom external call.
-    /// @param _hashedCustomExternalCallSignature The hash of the custom external call signature.
-    function revokeCustomExternalCall(bytes32 _hashedCustomExternalCallSignature) external onlyRole(EXTERNAL_CALL_REVOKER_ROLE) {
-        usedCustomExternalCallSignature[_hashedCustomExternalCallSignature] = true;
+    /// @notice Revokes custom external call signatures.
+    /// @param _customExternalCalls An array of hashed custom external call signatures.
+    function revokeCustomExternalCall(bytes32[] calldata _customExternalCalls) external onlyRole(EXTERNAL_CALL_REVOKER_ROLE) {
+        address sender = _msgSender();
 
-        emit CustomExternalCallRevoked(_msgSender(), _hashedCustomExternalCallSignature);
+        for (uint256 i = 0; i < _customExternalCalls.length; i++) {
+            bytes32 customExternalCall = _customExternalCalls[i];
+
+            usedCustomExternalCallSignature[customExternalCall] = true;
+
+            emit CustomExternalCallRevoked(sender, customExternalCall);
+        }
     }
 
     /// @notice Use credits to pay for external calls that transfer MANA.
