@@ -5,20 +5,17 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPolygonTestBase.sol";
+import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 
 contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     function test_constructor() public view {
         assertEq(creditsManager.hasRole(creditsManager.DEFAULT_ADMIN_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.CREDITS_SIGNER_ROLE(), creditsSigner), true);
         assertEq(creditsManager.hasRole(creditsManager.PAUSER_ROLE(), pauser), true);
-        assertEq(creditsManager.hasRole(creditsManager.PAUSER_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.USER_DENIER_ROLE(), userDenier), true);
-        assertEq(creditsManager.hasRole(creditsManager.USER_DENIER_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.CREDITS_REVOKER_ROLE(), creditsRevoker), true);
-        assertEq(creditsManager.hasRole(creditsManager.CREDITS_REVOKER_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.EXTERNAL_CALL_SIGNER_ROLE(), customExternalCallSigner), true);
         assertEq(creditsManager.hasRole(creditsManager.EXTERNAL_CALL_REVOKER_ROLE(), customExternalCallRevoker), true);
-        assertEq(creditsManager.hasRole(creditsManager.EXTERNAL_CALL_REVOKER_ROLE(), owner), true);
 
         assertEq(creditsManager.maxManaCreditedPerHour(), maxManaCreditedPerHour);
         assertEq(creditsManager.primarySalesAllowed(), primarySalesAllowed);
@@ -33,18 +30,20 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     }
 
     function test_pause_RevertsWhenNotPauser() public {
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.PAUSER_ROLE()));
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.Unauthorized.selector, address(this)));
         creditsManager.pause();
     }
 
     function test_pause_WhenPauser() public {
         vm.prank(pauser);
         creditsManager.pause();
+        assertTrue(creditsManager.paused());
     }
 
     function test_pause_WhenOwner() public {
         vm.prank(owner);
         creditsManager.pause();
+        assertTrue(creditsManager.paused());
     }
 
     function test_unpause_RevertsWhenNotOwner() public {
@@ -69,9 +68,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     }
 
     function test_denyUsers_RevertsWhenNotDenier() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.USER_DENIER_ROLE())
-        );
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.Unauthorized.selector, address(this)));
         address[] memory users = new address[](1);
         users[0] = address(this);
         bool[] memory areDenied = new bool[](1);
@@ -138,36 +135,34 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertTrue(creditsManager.isDenied(users[1]));
     }
 
-    function test_revokeCredits_RevertsWhenNotRevoker() public {
+    function test_revokeCreditSignatures_RevertsWhenNotRevoker() public {
         bytes32[] memory credits = new bytes32[](1);
         credits[0] = bytes32(0);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.CREDITS_REVOKER_ROLE())
-        );
-        creditsManager.revokeCredits(credits);
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.Unauthorized.selector, address(this)));
+        creditsManager.revokeCreditSignatures(credits);
     }
 
-    function test_revokeCredits_WhenRevoker() public {
+    function test_revokeCreditSignatures_WhenRevoker() public {
         bytes32[] memory credits = new bytes32[](1);
         credits[0] = bytes32(0);
         vm.expectEmit(address(creditsManager));
         emit CreditRevoked(creditsRevoker, credits[0]);
         vm.prank(creditsRevoker);
-        creditsManager.revokeCredits(credits);
+        creditsManager.revokeCreditSignatures(credits);
         assertTrue(creditsManager.isRevoked(credits[0]));
     }
 
-    function test_revokeCredits_WhenOwner() public {
+    function test_revokeCreditSignatures_WhenOwner() public {
         bytes32[] memory credits = new bytes32[](1);
         credits[0] = bytes32(0);
         vm.expectEmit(address(creditsManager));
         emit CreditRevoked(owner, credits[0]);
         vm.prank(owner);
-        creditsManager.revokeCredits(credits);
+        creditsManager.revokeCreditSignatures(credits);
         assertTrue(creditsManager.isRevoked(credits[0]));
     }
 
-    function test_revokeCredits_RevokeMultiple() public {
+    function test_revokeCreditSignatures_RevokeMultiple() public {
         bytes32[] memory credits = new bytes32[](2);
         credits[0] = bytes32(0);
         credits[1] = bytes32(uint256(1));
@@ -176,7 +171,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         vm.expectEmit(address(creditsManager));
         emit CreditRevoked(owner, credits[1]);
         vm.prank(owner);
-        creditsManager.revokeCredits(credits);
+        creditsManager.revokeCreditSignatures(credits);
         assertTrue(creditsManager.isRevoked(credits[0]));
         assertTrue(creditsManager.isRevoked(credits[1]));
     }
@@ -252,45 +247,41 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         creditsManager.allowCustomExternalCall(address(this), bytes4(0), true);
     }
 
-    function test_revokeCustomExternalCall_RevertsWhenNotCustomExternalCallRevoker() public {
+    function test_revokeCustomExternalCallSignatures_RevertsWhenNotCustomExternalCallRevoker() public {
         bytes32[] memory customExternalCalls = new bytes32[](1);
         customExternalCalls[0] = bytes32(0);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.EXTERNAL_CALL_REVOKER_ROLE()
-            )
-        );
-        creditsManager.revokeCustomExternalCall(customExternalCalls);
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.Unauthorized.selector, address(this)));
+        creditsManager.revokeCustomExternalCallSignatures(customExternalCalls);
     }
 
-    function test_revokeCustomExternalCall_WhenCustomExternalCallRevoker() public {
+    function test_revokeCustomExternalCallSignatures_WhenCustomExternalCallRevoker() public {
         bytes32[] memory customExternalCalls = new bytes32[](1);
         customExternalCalls[0] = bytes32(0);
         vm.expectEmit(address(creditsManager));
         emit CustomExternalCallRevoked(customExternalCallRevoker, customExternalCalls[0]);
         vm.prank(customExternalCallRevoker);
-        creditsManager.revokeCustomExternalCall(customExternalCalls);
+        creditsManager.revokeCustomExternalCallSignatures(customExternalCalls);
         assertTrue(creditsManager.usedCustomExternalCallSignature(customExternalCalls[0]));
     }
 
-    function test_revokeCustomExternalCall_WhenOwner() public {
+    function test_revokeCustomExternalCallSignatures_WhenOwner() public {
         bytes32[] memory customExternalCalls = new bytes32[](1);
         customExternalCalls[0] = bytes32(0);
         vm.expectEmit(address(creditsManager));
         emit CustomExternalCallRevoked(owner, customExternalCalls[0]);
         vm.prank(owner);
-        creditsManager.revokeCustomExternalCall(customExternalCalls);
+        creditsManager.revokeCustomExternalCallSignatures(customExternalCalls);
         assertTrue(creditsManager.usedCustomExternalCallSignature(customExternalCalls[0]));
     }
 
-    function test_revokeCustomExternalCall_RevokesMultiple() public {
+    function test_revokeCustomExternalCallSignatures_RevokesMultiple() public {
         bytes32[] memory customExternalCalls = new bytes32[](2);
         customExternalCalls[0] = bytes32(0);
         customExternalCalls[1] = bytes32(uint256(1));
         vm.expectEmit(address(creditsManager));
         emit CustomExternalCallRevoked(owner, customExternalCalls[0]);
         vm.prank(owner);
-        creditsManager.revokeCustomExternalCall(customExternalCalls);
+        creditsManager.revokeCustomExternalCallSignatures(customExternalCalls);
         assertTrue(creditsManager.usedCustomExternalCallSignature(customExternalCalls[0]));
         assertTrue(creditsManager.usedCustomExternalCallSignature(customExternalCalls[1]));
     }

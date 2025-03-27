@@ -894,7 +894,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         bytes32[] memory revokedCredits = new bytes32[](1);
         revokedCredits[0] = keccak256(creditsSignatures[0]);
         vm.prank(owner);
-        creditsManager.revokeCredits(revokedCredits);
+        creditsManager.revokeCreditSignatures(revokedCredits);
 
         MockExternalCallTarget externalCallTarget = new MockExternalCallTarget(creditsManager, IERC20(mana), 100 ether);
 
