@@ -161,8 +161,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         bytes32 salt;
     }
 
-    event UserDenied(address indexed _sender, address indexed _user);
-    event UserAllowed(address indexed _sender, address indexed _user);
+    event UserDenied(address indexed _sender, address indexed _user, bool _isDenied);
     event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 _tokenId, address indexed _to);
@@ -174,6 +173,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     event PrimarySalesAllowedUpdated(address indexed _sender, bool _primarySalesAllowed);
     event SecondarySalesAllowedUpdated(address indexed _sender, bool _secondarySalesAllowed);
 
+    error Unauthorized(address _sender);
     error DeniedUser(address _user);
     error InvalidExternalCallSelector(address _target, bytes4 _selector);
     error SecondarySalesNotAllowed();
@@ -225,25 +225,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         ICollectionFactory _collectionFactoryV3
     ) EIP712("Decentraland Credits", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _roles.owner);
-
         _grantRole(CREDITS_SIGNER_ROLE, _roles.creditsSigner);
-
         _grantRole(PAUSER_ROLE, _roles.pauser);
-        _grantRole(PAUSER_ROLE, _roles.owner);
-
         _grantRole(USER_DENIER_ROLE, _roles.userDenier);
-        _grantRole(USER_DENIER_ROLE, _roles.owner);
-
         _grantRole(CREDITS_REVOKER_ROLE, _roles.creditsRevoker);
-        _grantRole(CREDITS_REVOKER_ROLE, _roles.owner);
-
         _grantRole(EXTERNAL_CALL_SIGNER_ROLE, _roles.customExternalCallSigner);
-
         _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.customExternalCallRevoker);
-        _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.owner);
 
         _updateMaxManaCreditedPerHour(_maxManaCreditedPerHour);
-
         _updatePrimarySalesAllowed(_primarySalesAllowed);
         _updateSecondarySalesAllowed(_secondarySalesAllowed);
 
@@ -256,7 +245,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     }
 
     /// @notice Pauses the contract.
-    function pause() external onlyRole(PAUSER_ROLE) {
+    /// @dev Only the owner and pauser can pause the contract.
+    function pause() external {
+        address sender = _msgSender();
+
+        if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(PAUSER_ROLE, sender)) {
+            revert Unauthorized(sender);
+        }
+
         _pause();
     }
 
@@ -266,51 +262,72 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _unpause();
     }
 
-    /// @notice Denies a user from using credits.
-    /// @param _user The user to deny.
-    function denyUser(address _user) external onlyRole(USER_DENIER_ROLE) {
-        isDenied[_user] = true;
+    /// @notice Deny users from using credits.
+    /// @dev All users can consume credits unless denied.
+    /// Only the owner and user denier can deny users.
+    /// @param _users The users to deny.
+    /// @param _areDenied Whether the user at the same index is denied from using credits.
+    /// True  - User cannot use credits.
+    /// False - User can continue using credits. 
+    function denyUsers(address[] calldata _users, bool[] calldata _areDenied) external {
+        address sender = _msgSender();
 
-        emit UserDenied(_msgSender(), _user);
-    }
+        if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(USER_DENIER_ROLE, sender)) {
+            revert Unauthorized(sender);
+        }
 
-    /// @notice Allows a user to use credits.
-    /// @dev Only the owner can allow a user to use credits.
-    /// @dev All users are allowed by default.
-    /// @param _user The user to allow.
-    function allowUser(address _user) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        isDenied[_user] = false;
+        for (uint256 i = 0; i < _users.length; i++) {
+            address user = _users[i];
+            bool denied = _areDenied[i];
 
-        emit UserAllowed(_msgSender(), _user);
+            isDenied[user] = denied;
+
+            emit UserDenied(sender, user, denied);
+        }
     }
 
     /// @notice Revokes a credit.
-    /// @param _credit The hash of the credit signature.
-    function revokeCredit(bytes32 _credit) external onlyRole(CREDITS_REVOKER_ROLE) {
-        isRevoked[_credit] = true;
+    /// @dev Only the owner and credits revoker can revoke credits.
+    /// @param _signatures The hash of the credit signatures to be revoked.
+    function revokeCreditSignatures(bytes32[] calldata _signatures) external {
+        address sender = _msgSender();
 
-        emit CreditRevoked(_msgSender(), _credit);
+        if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(CREDITS_REVOKER_ROLE, sender)) {
+            revert Unauthorized(sender);
+        }
+
+        for (uint256 i = 0; i < _signatures.length; i++) {
+            bytes32 signature = _signatures[i];
+
+            isRevoked[signature] = true;
+
+            emit CreditRevoked(sender, signature);
+        }
     }
 
     /// @notice Update the maximum amount of MANA that can be credited per hour.
+    /// @dev Only the owner can update the maximum amount of MANA that can be credited per hour.
     /// @param _maxManaCreditedPerHour The new maximum amount of MANA that can be credited per hour.
     function updateMaxManaCreditedPerHour(uint256 _maxManaCreditedPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateMaxManaCreditedPerHour(_maxManaCreditedPerHour);
     }
 
     /// @notice Update whether primary sales are allowed.
+    /// @dev Only the owner can update whether primary sales are allowed.
     /// @param _primarySalesAllowed Whether primary sales are allowed.
     function updatePrimarySalesAllowed(bool _primarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updatePrimarySalesAllowed(_primarySalesAllowed);
     }
 
     /// @notice Update whether secondary sales are allowed.
+    /// @dev Only the owner can update whether secondary sales are allowed.
     /// @param _secondarySalesAllowed Whether secondary sales are allowed.
     function updateSecondarySalesAllowed(bool _secondarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateSecondarySalesAllowed(_secondarySalesAllowed);
     }
 
     /// @notice Withdraw ERC20 tokens from the contract.
+    /// @dev Only the owner can withdraw ERC20 tokens from the contract.
     /// @param _token The address of the ERC20 token.
     /// @param _amount The amount of ERC20 tokens to withdraw.
     /// @param _to The address to send the ERC20 tokens to.
@@ -321,6 +338,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     }
 
     /// @notice Withdraw ERC721 tokens from the contract.
+    /// @dev Only the owner can withdraw ERC721 tokens from the contract.
     /// @param _token The address of the ERC721 token.
     /// @param _tokenId The ID of the ERC721 token.
     /// @param _to The address to send the ERC721 token to.
@@ -331,6 +349,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     }
 
     /// @notice Allows a custom external call.
+    /// @dev Only the owner can allow custom external calls.
     /// @param _target The target of the external call.
     /// @param _selector The selector of the external call.
     /// @param _allowed Whether the external call is allowed.
@@ -340,12 +359,23 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit CustomExternalCallAllowed(_msgSender(), _target, _selector, _allowed);
     }
 
-    /// @notice Revokes a custom external call.
-    /// @param _hashedCustomExternalCallSignature The hash of the custom external call signature.
-    function revokeCustomExternalCall(bytes32 _hashedCustomExternalCallSignature) external onlyRole(EXTERNAL_CALL_REVOKER_ROLE) {
-        usedCustomExternalCallSignature[_hashedCustomExternalCallSignature] = true;
+    /// @notice Revokes custom external call signatures.
+    /// @dev Only the owner and credits revoker can revoke custom external call signatures.
+    /// @param _signatures An array of hashed custom external call signatures.
+    function revokeCustomExternalCallSignatures(bytes32[] calldata _signatures) external {
+        address sender = _msgSender();
 
-        emit CustomExternalCallRevoked(_msgSender(), _hashedCustomExternalCallSignature);
+        if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(EXTERNAL_CALL_REVOKER_ROLE, sender)) {
+            revert Unauthorized(sender);
+        }
+
+        for (uint256 i = 0; i < _signatures.length; i++) {
+            bytes32 signature = _signatures[i];
+
+            usedCustomExternalCallSignature[signature] = true;
+
+            emit CustomExternalCallRevoked(sender, signature);
+        }
     }
 
     /// @notice Use credits to pay for external calls that transfer MANA.

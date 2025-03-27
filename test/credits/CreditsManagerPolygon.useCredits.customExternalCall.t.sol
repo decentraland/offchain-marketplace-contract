@@ -821,7 +821,11 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
     function test_useCredits_RevertsWhenUserIsDenied() public {
         vm.prank(userDenier);
-        creditsManager.denyUser(address(this));
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        bool[] memory areDenied = new bool[](1);
+        areDenied[0] = true;
+        creditsManager.denyUsers(users, areDenied);
 
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
@@ -887,8 +891,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
+        bytes32[] memory revokedCredits = new bytes32[](1);
+        revokedCredits[0] = keccak256(creditsSignatures[0]);
         vm.prank(owner);
-        creditsManager.revokeCredit(keccak256(creditsSignatures[0]));
+        creditsManager.revokeCreditSignatures(revokedCredits);
 
         MockExternalCallTarget externalCallTarget = new MockExternalCallTarget(creditsManager, IERC20(mana), 100 ether);
 
