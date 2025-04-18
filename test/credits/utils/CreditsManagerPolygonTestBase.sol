@@ -46,7 +46,7 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
     event UserDenied(address indexed _sender, address indexed _user, bool _isDenied);
     event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
-    event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 _tokenId, address indexed _to);
+    event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
     event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
     event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _hashedExternalCallSignature);
     event CreditUsed(address indexed _sender, bytes32 indexed _creditId, CreditsManagerPolygon.Credit _credit, uint256 _value);
