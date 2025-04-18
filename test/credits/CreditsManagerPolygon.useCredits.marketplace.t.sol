@@ -4,11 +4,14 @@ pragma solidity 0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPolygonTestBase.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
 
 contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygonTestBase {
+    using MessageHashUtils for bytes32;
+
     function test_useCredits_RevertsWhenNotDecentralandItem() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
@@ -16,7 +19,9 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -104,7 +109,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -192,7 +198,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -283,7 +290,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -374,7 +382,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -452,7 +461,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -540,7 +550,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -628,7 +639,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -716,7 +728,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -761,7 +774,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -815,13 +829,8 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         IMarketplace.Trade[] memory trades = new IMarketplace.Trade[](1);
         trades[0] = trade;
 
-        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
-            target: marketplace,
-            selector: bytes4(0),
-            data: abi.encode(trades),
-            expiresAt: 0,
-            salt: bytes32(0)
-        });
+        CreditsManagerPolygon.ExternalCall memory externalCall =
+            CreditsManagerPolygon.ExternalCall({target: marketplace, selector: bytes4(0), data: abi.encode(trades), expiresAt: 0, salt: bytes32(0)});
 
         CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
             credits: credits,
@@ -938,7 +947,9 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 

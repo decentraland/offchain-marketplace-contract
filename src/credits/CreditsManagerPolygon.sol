@@ -9,6 +9,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import {NativeMetaTransaction, EIP712} from "src/common/NativeMetaTransaction.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
@@ -18,6 +19,7 @@ import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
 
 contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction, IERC721Receiver {
     using ECDSA for bytes32;
+    using MessageHashUtils for bytes32;
     using SafeERC20 for IERC20;
 
     /// @notice The role that can sign credits.
@@ -268,7 +270,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param _users The users to deny.
     /// @param _areDenied Whether the user at the same index is denied from using credits.
     /// True  - User cannot use credits.
-    /// False - User can continue using credits. 
+    /// False - User can continue using credits.
     function denyUsers(address[] calldata _users, bool[] calldata _areDenied) external {
         address sender = _msgSender();
 
@@ -580,8 +582,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         usedCustomExternalCallSignature[hashedCustomExternalCallSignature] = true;
 
         // Recover the signer of the external call.
-        address recoveredSigner =
-            keccak256(abi.encode(_sender, block.chainid, address(this), _args.externalCall)).recover(_args.customExternalCallSignature);
+        address recoveredSigner = keccak256(abi.encode(_sender, block.chainid, address(this), _args.externalCall)).toEthSignedMessageHash().recover(
+            _args.customExternalCallSignature
+        );
 
         // Check that the signer of the external call has the external call signer role.
         if (!hasRole(EXTERNAL_CALL_SIGNER_ROLE, recoveredSigner)) {
@@ -731,7 +734,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             }
 
             // Recover the signer of the signature.
-            address recoveredSigner = keccak256(abi.encode(_sender, block.chainid, address(this), credit)).recover(_args.creditsSignatures[i]);
+            address recoveredSigner =
+                keccak256(abi.encode(_sender, block.chainid, address(this), credit)).toEthSignedMessageHash().recover(_args.creditsSignatures[i]);
 
             // Check that the signature has been signed by the credits signer role.
             if (!hasRole(CREDITS_SIGNER_ROLE, recoveredSigner)) {

@@ -3,11 +3,14 @@ pragma solidity 0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 import {MockExternalCallTarget} from "test/credits/mocks/MockExternalCallTarget.sol";
 import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPolygonTestBase.sol";
 
 contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManagerPolygonTestBase {
+    using MessageHashUtils for bytes32;
+
     function test_useCredits_RevertsWhenCustomExternalCallNotAllowed() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
@@ -111,8 +114,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid + 1, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid + 1, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -129,7 +134,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         creditsManager.allowCustomExternalCall(address(0), bytes4(0), true);
 
         vm.expectRevert(
-            abi.encodeWithSelector(CreditsManagerPolygon.InvalidCustomExternalCallSignature.selector, 0xeCc32Fcec42A961891851b4956374578C918Bc79)
+            abi.encodeWithSelector(CreditsManagerPolygon.InvalidCustomExternalCallSignature.selector, 0x6237cF0957Bb2455F0BdB0D7c4545780bAa56Ff5)
         );
         creditsManager.useCredits(args);
     }
@@ -153,8 +158,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -193,8 +200,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -233,8 +242,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -273,8 +284,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -316,8 +329,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -363,8 +378,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -412,8 +429,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -461,8 +480,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -510,8 +531,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -547,8 +570,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid + 1, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid + 1, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -564,7 +588,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -591,7 +618,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditsManagerPolygon.InvalidSignature.selector, keccak256(creditsSignatures[0]), 0x34C28cf88279DB12826bebfAd1d83249dbb6Faa5
+                CreditsManagerPolygon.InvalidSignature.selector, keccak256(creditsSignatures[0]), 0xD3e688B176Bdfe10E6CFBAf831728A8B50d92367
             )
         );
         creditsManager.useCredits(args);
@@ -604,8 +631,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -621,7 +649,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -657,8 +688,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -674,7 +706,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -710,8 +745,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -727,7 +763,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -755,7 +794,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         creditsManager.useCredits(args);
 
         externalCall.salt = bytes32(uint256(1));
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
         args.customExternalCallSignature = abi.encodePacked(r, s, v);
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.MaxManaCreditedPerHourExceeded.selector, 49 ether, 51 ether));
@@ -769,8 +811,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -786,7 +829,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -833,8 +879,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -850,7 +897,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -886,8 +936,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -908,7 +959,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -944,8 +998,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -961,7 +1016,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -1007,8 +1065,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -1056,8 +1116,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -1093,8 +1155,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -1110,7 +1173,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -1145,8 +1211,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
 
         bytes[] memory creditsSignatures = new bytes[](1);
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
         // Create an external call target that will consume exactly the credit amount
@@ -1162,7 +1229,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
         CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
@@ -1198,7 +1268,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall2.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall2)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall2)).toEthSignedMessageHash()
+        );
         bytes memory customExternalCallSignature2 = abi.encodePacked(r, s, v);
 
         CreditsManagerPolygon.UseCreditsArgs memory args2 = CreditsManagerPolygon.UseCreditsArgs({
@@ -1228,8 +1301,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -1245,7 +1319,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -1296,8 +1373,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -1314,7 +1392,10 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -1345,95 +1426,99 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         creditsManager.useCredits(args);
     }
 
-function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefund() public {
-    CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+    function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefund() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-    // Credit is worth 500 mana
-    credits[0] = CreditsManagerPolygon.Credit({value: 500 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        // Credit is worth 500 mana
+        credits[0] = CreditsManagerPolygon.Credit({value: 500 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
 
-    bytes[] memory creditsSignatures = new bytes[](1);
+        bytes[] memory creditsSignatures = new bytes[](1);
 
-    (uint8 v, bytes32 r, bytes32 s) =
-        vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
-    creditsSignatures[0] = abi.encodePacked(r, s, v);
+        creditsSignatures[0] = abi.encodePacked(r, s, v);
 
-    // Item with cost 500 mana
-    MockExternalCallTarget externalCallTarget = new MockExternalCallTarget(creditsManager, IERC20(mana), 500 ether);
+        // Item with cost 500 mana
+        MockExternalCallTarget externalCallTarget = new MockExternalCallTarget(creditsManager, IERC20(mana), 500 ether);
 
-    // From the 500, 100 is transferred back to the credits manager
-    externalCallTarget.setBeneficiary(address(creditsManager));
-    externalCallTarget.setBeneficiaryCut(100 ether);
+        // From the 500, 100 is transferred back to the credits manager
+        externalCallTarget.setBeneficiary(address(creditsManager));
+        externalCallTarget.setBeneficiaryCut(100 ether);
 
-    CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
-        target: address(externalCallTarget),
-        selector: externalCallTarget.someFunction.selector,
-        data: bytes(""),
-        expiresAt: type(uint256).max,
-        salt: bytes32(0)
-    });
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: address(externalCallTarget),
+            selector: externalCallTarget.someFunction.selector,
+            data: bytes(""),
+            expiresAt: type(uint256).max,
+            salt: bytes32(0)
+        });
 
-    externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
+        externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-    (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
-    bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
+        bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
-    CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
-        credits: credits,
-        creditsSignatures: creditsSignatures,
-        externalCall: externalCall,
-        customExternalCallSignature: customExternalCallSignature,
-        // The user defines that they want to use the whole 500, and 100 extra just in case out of pocket.
-        maxUncreditedValue: 100 ether,
-        maxCreditedValue: 500 ether
-    });
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: customExternalCallSignature,
+            // The user defines that they want to use the whole 500, and 100 extra just in case out of pocket.
+            maxUncreditedValue: 100 ether,
+            maxCreditedValue: 500 ether
+        });
 
-    vm.prank(owner);
-    creditsManager.updateMaxManaCreditedPerHour(1000 ether);
+        vm.prank(owner);
+        creditsManager.updateMaxManaCreditedPerHour(1000 ether);
 
-    vm.prank(owner);
-    creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        vm.prank(owner);
+        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-    vm.prank(manaHolder);
-    IERC20(mana).transfer(address(this), 1000 ether);
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
-    vm.prank(address(this));
-    IERC20(mana).approve(address(creditsManager), 100 ether);
+        vm.prank(address(this));
+        IERC20(mana).approve(address(creditsManager), 100 ether);
 
-    vm.prank(manaHolder);
-    IERC20(mana).transfer(address(creditsManager), 1000 ether);
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
-    uint256 callerBalanceBefore = IERC20(mana).balanceOf(address(this));
-    uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
-    uint256 externalCallTargetBalanceBefore = IERC20(mana).balanceOf(address(externalCallTarget));
+        uint256 callerBalanceBefore = IERC20(mana).balanceOf(address(this));
+        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
+        uint256 externalCallTargetBalanceBefore = IERC20(mana).balanceOf(address(externalCallTarget));
 
-    assertEq(creditsManager.spentValue(keccak256(creditsSignatures[0])), 0);
+        assertEq(creditsManager.spentValue(keccak256(creditsSignatures[0])), 0);
 
-    // The mana transferred diff ends up being 400 because the credits manager was refunded 100 on the external call
-    uint256 expectedCreditedAmount = 400 ether;
+        // The mana transferred diff ends up being 400 because the credits manager was refunded 100 on the external call
+        uint256 expectedCreditedAmount = 400 ether;
 
-    vm.expectEmit(address(creditsManager));
-    emit CreditUsed(address(this), keccak256(creditsSignatures[0]), credits[0], expectedCreditedAmount);
-    vm.expectEmit(address(creditsManager));
-    emit CreditsUsed(address(this), expectedCreditedAmount, expectedCreditedAmount);
-    creditsManager.useCredits(args);
+        vm.expectEmit(address(creditsManager));
+        emit CreditUsed(address(this), keccak256(creditsSignatures[0]), credits[0], expectedCreditedAmount);
+        vm.expectEmit(address(creditsManager));
+        emit CreditsUsed(address(this), expectedCreditedAmount, expectedCreditedAmount);
+        creditsManager.useCredits(args);
 
-    // 400 are used instead of the 500
-    assertEq(creditsManager.spentValue(keccak256(creditsSignatures[0])), expectedCreditedAmount);
-    // 100 was taken initialy from the caller as that much was expected to be paid out of pocket,
-    // but given that it was not necessary, it was returned and the caller balance is the same as before
-    assertEq(IERC20(mana).balanceOf(address(this)), callerBalanceBefore);
-    // The credits manager balance is reduced by the 400 used as credits
-    assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - expectedCreditedAmount);
-    // The external call target balance is increased by the 400 credited.
-    // It would have been 500 but the the external call target returned 100 to the credits manager.
-    // The only loser in this operation is the seller (external call target:
-    // - The buyer used less credits
-    // - The credits manager had a net credit transfer, meaning nothing was lost that was not supposed to be lost
-    // - The external call target lost 100 MANA by transfering it to the credits manager
-    assertEq(IERC20(mana).balanceOf(address(externalCallTarget)), externalCallTargetBalanceBefore + expectedCreditedAmount);
-}
+        // 400 are used instead of the 500
+        assertEq(creditsManager.spentValue(keccak256(creditsSignatures[0])), expectedCreditedAmount);
+        // 100 was taken initialy from the caller as that much was expected to be paid out of pocket,
+        // but given that it was not necessary, it was returned and the caller balance is the same as before
+        assertEq(IERC20(mana).balanceOf(address(this)), callerBalanceBefore);
+        // The credits manager balance is reduced by the 400 used as credits
+        assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - expectedCreditedAmount);
+        // The external call target balance is increased by the 400 credited.
+        // It would have been 500 but the the external call target returned 100 to the credits manager.
+        // The only loser in this operation is the seller (external call target:
+        // - The buyer used less credits
+        // - The credits manager had a net credit transfer, meaning nothing was lost that was not supposed to be lost
+        // - The external call target lost 100 MANA by transfering it to the credits manager
+        assertEq(IERC20(mana).balanceOf(address(externalCallTarget)), externalCallTargetBalanceBefore + expectedCreditedAmount);
+    }
 
     function test_useCredits_Success_MaxManaCreditedPerHourIsResetAfterHour() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
@@ -1442,8 +1527,9 @@ function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefu
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -1459,7 +1545,10 @@ function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefu
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -1503,7 +1592,10 @@ function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefu
         assertEq(IERC20(mana).balanceOf(address(externalCallTarget)), externalCallTargetBalanceBefore + 100 ether);
 
         externalCall.salt = bytes32(uint256(1));
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
         args.customExternalCallSignature = abi.encodePacked(r, s, v);
 
         vm.warp(block.timestamp + 1 hours);
@@ -1527,12 +1619,15 @@ function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefu
 
         bytes[] memory creditsSignatures = new bytes[](2);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
-        (v, r, s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[1])));
+        (v, r, s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[1])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[1] = abi.encodePacked(r, s, v);
 
@@ -1548,7 +1643,10 @@ function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefu
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
@@ -1604,12 +1702,15 @@ function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefu
 
         bytes[] memory creditsSignatures = new bytes[](2);
 
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
-        (v, r, s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[1])));
+        (v, r, s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[1])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[1] = abi.encodePacked(r, s, v);
 
@@ -1625,7 +1726,10 @@ function test_useCredits_CreditsManagerAsBeneficiary_AccountingNotAffectedByRefu
 
         externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
 
-        (v, r, s) = vm.sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+        (v, r, s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
 
         bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
 
