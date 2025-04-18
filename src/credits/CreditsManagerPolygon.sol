@@ -567,7 +567,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
 
         // Check that the external call has not expired.
-        if (block.timestamp > _args.externalCall.expiresAt) {
+        if (block.timestamp >= _args.externalCall.expiresAt) {
             revert CustomExternalCallExpired(_args.externalCall.expiresAt);
         }
 
@@ -724,7 +724,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             bytes32 signatureHash = keccak256(_args.creditsSignatures[i]);
 
             // Check that the credit has not expired.
-            if (block.timestamp > credit.expiresAt) {
+            if (block.timestamp >= credit.expiresAt) {
                 revert CreditExpired(signatureHash);
             }
 

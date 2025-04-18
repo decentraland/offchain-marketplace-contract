@@ -64,6 +64,39 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         creditsManager.useCredits(args);
     }
 
+    function test_useCredits_RevertsWhenCustomExternalCallHasExpired_Inclusive() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+
+        bytes[] memory creditsSignatures = new bytes[](1);
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: address(0),
+            selector: bytes4(0),
+            data: bytes(""),
+            expiresAt: block.timestamp,
+            salt: bytes32(0)
+        });
+
+        bytes memory customExternalCallSignature = bytes("");
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: customExternalCallSignature,
+            maxUncreditedValue: 0,
+            maxCreditedValue: 1
+        });
+
+        vm.prank(owner);
+        creditsManager.allowCustomExternalCall(address(0), bytes4(0), true);
+
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.CustomExternalCallExpired.selector, block.timestamp));
+        creditsManager.useCredits(args);
+    }
+
     function test_useCredits_RevertsWhenCustomExternalCallECDSAInvalidSignatureLength() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
@@ -465,6 +498,57 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
         credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: 0, salt: bytes32(0)});
+
+        bytes[] memory creditsSignatures = new bytes[](1);
+
+        MockExternalCallTarget externalCallTarget = new MockExternalCallTarget(creditsManager, IERC20(mana), 100 ether);
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: address(externalCallTarget),
+            selector: externalCallTarget.someFunction.selector,
+            data: bytes(""),
+            expiresAt: type(uint256).max,
+            salt: bytes32(0)
+        });
+
+        externalCall.data = abi.encode(bytes32(uint256(0)), uint256(1), uint256(2));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            customExternalCallSignerPk,
+            keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)).toEthSignedMessageHash()
+        );
+
+        bytes memory customExternalCallSignature = abi.encodePacked(r, s, v);
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: customExternalCallSignature,
+            maxUncreditedValue: 99 ether,
+            maxCreditedValue: 1 ether
+        });
+
+        vm.prank(owner);
+        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
+
+        vm.prank(address(this));
+        IERC20(mana).approve(address(creditsManager), 99 ether);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.CreditExpired.selector, keccak256(creditsSignatures[0])));
+        creditsManager.useCredits(args);
+    }
+
+    function test_useCredits_RevertsWhenCreditIsExpired_Inclusive() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: block.timestamp, salt: bytes32(0)});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
