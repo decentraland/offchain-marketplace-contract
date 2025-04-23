@@ -19,6 +19,8 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
     address internal customExternalCallSigner;
     uint256 internal customExternalCallSignerPk;
     address internal customExternalCallRevoker;
+    address internal metaTxSigner;
+    uint256 internal metaTxSignerPk;
     address internal mana;
     uint256 internal maxManaCreditedPerHour;
     bool internal primarySalesAllowed;
@@ -69,6 +71,7 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
         creditsRevoker = makeAddr("creditsRevoker");
         (customExternalCallSigner, customExternalCallSignerPk) = makeAddrAndKey("customExternalCallSigner");
         customExternalCallRevoker = makeAddr("customExternalCallRevoker");
+        (metaTxSigner, metaTxSignerPk) = makeAddrAndKey("metaTxSigner");
 
         CreditsManagerPolygon.Roles memory roles = CreditsManagerPolygon.Roles({
             owner: owner,

@@ -67,4 +67,19 @@ contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
 
         return MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
     }
+
+    function metaTxToTypedHashData(address _userAddress, bytes calldata _functionData) external view returns (bytes32) {
+        bytes32 domainSeparator = _domainSeparatorV4();
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                0x01ecdc01065da9f72bf56a9def24a074b7ef512994beb776867cfbc664b5b959,
+                CreditsManagerPolygonHarness(address(this)).getNonce(_userAddress),
+                _userAddress,
+                keccak256(_functionData)
+            )
+        );
+
+        return MessageHashUtils.toTypedDataHash(domainSeparator, structHash);
+    }
 }
