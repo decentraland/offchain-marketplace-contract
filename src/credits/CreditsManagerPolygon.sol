@@ -176,6 +176,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     event SecondarySalesAllowedUpdated(address indexed _sender, bool _secondarySalesAllowed);
 
     error Unauthorized(address _sender);
+    error InvalidUsersLength();
+    error InvalidAreDeniedLength();
     error DeniedUser(address _user);
     error InvalidExternalCallSelector(address _target, bytes4 _selector);
     error SecondarySalesNotAllowed();
@@ -272,6 +274,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// True  - User cannot use credits.
     /// False - User can continue using credits.
     function denyUsers(address[] calldata _users, bool[] calldata _areDenied) external {
+        if (_users.length == 0) {
+            revert InvalidUsersLength();
+        }
+
+        if (_users.length != _areDenied.length) {
+            revert InvalidAreDeniedLength();
+        }
+
         address sender = _msgSender();
 
         if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(USER_DENIER_ROLE, sender)) {

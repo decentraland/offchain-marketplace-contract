@@ -67,6 +67,21 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         vm.stopPrank();
     }
 
+    function test_denyUsers_RevertsWhenUsersLengthIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.InvalidUsersLength.selector));
+        address[] memory users = new address[](0);
+        bool[] memory areDenied = new bool[](0);
+        creditsManager.denyUsers(users, areDenied);
+    }
+
+    function test_denyUsers_RevertsWhenAreDeniedLengthIsDifferentToUsersLength() public {
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.InvalidAreDeniedLength.selector));
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        bool[] memory areDenied = new bool[](0);
+        creditsManager.denyUsers(users, areDenied);
+    }
+
     function test_denyUsers_RevertsWhenNotDenier() public {
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.Unauthorized.selector, address(this)));
         address[] memory users = new address[](1);
