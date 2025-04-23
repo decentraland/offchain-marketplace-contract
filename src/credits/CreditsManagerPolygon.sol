@@ -56,14 +56,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     mapping(address => bool) public isDenied;
 
     /// @notice Whether a credit has been revoked.
-    /// @dev The key is the hash of the credit signature.
+    /// @dev The key is the hash of the credit.
     mapping(bytes32 => bool) public isRevoked;
 
     /// @notice The address of the MANA token.
     IERC20 public immutable mana;
 
     /// @notice The amount of MANA value used on each credit.
-    /// @dev The key is the hash of the credit signature.
+    /// @dev The key is the hash of the credit.
     mapping(bytes32 => uint256) public spentValue;
 
     /// @notice Maximum amount of MANA that can be credited per hour.
@@ -99,8 +99,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice Tracks the allowed custom external calls.
     mapping(address => mapping(bytes4 => bool)) public allowedCustomExternalCalls;
 
-    /// @notice Tracks the used external call signatures.
-    mapping(bytes32 => bool) public usedCustomExternalCallSignature;
+    /// @notice Tracks used custom external calls.
+    /// @dev The key is the hash of the custom external call.
+    mapping(bytes32 => bool) public usedCustomExternalCall;
 
     /// @notice The roles to initialize the contract with.
     /// @param owner The address that acts as default admin.
@@ -168,7 +169,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
     event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
-    event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _hashedExternalCallSignature);
+    event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _customExternalCallHash);
     event CreditUsed(address indexed _sender, bytes32 indexed _creditId, Credit _credit, uint256 _value);
     event CreditsUsed(address indexed _sender, uint256 _manaTransferred, uint256 _creditedValue);
     event MaxManaCreditedPerHourUpdated(address indexed _sender, uint256 _maxManaCreditedPerHour);
@@ -188,7 +189,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     error InvalidBeneficiary();
     error CustomExternalCallNotAllowed(address _target, bytes4 _selector);
     error CustomExternalCallExpired(uint256 _expiresAt);
-    error UsedCustomExternalCallSignature(bytes32 _hashedCustomExternalCallSignature);
+    error UsedCustomExternalCall(bytes32 _customExternalCallHash);
     error InvalidCustomExternalCallSignature(address _recoveredSigner);
     error ExternalCallFailed(ExternalCall _externalCall);
     error SenderBalanceChanged();
@@ -298,22 +299,22 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
-    /// @notice Revokes a credit.
+    /// @notice Revokes credits.
     /// @dev Only the owner and credits revoker can revoke credits.
-    /// @param _signatures The hash of the credit signatures to be revoked.
-    function revokeCreditSignatures(bytes32[] calldata _signatures) external {
+    /// @param _creditHashes The hashes of the credits to be revoked.
+    function revokeCredits(bytes32[] calldata _creditHashes) external {
         address sender = _msgSender();
 
         if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(CREDITS_REVOKER_ROLE, sender)) {
             revert Unauthorized(sender);
         }
 
-        for (uint256 i = 0; i < _signatures.length; i++) {
-            bytes32 signature = _signatures[i];
+        for (uint256 i = 0; i < _creditHashes.length; i++) {
+            bytes32 creditHash = _creditHashes[i];
 
-            isRevoked[signature] = true;
+            isRevoked[creditHash] = true;
 
-            emit CreditRevoked(sender, signature);
+            emit CreditRevoked(sender, creditHash);
         }
     }
 
@@ -371,22 +372,22 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit CustomExternalCallAllowed(_msgSender(), _target, _selector, _allowed);
     }
 
-    /// @notice Revokes custom external call signatures.
-    /// @dev Only the owner and credits revoker can revoke custom external call signatures.
-    /// @param _signatures An array of hashed custom external call signatures.
-    function revokeCustomExternalCallSignatures(bytes32[] calldata _signatures) external {
+    /// @notice Revokes custom external calls.
+    /// @dev Only the owner and credits revoker can revoke custom external calls.
+    /// @param _customExternalCallHashes An array of hashed custom external calls.
+    function revokeCustomExternalCalls(bytes32[] calldata _customExternalCallHashes) external {
         address sender = _msgSender();
 
         if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(EXTERNAL_CALL_REVOKER_ROLE, sender)) {
             revert Unauthorized(sender);
         }
 
-        for (uint256 i = 0; i < _signatures.length; i++) {
-            bytes32 signature = _signatures[i];
+        for (uint256 i = 0; i < _customExternalCallHashes.length; i++) {
+            bytes32 customExternalCallHash = _customExternalCallHashes[i];
 
-            usedCustomExternalCallSignature[signature] = true;
+            usedCustomExternalCall[customExternalCallHash] = true;
 
-            emit CustomExternalCallRevoked(sender, signature);
+            emit CustomExternalCallRevoked(sender, customExternalCallHash);
         }
     }
 
@@ -581,20 +582,18 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             revert CustomExternalCallExpired(_args.externalCall.expiresAt);
         }
 
-        bytes32 hashedCustomExternalCallSignature = keccak256(_args.customExternalCallSignature);
+        bytes32 customExternalCallHash = keccak256(abi.encode(_sender, block.chainid, address(this), _args.externalCall));
 
         // Check that the external call has not been used yet.
-        if (usedCustomExternalCallSignature[hashedCustomExternalCallSignature]) {
-            revert UsedCustomExternalCallSignature(hashedCustomExternalCallSignature);
+        if (usedCustomExternalCall[customExternalCallHash]) {
+            revert UsedCustomExternalCall(customExternalCallHash);
         }
 
         // Mark the external call as used.
-        usedCustomExternalCallSignature[hashedCustomExternalCallSignature] = true;
+        usedCustomExternalCall[customExternalCallHash] = true;
 
         // Recover the signer of the external call.
-        address recoveredSigner = keccak256(abi.encode(_sender, block.chainid, address(this), _args.externalCall)).toEthSignedMessageHash().recover(
-            _args.customExternalCallSignature
-        );
+        address recoveredSigner = customExternalCallHash.toEthSignedMessageHash().recover(_args.customExternalCallSignature);
 
         // Check that the signer of the external call has the external call signer role.
         if (!hasRole(EXTERNAL_CALL_SIGNER_ROLE, recoveredSigner)) {
@@ -731,33 +730,32 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
                 revert InvalidCreditValue();
             }
 
-            bytes32 signatureHash = keccak256(_args.creditsSignatures[i]);
+            bytes32 creditHash = keccak256(abi.encode(_sender, block.chainid, address(this), credit));
 
             // Check that the credit has not expired.
             if (block.timestamp >= credit.expiresAt) {
-                revert CreditExpired(signatureHash);
+                revert CreditExpired(creditHash);
             }
 
             // Check that the credit has not been revoked.
-            if (isRevoked[signatureHash]) {
-                revert RevokedCredit(signatureHash);
+            if (isRevoked[creditHash]) {
+                revert RevokedCredit(creditHash);
             }
 
             // Recover the signer of the signature.
-            address recoveredSigner =
-                keccak256(abi.encode(_sender, block.chainid, address(this), credit)).toEthSignedMessageHash().recover(_args.creditsSignatures[i]);
+            address recoveredSigner = creditHash.toEthSignedMessageHash().recover(_args.creditsSignatures[i]);
 
             // Check that the signature has been signed by the credits signer role.
             if (!hasRole(CREDITS_SIGNER_ROLE, recoveredSigner)) {
-                revert InvalidSignature(signatureHash, recoveredSigner);
+                revert InvalidSignature(creditHash, recoveredSigner);
             }
 
             // Calculate how much of the credit is left to be spent.
-            uint256 creditRemainingValue = credit.value - spentValue[signatureHash];
+            uint256 creditRemainingValue = credit.value - spentValue[creditHash];
 
             // Check that the credit has not been completely consumed.
             if (creditRemainingValue == 0) {
-                revert CreditConsumed(signatureHash);
+                revert CreditConsumed(creditHash);
             }
 
             // Calculate how much MANA is left to be credited from the total MANA transferred in the external call.
@@ -768,12 +766,12 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             uint256 creditValueToSpend = remainingValue < creditRemainingValue ? remainingValue : creditRemainingValue;
 
             // Increment the amount consumed from the credit.
-            spentValue[signatureHash] += creditValueToSpend;
+            spentValue[creditHash] += creditValueToSpend;
 
             // Add the credited amount to the total credited amount.
             creditedValue += creditValueToSpend;
 
-            emit CreditUsed(_sender, signatureHash, credit, creditValueToSpend);
+            emit CreditUsed(_sender, creditHash, credit, creditValueToSpend);
 
             // If enough credits have been spent, exit early to avoid unnecessary iterations.
             if (creditedValue == _manaTransferred) {
