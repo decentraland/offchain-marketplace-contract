@@ -521,15 +521,19 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
                 _verifyDecentralandCollection(asset.contractAddress);
 
                 // Depending on the asset type we check if primary sales or secondary sales are allowed.
-                //
-                // For NFTs, secondary sales have to be allowed.
-                if (asset.assetType == ASSET_TYPE_ERC721 && !memSecondarySalesAllowed) {
-                    revert SecondarySalesNotAllowed();
-                }
-
-                // For collection items, primary sales have to be allowed.
-                if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM && !memPrimarySalesAllowed) {
-                    revert PrimarySalesNotAllowed();
+                if (asset.assetType == ASSET_TYPE_ERC721) {
+                    // For NFTs, secondary sales have to be allowed.
+                    if (!memSecondarySalesAllowed) {
+                        revert SecondarySalesNotAllowed();
+                    }
+                } else if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM) {
+                    // For collection items, primary sales have to be allowed.
+                    if (!memPrimarySalesAllowed) {
+                        revert PrimarySalesNotAllowed();
+                    }
+                } else {
+                    // Other asset types are not allowed.
+                    revert InvalidTrade(trade);
                 }
 
                 // We check that the beneficiary was not set to 0 to prevent this contract from receiving the asset.
