@@ -8,12 +8,9 @@ import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol"
 
 contract DeployCreditsManagerPolygonScript is Script {
     function run() public {
-        // Get private key from environment
-        uint256 pk = vm.envUint("PRIVATE_KEY");
-        
         // Start broadcasting transactions
-        vm.startBroadcast(pk);
-        
+        vm.startBroadcast();
+
         // Create roles struct
         CreditsManagerPolygon.Roles memory roles = CreditsManagerPolygon.Roles({
             owner: vm.envAddress("OWNER"),
@@ -21,10 +18,10 @@ contract DeployCreditsManagerPolygonScript is Script {
             pauser: vm.envAddress("PAUSER"),
             userDenier: vm.envAddress("USER_DENIER"),
             creditsRevoker: vm.envAddress("CREDITS_REVOKER"),
-            customExternalCallSigner: vm.envAddress("EXTERNAL_CALL_SIGNER"),
-            customExternalCallRevoker: vm.envAddress("EXTERNAL_CALL_REVOKER")
+            customExternalCallSigner: vm.envAddress("CUSTOM_EXTERNAL_CALL_SIGNER"),
+            customExternalCallRevoker: vm.envAddress("CUSTOM_EXTERNAL_CALL_REVOKER")
         });
-        
+
         // Deploy CreditsManagerPolygon contract
         CreditsManagerPolygon creditsManager = new CreditsManagerPolygon(
             roles,
@@ -38,10 +35,10 @@ contract DeployCreditsManagerPolygonScript is Script {
             ICollectionFactory(vm.envAddress("COLLECTION_FACTORY")),
             ICollectionFactory(vm.envAddress("COLLECTION_FACTORY_V3"))
         );
-        
+
         // Log the deployed contract address
         console.log("CreditsManagerPolygon deployed at:", address(creditsManager));
-        
+
         vm.stopBroadcast();
     }
 }

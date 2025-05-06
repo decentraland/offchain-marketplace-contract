@@ -3,11 +3,14 @@ pragma solidity 0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPolygonTestBase.sol";
 import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
 
 contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPolygonTestBase {
+    using MessageHashUtils for bytes32;
+
     function test_useCredits_RevertsWhenNotDecentralandItem() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
@@ -15,18 +18,16 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
         ICollectionStore.ItemToBuy[] memory itemsToBuy = new ICollectionStore.ItemToBuy[](1);
 
-        itemsToBuy[0] = ICollectionStore.ItemToBuy({
-            collection: address(0),
-            ids: new uint256[](1),
-            prices: new uint256[](1),
-            beneficiaries: new address[](1)
-        });
+        itemsToBuy[0] =
+            ICollectionStore.ItemToBuy({collection: address(0), ids: new uint256[](1), prices: new uint256[](1), beneficiaries: new address[](1)});
 
         itemsToBuy[0].ids[0] = collectionItemId;
         itemsToBuy[0].prices[0] = 369 ether;
@@ -66,7 +67,9 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -106,18 +109,16 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
         ICollectionStore.ItemToBuy[] memory itemsToBuy = new ICollectionStore.ItemToBuy[](1);
 
-        itemsToBuy[0] = ICollectionStore.ItemToBuy({
-            collection: collection,
-            ids: new uint256[](1),
-            prices: new uint256[](1),
-            beneficiaries: new address[](1)
-        });
+        itemsToBuy[0] =
+            ICollectionStore.ItemToBuy({collection: collection, ids: new uint256[](1), prices: new uint256[](1), beneficiaries: new address[](1)});
 
         itemsToBuy[0].ids[0] = collectionItemId;
         itemsToBuy[0].prices[0] = 369 ether;
@@ -160,18 +161,16 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
         ICollectionStore.ItemToBuy[] memory itemsToBuy = new ICollectionStore.ItemToBuy[](1);
 
-        itemsToBuy[0] = ICollectionStore.ItemToBuy({
-            collection: collection,
-            ids: new uint256[](1),
-            prices: new uint256[](1),
-            beneficiaries: new address[](1)
-        });
+        itemsToBuy[0] =
+            ICollectionStore.ItemToBuy({collection: collection, ids: new uint256[](1), prices: new uint256[](1), beneficiaries: new address[](1)});
 
         itemsToBuy[0].ids[0] = collectionItemId;
         itemsToBuy[0].prices[0] = 369 ether;
@@ -211,18 +210,16 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(collectionCreator, block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(collectionCreator, block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
         ICollectionStore.ItemToBuy[] memory itemsToBuy = new ICollectionStore.ItemToBuy[](1);
 
-        itemsToBuy[0] = ICollectionStore.ItemToBuy({
-            collection: collection,
-            ids: new uint256[](1),
-            prices: new uint256[](1),
-            beneficiaries: new address[](1)
-        });
+        itemsToBuy[0] =
+            ICollectionStore.ItemToBuy({collection: collection, ids: new uint256[](1), prices: new uint256[](1), beneficiaries: new address[](1)});
 
         itemsToBuy[0].ids[0] = collectionItemId;
         itemsToBuy[0].prices[0] = 369 ether;
@@ -263,18 +260,16 @@ contract CreditsManagerPolygonUseCreditsCollectionStoreTest is CreditsManagerPol
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash()
+        );
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
         ICollectionStore.ItemToBuy[] memory itemsToBuy = new ICollectionStore.ItemToBuy[](1);
 
-        itemsToBuy[0] = ICollectionStore.ItemToBuy({
-            collection: collection,
-            ids: new uint256[](1),
-            prices: new uint256[](1),
-            beneficiaries: new address[](1)
-        });
+        itemsToBuy[0] =
+            ICollectionStore.ItemToBuy({collection: collection, ids: new uint256[](1), prices: new uint256[](1), beneficiaries: new address[](1)});
 
         itemsToBuy[0].ids[0] = collectionItemId;
         itemsToBuy[0].prices[0] = 369 ether;
