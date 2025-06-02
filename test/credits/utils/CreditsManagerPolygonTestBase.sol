@@ -61,7 +61,7 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
         return this.onERC721Received.selector;
     }
 
-    function setUp() public {
+    function setUp() public virtual {
         vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon", 68650527)); // Mar-04-2025 09:10:51 PM +UTC
 
         owner = makeAddr("owner");

@@ -1,0 +1,129 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPolygonTestBase.sol";
+import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
+import {ICollection as ICollectionBase} from "src/marketplace/interfaces/ICollection.sol";
+
+interface ICollectionManager {
+    struct ItemParam {
+        string rarity;
+        uint256 price;
+        address beneficiary;
+        string metadata;
+    }
+
+    function createCollection(
+        address _forwarder,
+        address _factory,
+        bytes32 _salt,
+        string memory _name,
+        string memory _symbol,
+        string memory _baseURI,
+        address _creator,
+        ItemParam[] memory _items
+    ) external;
+}
+
+interface ICollection is ICollectionBase {
+    function owner() external view returns (address);
+}
+
+contract CreditsManagerPolygonUseCreditsPublishCollectionTest is CreditsManagerPolygonTestBase {
+    using MessageHashUtils for bytes32;
+
+    address internal collectionManager;
+    address internal forwarder;
+
+    function _sign(uint256 _key, bytes32 _messageHash) private pure returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_key, _messageHash.toEthSignedMessageHash());
+
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        return signature;
+    }
+
+    function setUp() public override {
+        super.setUp();
+
+        collectionManager = 0x9D32AaC179153A991e832550d9F96441Ea27763A;
+        forwarder = 0xBF6755A83C0dCDBB2933A96EA778E00b717d7004;
+    }
+
+    function test_useCredits_PublishCollection() public {
+        bytes4 createCollectionSelector = ICollectionManager(collectionManager).createCollection.selector;
+
+        // Create Collection Items
+        ICollectionManager.ItemParam[] memory items = new ICollectionManager.ItemParam[](1);
+        items[0].rarity = "common";
+        items[0].price = 1 ether;
+        items[0].beneficiary = address(this);
+        items[0].metadata = "metadata";
+
+        // Create Collection External Call
+        CreditsManagerPolygon.ExternalCall memory externalCall;
+        externalCall.target = collectionManager;
+        externalCall.selector = createCollectionSelector;
+        externalCall.expiresAt = type(uint256).max;
+        externalCall.data = abi.encode(
+            forwarder,
+            collectionFactoryV3,
+            bytes32(0),
+            "CreditsManagerPublishCollectionCollectionName",
+            "CreditsManagerPublishCollectionCollectionSymbol",
+            "CreditsManagerPublishCollectionBaseURI",
+            address(this),
+            items
+        );
+
+        // External Call Signature
+        bytes memory customExternalCallSignature =
+            _sign(customExternalCallSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), externalCall)));
+
+        // Credits
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+        credits[0].value = 1000 ether;
+        credits[0].expiresAt = type(uint256).max;
+
+        // Credits Signatures
+        bytes[] memory creditsSignatures = new bytes[](1);
+        creditsSignatures[0] = _sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+
+        // Use Credits Args
+        CreditsManagerPolygon.UseCreditsArgs memory args;
+        args.credits = credits;
+        args.creditsSignatures = creditsSignatures;
+        args.externalCall = externalCall;
+        args.customExternalCallSignature = customExternalCallSignature;
+        args.maxCreditedValue = type(uint256).max;
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
+
+        vm.prank(owner);
+        creditsManager.allowCustomExternalCall(collectionManager, createCollectionSelector, true);
+
+        vm.prank(owner);
+        creditsManager.updateMaxManaCreditedPerHour(type(uint256).max);
+
+        uint256 callerBalanceBefore = IERC20(mana).balanceOf(address(this));
+        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
+
+        creditsManager.useCredits(args);
+
+        uint256 callerBalancerAfter = IERC20(mana).balanceOf(address(this));
+        uint256 creditsManagerBalanceAfter = IERC20(mana).balanceOf(address(creditsManager));
+
+        uint256 expectedPublishCollectionCost = 363151721157582426361;
+
+        assertEq(callerBalancerAfter, callerBalanceBefore);
+        assertEq(creditsManagerBalanceAfter, creditsManagerBalanceBefore - expectedPublishCollectionCost);
+
+        address expectedPublishedCollectionAddress = 0xdfaf732cD3623A0Bd4E120E6c87BF930875d220b;
+
+        assertEq(ICollection(expectedPublishedCollectionAddress).creator(), address(this));
+        assertEq(ICollection(expectedPublishedCollectionAddress).owner(), forwarder);
+    }
+}
