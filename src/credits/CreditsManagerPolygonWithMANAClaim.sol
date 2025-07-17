@@ -576,9 +576,8 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
     /// @param _args The arguments for the useCredits function.
     /// @param _sender The caller of the useCredits function.
     function _handleCustomExternalCallPreExecution(UseCreditsArgs calldata _args, address _sender) internal {
-        // Allow arbitrary calls to the MANA contract without pre-approval
+        // Allow arbitrary calls to the MANA contract only if the max uncredited value is 0.
         if (_args.externalCall.target == address(mana)) {
-            // For MANA contract calls, require zero uncredited value to prevent direct MANA transfers
             if (_args.maxUncreditedValue > 0) {
                 revert MaxUncreditedValueExceeded(_args.maxUncreditedValue, 0);
             }
