@@ -89,7 +89,6 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
         uint256 _manaUsdAggregatorTolerance    
     ) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
-        _grantRole(PAUSER_ROLE, msg.sender);
 
         creditsManager = _creditsManager;
         mana = _mana;
@@ -99,68 +98,48 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
         _updateManaUsdAggregator(_manaUsdAggregator, _manaUsdAggregatorTolerance);
     }
 
-    /// @notice Pauses the contract.
-    /// @dev Only the owner and pauser can pause the contract.
-    function pause() external {
-        address sender = _msgSender();
-
-        if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(PAUSER_ROLE, sender)) {
-            revert Unauthorized(sender);
-        }
-
-        _pause();
-    }
-
-    /// @notice Unpauses the contract.
-    /// @dev Only the owner can unpause the contract.
-    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _unpause();
-    }
-
-    function updateMaxUSDMANAFee(uint256 _maxUSDMANAFee) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updateMaxUSDMANAFee(_maxUSDMANAFee);
-    }
-
-    function _updateMaxUSDMANAFee(uint256 _maxUSDMANAFee) internal {
-        maxUSDMANAFee = _maxUSDMANAFee;
-    }
-
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @param _args The arguments for the useCredits function.
     function execute(ExternalCall calldata _args) external nonReentrant whenNotPaused {
-        (uint32 manaFee) = abi.decode(_args.extra, (uint32));
-
         // Get the sender of the transaction.
         // Defined here to prevent calling _msgSender() multiple times for this transaction.
         address sender = _msgSender();
 
+        // Validate that the sender is the credits manager.
         if(sender != creditsManager) {
             revert Unauthorized(sender);
         }
 
+        // Validate that the target is the coral contract.
         if(_args.target != coral) {
             revert InvalidTarget();
         }
 
+        // Validate that the MANA fee is not greater than the maximum allowed.
+        (uint32 manaFee) = abi.decode(_args.extra, (uint32));
         _validateMANAFee(manaFee);
 
         uint256 namePrice = 100 ether;
 
+        // Approve the MANA tokens to the coral contract for the total amount of the MANA fee plus the name price.
         mana.forceApprove(coral, manaFee + namePrice);
-        mana.transferFrom(sender, address(this), namePrice);
+        // Transfer the name price in MANA to the contract from the credits manager.
+        mana.transferFrom(creditsManager, address(this), namePrice);
 
+        // Execute the external call.
         (bool success,) = _args.target.call(abi.encodePacked(_args.selector, _args.data));
 
         if (!success) {
             revert ExternalCallFailed(_args);
         }
 
+        // Reset the approval of the MANA tokens to the coral contract.
         mana.forceApprove(coral, 0);
 
         emit Executed(_args);
     }
 
-    function _validateMANAFee(uint256 _manaFee) internal view returns (uint256) {
+    function _validateMANAFee(uint256 _manaFee) internal view {
         // Obtains the price of MANA in USD.
         int256 manaUsdRate = _getRateFromAggregator(manaUsdAggregator, manaUsdAggregatorTolerance);
 
@@ -193,6 +172,24 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
         emit ERC721Withdrawn(_msgSender(), _token, _tokenId, _to);
     }
 
+    /// @notice Pauses the contract.
+    /// @dev Only the owner and pauser can pause the contract.
+    function pause() external {
+        address sender = _msgSender();
+
+        if (!hasRole(DEFAULT_ADMIN_ROLE, sender) && !hasRole(PAUSER_ROLE, sender)) {
+            revert Unauthorized(sender);
+        }
+
+        _pause();
+    }
+
+    /// @notice Unpauses the contract.
+    /// @dev Only the owner can unpause the contract.
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
+    }
+
     /// @notice Updates the MANA/USD price aggregator and tolerance.
     /// @param _aggregator The new MANA/USD price aggregator.
     /// @param _tolerance The new tolerance that indicates if the result provided by the aggregator is old.
@@ -206,5 +203,13 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
         manaUsdAggregatorTolerance = _tolerance;
 
         emit ManaUsdAggregatorUpdated(_aggregator, _tolerance);
+    }
+
+    function updateMaxUSDMANAFee(uint256 _maxUSDMANAFee) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateMaxUSDMANAFee(_maxUSDMANAFee);
+    }
+
+    function _updateMaxUSDMANAFee(uint256 _maxUSDMANAFee) internal {
+        maxUSDMANAFee = _maxUSDMANAFee;
     }
 }
