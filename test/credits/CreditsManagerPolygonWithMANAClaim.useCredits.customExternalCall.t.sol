@@ -1987,8 +1987,6 @@ contract CreditsManagerPolygonWithMANAClaimUseCreditsCustomExternalCallTest is C
         creditsManager.allowCustomExternalCall(address(mana), IERC20.transfer.selector, true);
 
         uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
-        uint256 beneficiaryBalanceBefore = IERC20(mana).balanceOf(address(this));
-        uint256 allowanceBefore = IERC20(mana).allowance(address(creditsManager), address(this));
         
         // This call should be allowed without pre-approval for MANA target
         vm.expectEmit(address(creditsManager));
@@ -2055,12 +2053,7 @@ contract CreditsManagerPolygonWithMANAClaimUseCreditsCustomExternalCallTest is C
         
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(mana), IERC20.transfer.selector, true);
-
-        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
-        uint256 beneficiaryBalanceBefore = IERC20(mana).balanceOf(address(this));
-        uint256 allowanceBefore = IERC20(mana).allowance(address(creditsManager), address(this));
         
-
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.MaxUncreditedValueExceeded.selector, 0.1 ether, 0));
         creditsManager.useCredits(args);
     }    
