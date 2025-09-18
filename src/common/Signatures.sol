@@ -51,10 +51,11 @@ abstract contract Signatures is Ownable, EIP712 {
     /// @dev Useful to cancel a signature so it cannot be used anymore.
     /// The implementation should call this function after validating that the caller is the creator of the signature.
     /// @param _hashedSignature The hash of the signature to cancel.
-    function _cancelSignature(bytes32 _hashedSignature) internal {
-        cancelledSignatures[_hashedSignature] = true;
+    /// @param _caller The address that is canceling the signature.
+    function _cancelSignature(bytes32 _hashedSignature, address _caller) internal {
+        cancelledSignatures[keccak256(abi.encode(_caller, _hashedSignature))] = true;
 
-        emit SignatureCancelled(_msgSender(), _hashedSignature);
+        emit SignatureCancelled(_caller, _hashedSignature);
     }
 
     /// @dev Verifies that a signature has been signed by a particular signer.

@@ -3,12 +3,20 @@ pragma solidity 0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
-import {ERC1271WalletMock} from "@openzeppelin/contracts/mocks/ERC1271WalletMock.sol";
+import {ERC1271WalletMock, ERC1271MaliciousMock} from "@openzeppelin/contracts/mocks/ERC1271WalletMock.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Marketplace} from "src/marketplace/Marketplace.sol";
 import {MockExternalChecks} from "src/mocks/MockExternalChecks.sol";
 import {EIP712} from "src/common/EIP712.sol";
+
+// Import the malicious contract from the coupon tests
+contract MaliciousContractWithCorrectMagicValue {
+    function isValidSignature(bytes32, bytes memory) external pure returns (bytes4) {
+        // Return the correct ERC1271 magic value (isValidSignature function selector)
+        return 0x1626ba7e;
+    }
+}
 
 contract MarketplaceHarness is Marketplace {
     constructor(address _owner) Ownable(_owner) EIP712("Marketplace", "1.0.0") {}
@@ -202,8 +210,6 @@ contract IncreaseSignerSignatureIndexTests is MarketplaceTests {
 contract CancelSignatureTests is MarketplaceTests {
     event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
 
-    error InvalidSignature();
-
     function test_CanSendAnEmptyArrayOfTrades() public {
         MarketplaceHarness.Trade[] memory trades;
 
@@ -211,15 +217,6 @@ contract CancelSignatureTests is MarketplaceTests {
         marketplace.cancelSignature(trades);
     }
 
-    function test_RevertsIfTheSignerIsNotTheCaller() public {
-        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
-
-        trades[0].signature = signTrade(trades[0]);
-
-        vm.prank(other);
-        vm.expectRevert(InvalidSignature.selector);
-        marketplace.cancelSignature(trades);
-    }
 
     function test_EmitSignatureCancelledEvent() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
@@ -237,12 +234,15 @@ contract CancelSignatureTests is MarketplaceTests {
 
         trades[0].signature = signTrade(trades[0]);
 
-        assertEq(marketplace.cancelledSignatures(keccak256(trades[0].signature)), false);
+        bytes32 hashedSignature = keccak256(trades[0].signature);
+        bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
+
+        assertEq(marketplace.cancelledSignatures(cancellationKey), false);
 
         vm.prank(signer.addr);
         marketplace.cancelSignature(trades);
 
-        assertEq(marketplace.cancelledSignatures(keccak256(trades[0].signature)), true);
+        assertEq(marketplace.cancelledSignatures(cancellationKey), true);
     }
 
     function test_CanCancelTheSameSignatureMultipleTimes() public {
@@ -250,13 +250,16 @@ contract CancelSignatureTests is MarketplaceTests {
 
         trades[0].signature = signTrade(trades[0]);
 
-        assertEq(marketplace.cancelledSignatures(keccak256(trades[0].signature)), false);
+        bytes32 hashedSignature = keccak256(trades[0].signature);
+        bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
+
+        assertEq(marketplace.cancelledSignatures(cancellationKey), false);
 
         for (uint256 i = 0; i < 10; i++) {
             vm.prank(signer.addr);
             marketplace.cancelSignature(trades);
 
-            assertEq(marketplace.cancelledSignatures(keccak256(trades[0].signature)), true);
+            assertEq(marketplace.cancelledSignatures(cancellationKey), true);
         }
     }
 
@@ -267,54 +270,142 @@ contract CancelSignatureTests is MarketplaceTests {
             trades[i].checks.salt = bytes32(i);
             trades[i].signature = signTrade(trades[i]);
 
-            assertEq(marketplace.cancelledSignatures(keccak256(trades[i].signature)), false);
+            bytes32 hashedSignature = keccak256(trades[i].signature);
+            bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
+            assertEq(marketplace.cancelledSignatures(cancellationKey), false);
         }
 
         vm.prank(signer.addr);
         marketplace.cancelSignature(trades);
 
         for (uint256 i = 0; i < trades.length; i++) {
-            assertEq(marketplace.cancelledSignatures(keccak256(trades[i].signature)), true);
+            bytes32 hashedSignature = keccak256(trades[i].signature);
+            bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
+            assertEq(marketplace.cancelledSignatures(cancellationKey), true);
         }
     }
 
-    function test_RevertsIfOneOfTheMultipleTradesSignaturesCancelledIsInvalid() public {
-        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](10);
 
-        for (uint256 i = 0; i < trades.length; i++) {
-            trades[i].checks.salt = bytes32(i);
-            trades[i].signature = signTrade(trades[i]);
-        }
-
-        trades[5].signature = "0xInvalid";
-
-        vm.prank(signer.addr);
-        vm.expectRevert(InvalidSignature.selector);
-        marketplace.cancelSignature(trades);
-    }
-
-    function test_RevertsIfERC1271SignatureVerificationFails() public {
-        ERC1271WalletMock contractWallet = new ERC1271WalletMock(other);
-
-        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
-
-        trades[0].signature = signTrade(trades[0]);
-
-        vm.prank(address(contractWallet));
-        vm.expectRevert(InvalidSignature.selector);
-        marketplace.cancelSignature(trades);
-    }
 
     function test_SupportsERC1271SignatureVerification() public {
         ERC1271WalletMock contractWallet = new ERC1271WalletMock(signer.addr);
 
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-        trades[0].signature = signTrade(trades[0]);
+        // Set the signer to the contract wallet
+        trades[0].signer = address(contractWallet);
+        
+        // Create a signature for the contract wallet (not the regular signer)
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, marketplace.eip712TradeHash(trades[0]));
+        trades[0].signature = abi.encodePacked(r, s, v);
 
         vm.prank(address(contractWallet));
         marketplace.cancelSignature(trades);
     }
+
+    function test_AnyoneCanCancelAnySignature() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+        trades[0].signature = signTrade(trades[0]);
+
+        bytes32 hashedSignature = keccak256(trades[0].signature);
+        bytes32 cancellationKey = keccak256(abi.encode(other, hashedSignature));
+
+        assertEq(marketplace.cancelledSignatures(cancellationKey), false);
+
+        // Anyone can cancel any signature (DoS prevention)
+        vm.prank(other);
+        marketplace.cancelSignature(trades);
+
+        assertEq(marketplace.cancelledSignatures(cancellationKey), true);
+    }
+
+    function test_CancelSignatureByNonSignerDoesNotPreventThirdPartyFromAccepting() public {
+        // Create a third party who will accept the trade
+        address thirdParty = makeAddr("thirdParty");
+        
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+        trades[0].signer = signer.addr;
+        trades[0].checks.uses = 1; // Allow the signature to be used once
+        trades[0].checks.expiration = block.timestamp + 1; // Set expiration to future
+        trades[0].signature = signTrade(trades[0]);
+
+        bytes32 hashedSignature = keccak256(trades[0].signature);
+        bytes32 signerCancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
+        bytes32 otherCancellationKey = keccak256(abi.encode(other, hashedSignature));
+        bytes32 thirdPartyCancellationKey = keccak256(abi.encode(thirdParty, hashedSignature));
+
+        // Initially, no cancellations exist
+        assertEq(marketplace.cancelledSignatures(signerCancellationKey), false);
+        assertEq(marketplace.cancelledSignatures(otherCancellationKey), false);
+        assertEq(marketplace.cancelledSignatures(thirdPartyCancellationKey), false);
+
+        // Someone else cancels the signature (they didn't create it)
+        vm.prank(other);
+        marketplace.cancelSignature(trades);
+
+        // The cancellation is tied to 'other', not the original signer or third party
+        assertEq(marketplace.cancelledSignatures(signerCancellationKey), false);
+        assertEq(marketplace.cancelledSignatures(otherCancellationKey), true);
+        assertEq(marketplace.cancelledSignatures(thirdPartyCancellationKey), false);
+
+        // A third party can still accept the trade successfully
+        // This demonstrates that cancellations are caller-specific, not signature-specific
+        vm.prank(thirdParty);
+        marketplace.accept(trades);
+
+        // Verify the trade was accepted (no revert means success)
+        // The cancellation by 'other' doesn't prevent 'thirdParty' from accepting the trade
+        // This shows the DoS protection works correctly - only the caller's cancellation affects them
+    }
+
+    function test_MaliciousContractCanReuseValidSignatureForSameTradeAndConsumeUses() public {
+        // Deploy a malicious contract that implements ERC1271
+        MaliciousContractWithCorrectMagicValue maliciousContract = new MaliciousContractWithCorrectMagicValue();
+        
+        // Create a legitimate trade with 1 use, signed by the real user
+        MarketplaceHarness.Trade memory legitimateTrade;
+        legitimateTrade.checks.expiration = block.timestamp + 1;
+        legitimateTrade.checks.uses = 1;
+        legitimateTrade.signature = signTrade(legitimateTrade);
+        
+        // Create the EXACT same trade (same parameters) but the malicious contract will use it
+        // The malicious contract can reuse the valid signature for the same trade
+        MarketplaceHarness.Trade memory maliciousTrade = legitimateTrade; // Exact same trade
+        maliciousTrade.signer = address(maliciousContract);
+        
+        // Initially, the signature has 0 uses
+        bytes32 hashedSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateTrade.signature)));
+        bytes32 hashedMaliciousSignature = keccak256(abi.encode(address(maliciousContract), keccak256(maliciousTrade.signature)));
+        assertNotEq(hashedSignature, hashedMaliciousSignature);
+        assertEq(legitimateTrade.signature, maliciousTrade.signature);
+        assertEq(marketplace.signatureUses(hashedSignature), 0);
+        assertEq(marketplace.signatureUses(hashedMaliciousSignature), 0);
+        
+        // The malicious contract uses the signature for the same trade
+        // This should succeed because the signature is valid and the malicious contract
+        // can bypass signature verification by implementing ERC1271
+        MarketplaceHarness.Trade[] memory maliciousTrades = new MarketplaceHarness.Trade[](1);
+        maliciousTrades[0] = maliciousTrade;
+        
+        vm.prank(address(maliciousContract));
+        marketplace.accept(maliciousTrades);
+        
+        // The signature use count is now 1 for the malicious trade
+        assertEq(marketplace.signatureUses(hashedSignature), 0);
+        assertEq(marketplace.signatureUses(hashedMaliciousSignature), 1);
+        
+        MarketplaceHarness.Trade[] memory legitimateTrades = new MarketplaceHarness.Trade[](1);
+        legitimateTrade.signer = signer.addr;
+        legitimateTrades[0] = legitimateTrade;
+        
+        vm.prank(signer.addr);
+        marketplace.accept(legitimateTrades);
+
+        // The signature use count is now 1 for the both trades
+        assertEq(marketplace.signatureUses(hashedSignature), 1);
+        assertEq(marketplace.signatureUses(hashedMaliciousSignature), 1);
+    }
+
 }
 
 contract AcceptTests is MarketplaceTests {
@@ -339,18 +430,18 @@ contract AcceptTests is MarketplaceTests {
 
     function test_RevertsIfTheSignatureHasBeenCancelled() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
-
+        trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 
         vm.prank(signer.addr);
         marketplace.cancelSignature(trades);
 
-        vm.prank(other);
         vm.expectRevert(UsingCancelledSignature.selector);
+        vm.prank(signer.addr);
         marketplace.accept(trades);
     }
 
-    function test_RevertsIfTheSignatureHasBeenUsed() public {
+    function test_RevertsIfTheTradeHasBeenUsed() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
@@ -891,3 +982,5 @@ contract AcceptTests is MarketplaceTests {
         marketplace.accept(trades);
     }
 }
+
+

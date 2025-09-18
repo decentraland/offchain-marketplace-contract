@@ -34,13 +34,10 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     /// @param _trades The list of trade signatures to be canceled.
     function cancelSignature(Trade[] calldata _trades) external {
         address caller = _msgSender();
-
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade calldata trade = _trades[i];
 
-            _verifyTradeSignature(trade, caller);
-
-            _cancelSignature(keccak256(trade.signature));
+            _cancelSignature(keccak256(trade.signature), caller);
         }
     }
 
@@ -94,20 +91,21 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
         bytes32 tradeId = getTradeId(_trade, _caller);
-        uint256 currentSignatureUses = signatureUses[hashedSignature];
+        bytes32 hashedSignatureWithSigner = keccak256(abi.encode(signer, hashedSignature));
+        uint256 currentSignatureUses = signatureUses[hashedSignatureWithSigner];
 
         if (usedTradeIds[tradeId]) {
             revert UsedTradeId();
         }
 
-        _verifyChecks(_trade.checks, hashedSignature, currentSignatureUses, signer, _caller);
+        _verifyChecks(_trade.checks, hashedSignatureWithSigner, currentSignatureUses, signer, _caller);
         _verifyTradeSignature(_trade, signer);
 
         if (currentSignatureUses + 1 == _trade.checks.uses) {
             usedTradeIds[tradeId] = true;
         }
 
-        signatureUses[hashedSignature]++;
+        signatureUses[hashedSignatureWithSigner]++;
     }
 
     /// @dev Verifies that the Trade signature is valid.
