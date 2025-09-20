@@ -7,6 +7,12 @@ import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 
 contract DeployCreditsManagerPolygonScript is Script {
+    function _createMarketplaceArray(address _marketplace) private pure returns (address[] memory) {
+        address[] memory marketplaces = new address[](1);
+        marketplaces[0] = _marketplace;
+        return marketplaces;
+    }
+
     function run() public {
         // Start broadcasting transactions
         vm.startBroadcast();
@@ -29,11 +35,11 @@ contract DeployCreditsManagerPolygonScript is Script {
             vm.envBool("PRIMARY_SALES_ALLOWED"),
             vm.envBool("SECONDARY_SALES_ALLOWED"),
             IERC20(vm.envAddress("MANA_TOKEN")),
-            vm.envAddress("MARKETPLACE"),
             vm.envAddress("LEGACY_MARKETPLACE"),
             vm.envAddress("COLLECTION_STORE"),
             ICollectionFactory(vm.envAddress("COLLECTION_FACTORY")),
-            ICollectionFactory(vm.envAddress("COLLECTION_FACTORY_V3"))
+            ICollectionFactory(vm.envAddress("COLLECTION_FACTORY_V3")),
+            _createMarketplaceArray(vm.envAddress("MARKETPLACE"))
         );
 
         // Log the deployed contract address

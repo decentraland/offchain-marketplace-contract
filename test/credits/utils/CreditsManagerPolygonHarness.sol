@@ -24,6 +24,12 @@ contract TestTradeHashing is MarketplaceTypesHashing {
 contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
     TestTradeHashing private testTradeHashing;
 
+    function _createMarketplaceArray(address _marketplace) private pure returns (address[] memory) {
+        address[] memory marketplaces = new address[](1);
+        marketplaces[0] = _marketplace;
+        return marketplaces;
+    }
+
     constructor(
         Roles memory _roles,
         uint256 _maxManaCreditedPerHour,
@@ -42,11 +48,11 @@ contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
             _primarySalesAllowed,
             _secondarySalesAllowed,
             _mana,
-            _marketplace,
             _legacyMarketplace,
             _collectionStore,
             _collectionFactory,
-            _collectionFactoryV3
+            _collectionFactoryV3,
+            _createMarketplaceArray(_marketplace)
         )
     {
         testTradeHashing = new TestTradeHashing();
