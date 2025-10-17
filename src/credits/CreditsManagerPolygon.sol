@@ -243,7 +243,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _updateSecondarySalesAllowed(_secondarySalesAllowed);
 
         for (uint256 i = 0; i < _marketplaces.length; i++) {
-            _allowMarketplaces(_marketplaces[i], true);
+            _allowMarketplace(_marketplaces[i], true);
         }
 
         mana = _mana;
@@ -365,17 +365,17 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit ERC721Withdrawn(_msgSender(), _token, _tokenId, _to);
     }
 
-    /// @notice Allows marketplace.
+    /// @notice Allows marketplaces.
     /// @dev Only the owner can allow marketplace.
     /// @param _target The target of the marketplace.
     /// @param _allowed Whether the marketplace is allowed.
-    function allowMarketplace(address[] calldata _target, bool[] calldata _allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function allowMarketplaces(address[] calldata _target, bool[] calldata _allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         for (uint256 i = 0; i < _target.length; i++) {
-            _allowMarketplaces(_target[i], _allowed[i]);
+            _allowMarketplace(_target[i], _allowed[i]);
         }
     }
 
-    function _allowMarketplaces(address _target, bool _allowed) internal {
+    function _allowMarketplace(address _target, bool _allowed) internal {
         marketplaces[_target] = _allowed;
 
         emit MarketplaceAllowed(_msgSender(), _target, _allowed);

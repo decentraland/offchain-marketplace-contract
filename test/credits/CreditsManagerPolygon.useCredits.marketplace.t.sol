@@ -1247,7 +1247,7 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
         );
-        creditsManager.allowMarketplace(targets, allowed);
+        creditsManager.allowMarketplaces(targets, allowed);
     }
 
     function test_allowMarketplace_WhenOwner() public {
@@ -1262,7 +1262,7 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         vm.expectEmit(address(creditsManager));
         emit MarketplaceAllowed(owner, newMarketplace, true);
         vm.prank(owner);
-        creditsManager.allowMarketplace(targets, allowed);
+        creditsManager.allowMarketplaces(targets, allowed);
 
         assertTrue(creditsManager.marketplaces(newMarketplace));
     }
@@ -1276,7 +1276,7 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         // First allow the marketplace
         vm.prank(owner);
-        creditsManager.allowMarketplace(targets, allowed);
+        creditsManager.allowMarketplaces(targets, allowed);
         assertTrue(creditsManager.marketplaces(newMarketplace));
 
         // Then disallow it
@@ -1284,7 +1284,7 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         vm.expectEmit(address(creditsManager));
         emit MarketplaceAllowed(owner, newMarketplace, false);
         vm.prank(owner);
-        creditsManager.allowMarketplace(targets, allowed);
+        creditsManager.allowMarketplaces(targets, allowed);
 
         assertFalse(creditsManager.marketplaces(newMarketplace));
     }
@@ -1312,7 +1312,7 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         emit MarketplaceAllowed(owner, marketplace3, true);
         
         vm.prank(owner);
-        creditsManager.allowMarketplace(targets, allowed);
+        creditsManager.allowMarketplaces(targets, allowed);
 
         assertTrue(creditsManager.marketplaces(marketplace1));
         assertFalse(creditsManager.marketplaces(marketplace2));
@@ -1410,7 +1410,7 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         allowed[0] = true;
 
         vm.prank(owner);
-        creditsManager.allowMarketplace(targets, allowed);
+        creditsManager.allowMarketplaces(targets, allowed);
         assertTrue(creditsManager.marketplaces(newMarketplace));
 
         // Now test using credits with this newly allowed marketplace
