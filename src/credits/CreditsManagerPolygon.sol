@@ -81,9 +81,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice Whether secondary sales are allowed.
     bool public secondarySalesAllowed;
 
-    /// @notice The address of the Marketplace contract.
-    address public immutable marketplace;
-
     /// @notice The address of the Legacy Marketplace contract.
     address public immutable legacyMarketplace;
 
@@ -95,6 +92,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice The address of the CollectionFactoryV3 contract.
     ICollectionFactory public immutable collectionFactoryV3;
+
+    /// @notice The address of the Marketplace contract.
+    mapping(address => bool) public marketplaces;
 
     /// @notice Tracks the allowed custom external calls.
     mapping(address => mapping(bytes4 => bool)) public allowedCustomExternalCalls;
@@ -168,6 +168,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
+    event MarketplaceAllowed(address indexed _sender, address indexed _target, bool _allowed);
     event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
     event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _customExternalCallHash);
     event CreditUsed(address indexed _sender, bytes32 indexed _creditId, Credit _credit, uint256 _value);
@@ -212,22 +213,22 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param _primarySalesAllowed Whether primary sales are allowed.
     /// @param _secondarySalesAllowed Whether secondary sales are allowed.
     /// @param _mana The MANA token.
-    /// @param _marketplace The Marketplace contract.
     /// @param _legacyMarketplace The Legacy Marketplace contract.
     /// @param _collectionStore The CollectionStore contract.
     /// @param _collectionFactory The CollectionFactory contract.
     /// @param _collectionFactoryV3 The CollectionFactoryV3 contract.
+    /// @param _marketplaces The Marketplace contracts.
     constructor(
         Roles memory _roles,
         uint256 _maxManaCreditedPerHour,
         bool _primarySalesAllowed,
         bool _secondarySalesAllowed,
         IERC20 _mana,
-        address _marketplace,
         address _legacyMarketplace,
         address _collectionStore,
         ICollectionFactory _collectionFactory,
-        ICollectionFactory _collectionFactoryV3
+        ICollectionFactory _collectionFactoryV3,
+        address[] memory _marketplaces
     ) EIP712("Decentraland Credits", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _roles.owner);
         _grantRole(CREDITS_SIGNER_ROLE, _roles.creditsSigner);
@@ -241,8 +242,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _updatePrimarySalesAllowed(_primarySalesAllowed);
         _updateSecondarySalesAllowed(_secondarySalesAllowed);
 
+        for (uint256 i = 0; i < _marketplaces.length; i++) {
+            _allowMarketplace(_marketplaces[i], true);
+        }
+
         mana = _mana;
-        marketplace = _marketplace;
         legacyMarketplace = _legacyMarketplace;
         collectionStore = _collectionStore;
         collectionFactory = _collectionFactory;
@@ -361,6 +365,22 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit ERC721Withdrawn(_msgSender(), _token, _tokenId, _to);
     }
 
+    /// @notice Allows marketplaces.
+    /// @dev Only the owner can allow marketplace.
+    /// @param _target The target of the marketplace.
+    /// @param _allowed Whether the marketplace is allowed.
+    function allowMarketplaces(address[] calldata _target, bool[] calldata _allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i = 0; i < _target.length; i++) {
+            _allowMarketplace(_target[i], _allowed[i]);
+        }
+    }
+
+    function _allowMarketplace(address _target, bool _allowed) internal {
+        marketplaces[_target] = _allowed;
+
+        emit MarketplaceAllowed(_msgSender(), _target, _allowed);
+    }
+
     /// @notice Allows a custom external call.
     /// @dev Only the owner can allow custom external calls.
     /// @param _target The target of the external call.
@@ -444,7 +464,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         // Route to the appropriate pre-execution handler based on the target contract
         if (_args.externalCall.target == legacyMarketplace) {
             _handleLegacyMarketplacePreExecution(_args);
-        } else if (_args.externalCall.target == marketplace) {
+        } else if (marketplaces[_args.externalCall.target]) {
             _handleMarketplacePreExecution(_args);
         } else if (_args.externalCall.target == collectionStore) {
             _handleCollectionStorePreExecution(_args);

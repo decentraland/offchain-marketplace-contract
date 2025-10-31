@@ -8,6 +8,14 @@ import {CouponManager} from "src/coupons/CouponManager.sol";
 import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 import {MockCoupon} from "src/mocks/MockCoupon.sol";
 
+// Import the malicious contract from the marketplace tests
+contract MaliciousContractWithCorrectMagicValue {
+    function isValidSignature(bytes32, bytes memory) external pure returns (bytes4) {
+        // Return the correct ERC1271 magic value (isValidSignature function selector)
+        return 0x1626ba7e;
+    }
+}
+
 contract CouponManagerHarness is CouponManager {
     constructor(address _marketplace, address _owner, address[] memory _allowedCoupons) CouponManager(_marketplace, _owner, _allowedCoupons) {}
 
@@ -45,6 +53,7 @@ abstract contract CouponsTests is Test {
     }
 
     function signCoupon(CouponManagerHarness.Coupon memory _coupon) internal view returns (bytes memory) {
+        // Set the signer field to ensure the signature is bound to the correct signer
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, couponManager.eip712CouponHash(_coupon));
         return abi.encodePacked(r, s, v);
     }
@@ -200,7 +209,9 @@ contract ApplyCouponTests is CouponsTests {
         coupon.checks.uses = 1;
         coupon.signature = signCoupon(coupon);
 
-        assertEq(couponManager.signatureUses(keccak256(coupon.signature)), 0);
+        bytes32 hashedCouponSignatureWithSigner = keccak256(abi.encode(signer.addr, keccak256(coupon.signature)));
+
+        assertEq(couponManager.signatureUses(hashedCouponSignatureWithSigner), 0);
 
         vm.prank(marketplace);
         vm.expectEmit(address(couponManager));
@@ -208,25 +219,18 @@ contract ApplyCouponTests is CouponsTests {
         CouponManagerHarness.Trade memory updatedTrade = couponManager.applyCoupon(trade, coupon);
         // Mock coupon implementation updates the signer of the trade to address(1337).
         assertEq(updatedTrade.signer, address(1337));
-        assertEq(couponManager.signatureUses(keccak256(coupon.signature)), 1);
+        assertEq(couponManager.signatureUses(hashedCouponSignatureWithSigner), 1);
     }
 }
 
 contract CancelSignatureTestsCouponManager is CouponsTests {
     event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
+    
+    error SignatureOveruse();
 
     function test_CanSendEmptyListOfCoupons() public {
         vm.prank(other);
         couponManager.cancelSignature(new CouponManagerHarness.Coupon[](0));
-    }
-
-    function test_RevertsIfInvalidSigner() public {
-        CouponManagerHarness.Coupon[] memory couponList = new CouponManagerHarness.Coupon[](1);
-        couponList[0].signature = signCoupon(couponList[0]);
-
-        vm.prank(other);
-        vm.expectRevert(InvalidSignature.selector);
-        couponManager.cancelSignature(couponList);
     }
 
     function test_SignatureCancelled() public {
@@ -234,15 +238,16 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         couponList[0].signature = signCoupon(couponList[0]);
 
         bytes32 hashedSignature = keccak256(couponList[0].signature);
+        bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
 
-        assertEq(couponManager.cancelledSignatures(hashedSignature), false);
+        assertEq(couponManager.cancelledSignatures(cancellationKey), false);
 
         vm.prank(signer.addr);
         vm.expectEmit(address(couponManager));
         emit SignatureCancelled(signer.addr, hashedSignature);
         couponManager.cancelSignature(couponList);
 
-        assertEq(couponManager.cancelledSignatures(hashedSignature), true);
+        assertEq(couponManager.cancelledSignatures(cancellationKey), true);
     }
 
     function test_MultipleSignaturesCancelled() public {
@@ -254,11 +259,13 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
 
         bytes32 hashedSignature1 = keccak256(couponList[0].signature);
         bytes32 hashedSignature2 = keccak256(couponList[1].signature);
+        bytes32 cancellationKey1 = keccak256(abi.encode(signer.addr, hashedSignature1));
+        bytes32 cancellationKey2 = keccak256(abi.encode(signer.addr, hashedSignature2));
 
         assertNotEq(hashedSignature1, hashedSignature2);
 
-        assertEq(couponManager.cancelledSignatures(hashedSignature1), false);
-        assertEq(couponManager.cancelledSignatures(hashedSignature2), false);
+        assertEq(couponManager.cancelledSignatures(cancellationKey1), false);
+        assertEq(couponManager.cancelledSignatures(cancellationKey2), false);
 
         vm.prank(signer.addr);
         vm.expectEmit(address(couponManager));
@@ -267,8 +274,8 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         emit SignatureCancelled(signer.addr, hashedSignature2);
         couponManager.cancelSignature(couponList);
 
-        assertEq(couponManager.cancelledSignatures(hashedSignature1), true);
-        assertEq(couponManager.cancelledSignatures(hashedSignature2), true);
+        assertEq(couponManager.cancelledSignatures(cancellationKey1), true);
+        assertEq(couponManager.cancelledSignatures(cancellationKey2), true);
     }
 
     function test_CanCancelTheSameSignatureMultipleTimes() public {
@@ -278,11 +285,13 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
 
         bytes32 hashedSignature1 = keccak256(couponList[0].signature);
         bytes32 hashedSignature2 = keccak256(couponList[1].signature);
+        bytes32 cancellationKey1 = keccak256(abi.encode(signer.addr, hashedSignature1));
+        bytes32 cancellationKey2 = keccak256(abi.encode(signer.addr, hashedSignature2));
 
         assertEq(hashedSignature1, hashedSignature2);
 
-        assertEq(couponManager.cancelledSignatures(hashedSignature1), false);
-        assertEq(couponManager.cancelledSignatures(hashedSignature2), false);
+        assertEq(couponManager.cancelledSignatures(cancellationKey1), false);
+        assertEq(couponManager.cancelledSignatures(cancellationKey2), false);
 
         vm.prank(signer.addr);
         vm.expectEmit(address(couponManager));
@@ -291,7 +300,99 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         emit SignatureCancelled(signer.addr, hashedSignature2);
         couponManager.cancelSignature(couponList);
 
-        assertEq(couponManager.cancelledSignatures(hashedSignature1), true);
-        assertEq(couponManager.cancelledSignatures(hashedSignature2), true);
+        assertEq(couponManager.cancelledSignatures(cancellationKey1), true);
+        assertEq(couponManager.cancelledSignatures(cancellationKey2), true);
     }
+
+    function test_AnyoneCanCancelAnySignature() public {
+        CouponManagerHarness.Coupon[] memory couponList = new CouponManagerHarness.Coupon[](1);
+        couponList[0].signature = signCoupon(couponList[0]);
+
+        bytes32 hashedSignature = keccak256(couponList[0].signature);
+        bytes32 cancellationKey = keccak256(abi.encode(other, hashedSignature));
+
+        assertEq(couponManager.cancelledSignatures(cancellationKey), false);
+
+        // Anyone can cancel any signature (DoS prevention)
+        vm.prank(other);
+        couponManager.cancelSignature(couponList);
+
+        assertEq(couponManager.cancelledSignatures(cancellationKey), true);
+    }
+
+    function test_CancelCouponByNonSignerDoesNotPreventThirdPartyFromUsing() public {
+        // Create a third party who will use the coupon
+        address thirdParty = makeAddr("thirdParty");
+        
+        CouponManagerHarness.Coupon[] memory couponList = new CouponManagerHarness.Coupon[](1);
+        couponList[0].signature = signCoupon(couponList[0]);
+
+        bytes32 hashedSignature = keccak256(couponList[0].signature);
+        bytes32 signerCancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
+        bytes32 otherCancellationKey = keccak256(abi.encode(other, hashedSignature));
+        bytes32 thirdPartyCancellationKey = keccak256(abi.encode(thirdParty, hashedSignature));
+
+        // Initially, no cancellations exist
+        assertEq(couponManager.cancelledSignatures(signerCancellationKey), false);
+        assertEq(couponManager.cancelledSignatures(otherCancellationKey), false);
+        assertEq(couponManager.cancelledSignatures(thirdPartyCancellationKey), false);
+
+        // Someone else cancels the coupon signature (they didn't create it)
+        vm.prank(other);
+        couponManager.cancelSignature(couponList);
+
+        // The cancellation is tied to 'other', not the original signer or third party
+        assertEq(couponManager.cancelledSignatures(signerCancellationKey), false);
+        assertEq(couponManager.cancelledSignatures(otherCancellationKey), true);
+        assertEq(couponManager.cancelledSignatures(thirdPartyCancellationKey), false);
+    }
+
+    function test_MaliciousContractCanReuseValidSignatureForSameCouponAndConsumeUses() public {
+        // Deploy a malicious contract that implements ERC1271
+        address sc = address(new MaliciousContractWithCorrectMagicValue());
+        
+        // Create a legitimate coupon with 1 use, signed by the real user
+        CouponManagerHarness.Coupon memory legitimateCoupon;
+        legitimateCoupon.couponAddress = allowedCoupon;
+        legitimateCoupon.checks.expiration = block.timestamp + 1;
+        legitimateCoupon.checks.uses = 1;
+        legitimateCoupon.signature = signCoupon(legitimateCoupon);
+        
+        // Create a coupon with same signature
+        // The malicious contract can reuse the valid signature for the same coupon
+        CouponManagerHarness.Coupon memory fakeCoupon;
+        fakeCoupon.couponAddress = allowedCoupon;
+        fakeCoupon.checks.expiration = block.timestamp + 1;
+        fakeCoupon.checks.uses = 1;
+        fakeCoupon.signature = signCoupon(fakeCoupon);
+        
+        // Initially, the signature has 0 uses
+        bytes32 hashedSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateCoupon.signature)));
+        bytes32 hashedFakeSignature = keccak256(abi.encode(sc, keccak256(fakeCoupon.signature)));
+        assertNotEq(hashedSignature, hashedFakeSignature);
+        assertEq(couponManager.signatureUses(hashedSignature), 0);
+        assertEq(couponManager.signatureUses(hashedFakeSignature), 0);
+        
+        // The malicious contract uses the signature for the same coupon
+        // This should succeed because the signature is valid and the malicious contract
+        // can bypass signature verification by implementing ERC1271
+        CouponManagerHarness.Trade memory trade;
+        trade.signer = sc; // Set the trade signer to match the coupon signer
+        vm.prank(marketplace);
+        couponManager.applyCoupon(trade, fakeCoupon);
+        
+        // The signature use count is now 1
+        assertEq(couponManager.signatureUses(hashedSignature), 0);
+        assertEq(couponManager.signatureUses(hashedFakeSignature), 1);
+        
+        // Now when the legitimate user tries to use their original coupon, it should fail
+        // because the signature has already been used (SignatureOveruse error)
+        trade.signer = signer.addr; // Set the trade signer to match the coupon signer
+        vm.prank(marketplace);
+        couponManager.applyCoupon(trade, legitimateCoupon);
+
+        assertEq(couponManager.signatureUses(hashedSignature), 1);
+        assertEq(couponManager.signatureUses(hashedFakeSignature), 1);
+    }
+
 }

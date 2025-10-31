@@ -22,7 +22,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(creditsManager.secondarySalesAllowed(), secondarySalesAllowed);
 
         assertEq(address(creditsManager.mana()), mana);
-        assertEq(creditsManager.marketplace(), marketplace);
+        assertEq(creditsManager.marketplaces(marketplace), true);
         assertEq(creditsManager.legacyMarketplace(), legacyMarketplace);
         assertEq(creditsManager.collectionStore(), collectionStore);
         assertEq(address(creditsManager.collectionFactory()), collectionFactory);

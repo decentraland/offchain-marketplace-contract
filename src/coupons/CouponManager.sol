@@ -65,9 +65,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         for (uint256 i = 0; i < _coupons.length; i++) {
             Coupon calldata coupon = _coupons[i];
 
-            _verifyCouponSignature(coupon, caller);
-
-            _cancelSignature(keccak256(coupon.signature));
+            _cancelSignature(keccak256(coupon.signature), caller);
         }
     }
 
@@ -90,20 +88,21 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
             revert CouponNotAllowed(couponAddress);
         }
 
+        address signer = _trade.signer;
         bytes32 hashedCouponSignature = keccak256(_coupon.signature);
         bytes32 hashedTradeSignature = keccak256(_trade.signature);
-        uint256 currentSignatureUses = signatureUses[hashedCouponSignature];
-        address signer = _trade.signer;
+        bytes32 hashedCouponSignatureWithSigner = keccak256(abi.encode(signer, hashedCouponSignature));
+        uint256 currentSignatureUses = signatureUses[hashedCouponSignatureWithSigner];
 
         // Verify that the check values provided in the Coupon are correct.
-        _verifyChecks(_coupon.checks, hashedCouponSignature, currentSignatureUses, signer, caller);
+        _verifyChecks(_coupon.checks, hashedCouponSignatureWithSigner, currentSignatureUses, signer, caller);
         // Verify that the Coupon signature is valid.
         _verifyCouponSignature(_coupon, signer);
 
         emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature, _coupon);
 
         // Increase the amount of uses of the Coupon signature.
-        signatureUses[hashedCouponSignature]++;
+        signatureUses[hashedCouponSignatureWithSigner]++;
 
         // Apply the Coupon and return the modified Trade.
         return ICoupon(couponAddress).applyCoupon(_trade, _coupon);
