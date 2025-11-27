@@ -66,11 +66,9 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     error Unauthorized(address _sender);
     error InvalidTarget();
     error InvalidSelector();
-    error InvalidData();
     error MANAforFeeExceeded();
     error ExecutionExpired(ExternalCall _externalCall);
     error CallFailed(ExternalCall _externalCall);
-
 
     /// @notice Initializes the RegisterNameCrossChainExecutor contract.
     /// @param _owner The owner of the contract who will have DEFAULT_ADMIN_ROLE.
