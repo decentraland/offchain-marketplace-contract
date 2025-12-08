@@ -16,7 +16,7 @@ contract RegisterNameCrossChainExecutorCoreTest is RegisterNameCrossChainExecuto
         assertEq(executor.creditsManager(), creditsManager);
         assertEq(address(executor.mana()), mana);
         assertEq(executor.coral(), address(coral));
-        assertEq(executor.maxUSDMANAFee(), maxUSDMANAFee);
+        assertEq(executor.maxFeeUSD(), maxUSDMANAFee);
         assertEq(address(executor.manaUsdAggregator()), address(manaUsdAggregator));
         assertEq(executor.manaUsdAggregatorTolerance(), manaUsdAggregatorTolerance);
         assertEq(executor.NAME_PRICE(), NAME_PRICE);
@@ -61,45 +61,23 @@ contract RegisterNameCrossChainExecutorCoreTest is RegisterNameCrossChainExecuto
         vm.stopPrank();
     }
 
-    function test_updateManaUsdAggregator_RevertsWhenNotOwner() public {
-        address newAggregator = makeAddr("newAggregator");
+    function test_updateMaxFeeUSD_RevertsWhenNotOwner() public {
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), executor.DEFAULT_ADMIN_ROLE())
         );
-        executor.updateManaUsdAggregator(newAggregator, 2 hours);
+        executor.updateMaxFeeUSD(10 ether);
     }
 
-    function test_updateManaUsdAggregator_WhenOwner() public {
-        address newAggregator = makeAddr("newAggregator");
-        uint256 newTolerance = 2 hours;
-
-        vm.expectEmit(address(executor));
-        emit ManaUsdAggregatorUpdated(newAggregator, newTolerance);
-
-        vm.prank(owner);
-        executor.updateManaUsdAggregator(newAggregator, newTolerance);
-
-        assertEq(address(executor.manaUsdAggregator()), newAggregator);
-        assertEq(executor.manaUsdAggregatorTolerance(), newTolerance);
-    }
-
-    function test_updateMaxUSDMANAFee_RevertsWhenNotOwner() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), executor.DEFAULT_ADMIN_ROLE())
-        );
-        executor.updateMaxUSDMANAFee(10 ether);
-    }
-
-    function test_updateMaxUSDMANAFee_WhenOwner() public {
+    function test_updateMaxFeeUSD_WhenOwner() public {
         uint256 newMaxFee = 10 ether;
 
         vm.expectEmit(address(executor));
-        emit MaxUSDMANAFeeUpdated(newMaxFee);
+        emit MaxFeeUSDUpdated(newMaxFee);
 
         vm.prank(owner);
-        executor.updateMaxUSDMANAFee(newMaxFee);
+        executor.updateMaxFeeUSD(newMaxFee);
 
-        assertEq(executor.maxUSDMANAFee(), newMaxFee);
+        assertEq(executor.maxFeeUSD(), newMaxFee);
     }
 
     function test_withdrawERC20_RevertsWhenNotOwner() public {

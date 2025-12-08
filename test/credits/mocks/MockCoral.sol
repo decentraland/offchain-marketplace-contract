@@ -17,6 +17,7 @@ contract MockCoral {
 
     address public owner;
     bool public shouldRevert;
+    bool public shouldRevertWithoutData;
     uint256 public lastAmountReceived;
     address public lastTokenReceived;
     address public reentrancyCallback;
@@ -31,6 +32,12 @@ contract MockCoral {
     }
 
     function fundAndRunMulticall(address token, uint256 amount, Call[] calldata calls) external payable {
+        if (shouldRevertWithoutData) {
+            // Revert without return data using assembly
+            assembly {
+                revert(0, 0)
+            }
+        }
         if (shouldRevert) {
             revert("Mock Coral: Forced revert");
         }
@@ -64,6 +71,10 @@ contract MockCoral {
 
     function setShouldRevert(bool _shouldRevert) external onlyOwner {
         shouldRevert = _shouldRevert;
+    }
+
+    function setShouldRevertWithoutData(bool _shouldRevertWithoutData) external onlyOwner {
+        shouldRevertWithoutData = _shouldRevertWithoutData;
     }
 
     function setOwner(address _owner) external onlyOwner {

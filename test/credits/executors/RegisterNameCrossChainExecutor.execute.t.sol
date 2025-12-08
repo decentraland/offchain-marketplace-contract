@@ -35,24 +35,6 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
         executor.execute(call);
     }
 
-    function test_execute_RevertsWhenInvalidSelector() public {
-        RegisterNameCrossChainExecutor.ExternalCall memory call = _createValidExternalCall(1 ether);
-        call.selector = 0x12345678;
-
-        vm.expectRevert(abi.encodeWithSelector(RegisterNameCrossChainExecutor.InvalidSelector.selector));
-        vm.prank(creditsManager);
-        executor.execute(call);
-    }
-
-    function test_execute_RevertsWhenExpired() public {
-        RegisterNameCrossChainExecutor.ExternalCall memory call = _createValidExternalCall(1 ether);
-        call.expiresAt = block.timestamp - 1;
-
-        vm.expectRevert(abi.encodeWithSelector(RegisterNameCrossChainExecutor.ExecutionExpired.selector, call));
-        vm.prank(creditsManager);
-        executor.execute(call);
-    }
-
     function test_execute_RevertsWhenMANAFeeExceeded() public {
         // With MANA at $0.50, max fee of $5 = 10 MANA
         // So trying to use 11 MANA should fail
@@ -157,7 +139,29 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
         vm.prank(creditsManager);
         IERC20(mana).approve(address(executor), NAME_PRICE);
 
-        vm.expectRevert(abi.encodeWithSelector(RegisterNameCrossChainExecutor.CallFailed.selector, call));
+        // The revert reason from MockCoral will be bubbled up
+        vm.expectRevert("Mock Coral: Forced revert");
+
+        vm.prank(creditsManager);
+        executor.execute(call);
+    }
+
+    function test_execute_RevertsWithExecutionFailed_WhenCoralCallFailsWithoutReturnData() public {
+        // Make coral revert without return data - coral owner is the test contract
+        coral.setShouldRevertWithoutData(true);
+
+        uint256 manaFee = 1 ether;
+        RegisterNameCrossChainExecutor.ExternalCall memory call = _createValidExternalCall(manaFee);
+
+        // Transfer manaFee to executor
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(executor), manaFee);
+
+        vm.prank(creditsManager);
+        IERC20(mana).approve(address(executor), NAME_PRICE);
+
+        // When there's no return data, ExecutionFailed error should be used
+        vm.expectRevert(abi.encodeWithSelector(RegisterNameCrossChainExecutor.ExecutionFailed.selector, call));
 
         vm.prank(creditsManager);
         executor.execute(call);
@@ -331,28 +335,10 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
         assertEq(IERC20(mana).balanceOf(address(coral)), coralBalanceBefore + (NAME_PRICE + manaFee) * 3);
     }
 
-    function test_execute_Success_WithDifferentExpiration() public {
-        uint256 manaFee = 1 ether;
-        RegisterNameCrossChainExecutor.ExternalCall memory call = _createValidExternalCall(manaFee);
-
-        // Set expiration to 1 second from now
-        call.expiresAt = block.timestamp + 1;
-
-        // Transfer manaFee to executor
-        vm.prank(manaHolder);
-        IERC20(mana).transfer(address(executor), manaFee);
-
-        vm.prank(creditsManager);
-        IERC20(mana).approve(address(executor), NAME_PRICE);
-
-        vm.prank(creditsManager);
-        executor.execute(call);
-    }
-
     function test_execute_Success_WithUpdatedMaxFee() public {
         // Update max fee to $10
         vm.prank(owner);
-        executor.updateMaxUSDMANAFee(10 ether);
+        executor.updateMaxFeeUSD(10 ether);
 
         // Now 20 MANA should be valid (20 MANA * $0.50 = $10)
         uint256 manaFee = 20 ether;
@@ -388,37 +374,6 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
         // Execute from creditsManager
         vm.prank(creditsManager);
         executor.execute(call);
-    }
-
-    function test_execute_Success_SameBlockNotExpired() public {
-        uint256 manaFee = 1 ether;
-        RegisterNameCrossChainExecutor.ExternalCall memory call = _createValidExternalCall(manaFee);
-        call.expiresAt = block.timestamp;
-
-        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(creditsManager);
-        uint256 executorBalanceBefore = IERC20(mana).balanceOf(address(executor));
-        uint256 coralBalanceBefore = IERC20(mana).balanceOf(address(coral));
-
-        // Transfer manaFee to executor
-        vm.prank(manaHolder);
-        IERC20(mana).transfer(address(executor), manaFee);
-
-        // Approve MANA from creditsManager to executor
-        vm.prank(creditsManager);
-        IERC20(mana).approve(address(executor), NAME_PRICE);
-
-        vm.prank(creditsManager);
-        executor.execute(call);
-
-        // Verify balances
-        // CreditsManager should have decreased by NAME_PRICE
-        assertEq(IERC20(mana).balanceOf(creditsManager), creditsManagerBalanceBefore - NAME_PRICE);
-
-        // Executor should have lost the manaFee (back to initial balance)
-        assertEq(IERC20(mana).balanceOf(address(executor)), executorBalanceBefore);
-
-        // Coral should have received NAME_PRICE + manaFee
-        assertEq(IERC20(mana).balanceOf(address(coral)), coralBalanceBefore + NAME_PRICE + manaFee);
     }
 
     function test_execute_RevertsOnReentrancy() public {

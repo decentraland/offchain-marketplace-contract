@@ -30,8 +30,7 @@ contract RegisterNameCrossChainExecutorTestBase is Test {
     event Executed(RegisterNameCrossChainExecutor.ExternalCall _externalCall);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
-    event ManaUsdAggregatorUpdated(address indexed _aggregator, uint256 _tolerance);
-    event MaxUSDMANAFeeUpdated(uint256 _maxUSDMANAFee);
+    event MaxFeeUSDUpdated(uint256 _maxFeeUSD);
 
     function setUp() public virtual {
         vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon", 68650527)); // Mar-04-2025 09:10:51 PM +UTC
@@ -80,16 +79,14 @@ contract RegisterNameCrossChainExecutorTestBase is Test {
             callType: 0, target: nameRegistry, value: 0, callData: abi.encodeWithSignature("registerName(string)", "test.dcl.eth"), payload: ""
         });
 
-        // Encode ONLY the parameters (address token, uint256 amount, Call[] calldata calls)
-        // The selector will be prepended in execute()
-        bytes memory data = abi.encode(mana, NAME_PRICE + _manaFee, calls);
+        // Encode the full function call including selector
+        // fundAndRunMulticall(address token, uint256 amount, Call[] calldata calls)
+        bytes memory data = abi.encodeWithSelector(FUND_AND_RUN_MULTICALL_SELECTOR, mana, NAME_PRICE + _manaFee, calls);
 
         return RegisterNameCrossChainExecutor.ExternalCall({
             target: address(coral),
-            selector: FUND_AND_RUN_MULTICALL_SELECTOR,
             data: data,
-            extra: abi.encode(_manaFee),
-            expiresAt: block.timestamp + 1 hours
+            extra: abi.encode(_manaFee)
         });
     }
 
