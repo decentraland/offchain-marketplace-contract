@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {IAggregator} from "src/marketplace/interfaces/IAggregator.sol";
 import {AggregatorHelper} from "src/marketplace/AggregatorHelper.sol";
@@ -16,6 +17,7 @@ import {AggregatorHelper} from "src/marketplace/AggregatorHelper.sol";
 /// @dev This contract validates and executes external calls to register names cross-chain, ensuring proper MANA fee limits
 contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGuard, AggregatorHelper {
     using SafeERC20 for IERC20;
+    using Address for address;
 
     /// @notice The role that can pause the contract.
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -61,7 +63,6 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     error Unauthorized(address _sender);
     error InvalidTarget();
     error MANAforFeeExceeded();
-    error ExecutionFailed(ExternalCall _externalCall);
 
     /// @notice Initializes the RegisterNameCrossChainExecutor contract.
     /// @param _owner The owner of the contract who will have DEFAULT_ADMIN_ROLE.
@@ -118,24 +119,8 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
         // Approve the MANA tokens to the coral contract for the total amount of the MANA fee plus the name price.
         mana.forceApprove(coral, manaFee + NAME_PRICE);
 
-        // Execute the external call.
-        (bool success, bytes memory returnData) = _args.target.call(_args.data);
-
-        if (!success) {
-            // Bubble up the revert reason if present
-            if (returnData.length > 0) {
-                assembly {
-                    // The first 32 bytes of the bytes data is its length
-                    let returnDataSize := mload(returnData)
-                    // Move the pointer 32 bytes to ignore the length of the bytes data,
-                    // Revert with the actual error message.
-                    revert(add(32, returnData), returnDataSize)
-                }
-            } else {
-                // No revert reason, use generic error
-                revert ExecutionFailed(_args);
-            }
-        }
+        // Execute the external call using OpenZeppelin's Address library which automatically bubbles up errors.
+        _args.target.functionCall(_args.data);
 
         // Reset the approval of the MANA tokens to the coral contract.
         mana.forceApprove(coral, 0);

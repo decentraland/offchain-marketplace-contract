@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {RegisterNameCrossChainExecutorTestBase} from "test/credits/utils/RegisterNameCrossChainExecutorTestBase.sol";
 import {RegisterNameCrossChainExecutor} from "src/credits/executors/RegisterNameCrossChainExecutor.sol";
 import {AggregatorHelper} from "src/marketplace/AggregatorHelper.sol";
@@ -146,7 +147,7 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
         executor.execute(call);
     }
 
-    function test_execute_RevertsWithExecutionFailed_WhenCoralCallFailsWithoutReturnData() public {
+    function test_execute_RevertsWithFailedInnerCall_WhenCoralCallFailsWithoutReturnData() public {
         // Make coral revert without return data - coral owner is the test contract
         coral.setShouldRevertWithoutData(true);
 
@@ -160,8 +161,8 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
         vm.prank(creditsManager);
         IERC20(mana).approve(address(executor), NAME_PRICE);
 
-        // When there's no return data, ExecutionFailed error should be used
-        vm.expectRevert(abi.encodeWithSelector(RegisterNameCrossChainExecutor.ExecutionFailed.selector, call));
+        // When there's no return data, OpenZeppelin's Address library uses FailedInnerCall error
+        vm.expectRevert(abi.encodeWithSelector(Address.FailedInnerCall.selector));
 
         vm.prank(creditsManager);
         executor.execute(call);
