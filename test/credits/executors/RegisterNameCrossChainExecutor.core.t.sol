@@ -16,9 +16,9 @@ contract RegisterNameCrossChainExecutorCoreTest is RegisterNameCrossChainExecuto
         assertEq(executor.creditsManager(), creditsManager);
         assertEq(address(executor.mana()), mana);
         assertEq(executor.coral(), address(coral));
-        assertEq(executor.maxFeeUSD(), maxUSDMANAFee);
-        assertEq(address(executor.manaUsdAggregator()), address(manaUsdAggregator));
-        assertEq(executor.manaUsdAggregatorTolerance(), manaUsdAggregatorTolerance);
+        assertEq(executor.maxUSDFee(), maxUSDMANAFee);
+        assertEq(address(executor.manaUSDAggregator()), address(manaUSDAggregator));
+        assertEq(executor.manaUSDAggregatorTolerance(),     manaUSDAggregatorTolerance);
         assertEq(executor.NAME_PRICE(), NAME_PRICE);
     }
 
@@ -65,19 +65,19 @@ contract RegisterNameCrossChainExecutorCoreTest is RegisterNameCrossChainExecuto
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), executor.DEFAULT_ADMIN_ROLE())
         );
-        executor.updateMaxFeeUSD(10 ether);
+        executor.updateMaxUSDFee(10 ether);
     }
 
     function test_updateMaxFeeUSD_WhenOwner() public {
         uint256 newMaxFee = 10 ether;
 
         vm.expectEmit(address(executor));
-        emit MaxFeeUSDUpdated(newMaxFee);
+        emit MaxUSDFeeUpdated(newMaxFee);
 
         vm.prank(owner);
-        executor.updateMaxFeeUSD(newMaxFee);
+        executor.updateMaxUSDFee(newMaxFee);
 
-        assertEq(executor.maxFeeUSD(), newMaxFee);
+        assertEq(executor.maxUSDFee(), newMaxFee);
     }
 
     function test_withdrawERC20_RevertsWhenNotOwner() public {

@@ -104,7 +104,7 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
     function test_execute_RevertsWhenAggregatorAnswerIsNegative() public {
         // Set negative price
         vm.prank(owner);
-        manaUsdAggregator.setAnswer(-1);
+        manaUSDAggregator.setAnswer(-1);
 
         RegisterNameCrossChainExecutor.ExternalCall memory call = _createValidExternalCall(1 ether);
 
@@ -116,7 +116,7 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
     function test_execute_RevertsWhenAggregatorAnswerIsStale() public {
         // Set stale data (more than tolerance)
         vm.prank(owner);
-        manaUsdAggregator.setUpdatedAtOffset(manaUsdAggregatorTolerance + 1);
+        manaUSDAggregator.setUpdatedAtOffset(manaUSDAggregatorTolerance + 1);
 
         RegisterNameCrossChainExecutor.ExternalCall memory call = _createValidExternalCall(1 ether);
 
@@ -280,7 +280,7 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
 
         // Now increase MANA price to $1.00
         vm.prank(owner);
-        manaUsdAggregator.setAnswer(100000000); // $1.00 with 8 decimals
+        manaUSDAggregator.setAnswer(100000000); // $1.00 with 8 decimals
 
         // Now 8 MANA = $8, which exceeds the $5 limit
         RegisterNameCrossChainExecutor.ExternalCall memory call2 = _createValidExternalCall(manaFee);
@@ -338,7 +338,7 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
     function test_execute_Success_WithUpdatedMaxFee() public {
         // Update max fee to $10
         vm.prank(owner);
-        executor.updateMaxFeeUSD(10 ether);
+        executor.updateMaxUSDFee(10 ether);
 
         // Now 20 MANA should be valid (20 MANA * $0.50 = $10)
         uint256 manaFee = 20 ether;
@@ -387,8 +387,8 @@ contract RegisterNameCrossChainExecutorExecuteTest is RegisterNameCrossChainExec
             IERC20(mana),
             address(coral),
             maxUSDMANAFee,
-            address(manaUsdAggregator),
-            manaUsdAggregatorTolerance
+            address(manaUSDAggregator),
+            manaUSDAggregatorTolerance
         );
 
         // Set the executor in the malicious contract

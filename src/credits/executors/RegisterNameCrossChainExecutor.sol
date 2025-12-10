@@ -34,14 +34,14 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
 
     /// @notice The MANA/USD Chainlink aggregator.
     /// @dev Used to obtain the rate of MANA expressed in USD.
-    IAggregator public immutable manaUsdAggregator;
+    IAggregator public immutable manaUSDAggregator;
 
     /// @notice Maximum time (in seconds) since the MANA/USD aggregator result was last updated before it is considered outdated.
-    uint256 public immutable manaUsdAggregatorTolerance;
+    uint256 public immutable manaUSDAggregatorTolerance;
 
     /// @notice Maximum USD amount that can be paid in MANA for the transaction fee.
     /// @dev Expressed in USD with 18 decimals (e.g., 1000000000000000000 = $1.00).
-    uint256 public maxFeeUSD;
+    uint256 public maxUSDFee;
 
     /// @notice Struct containing the parameters for an external call to be executed.
     /// @param target The contract address of the external call.
@@ -56,7 +56,7 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     event Executed(ExternalCall _externalCall);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
-    event MaxFeeUSDUpdated(uint256 _maxFeeUSD);
+    event MaxUSDFeeUpdated(uint256 _maxUSDFee);
 
     error Unauthorized(address _sender);
     error InvalidTarget();
@@ -68,27 +68,27 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     /// @param _creditsManager The address of the credits manager contract.
     /// @param _mana The address of the MANA token contract.
     /// @param _coral The address of the Coral contract for cross-chain execution.
-    /// @param _maxFeeUSD The maximum USD amount (in 18 decimals) that can be paid in MANA for the fee.
-    /// @param _manaUsdAggregator The address of the MANA/USD price aggregator.
-    /// @param _manaUsdAggregatorTolerance The tolerance (in seconds) that indicates if the result provided by the aggregator is old.
+    /// @param _maxUSDFee The maximum USD amount (in 18 decimals) that can be paid in MANA for the fee.
+    /// @param _manaUSDAggregator The address of the MANA/USD price aggregator.
+    /// @param _manaUSDAggregatorTolerance The tolerance (in seconds) that indicates if the result provided by the aggregator is old.
     constructor(
         address _owner,
         address _creditsManager,
         IERC20 _mana,
         address _coral,
-        uint256 _maxFeeUSD,
-        address _manaUsdAggregator,
-        uint256 _manaUsdAggregatorTolerance
+        uint256 _maxUSDFee,
+        address _manaUSDAggregator,
+        uint256 _manaUSDAggregatorTolerance
     ) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
 
         creditsManager = _creditsManager;
         mana = _mana;
         coral = _coral;
-        manaUsdAggregator = IAggregator(_manaUsdAggregator);
-        manaUsdAggregatorTolerance = _manaUsdAggregatorTolerance;
+        manaUSDAggregator = IAggregator(_manaUSDAggregator);
+        manaUSDAggregatorTolerance = _manaUSDAggregatorTolerance;
 
-        _updateMaxFeeUSD(_maxFeeUSD);
+        _updateMaxUSDFee(_maxUSDFee);
     }
 
     /// @notice Executes a cross-chain name registration call through the Coral contract.
@@ -185,9 +185,9 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
 
     /// @notice Updates the maximum USD amount that can be paid in MANA for the transaction fee.
     /// @dev Only the contract admin can call this function.
-    /// @param _maxFeeUSD The new maximum USD MANA fee (in 18 decimals).
-    function updateMaxFeeUSD(uint256 _maxFeeUSD) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updateMaxFeeUSD(_maxFeeUSD);
+    /// @param _maxUSDFee The new maximum USD MANA fee (in 18 decimals).
+    function updateMaxUSDFee(uint256 _maxUSDFee) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateMaxUSDFee(_maxUSDFee);
     }
 
     /// @notice Validates that the MANA fee does not exceed the maximum allowed USD value.
@@ -195,11 +195,11 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     /// @param _manaFee The MANA fee amount to validate.
     function _validateMANAFee(uint256 _manaFee) internal view {
         // Obtains the price of MANA in USD from the Chainlink aggregator.
-        int256 manaUsdRate = _getRateFromAggregator(manaUsdAggregator, manaUsdAggregatorTolerance);
+        int256 manaUSDRate = _getRateFromAggregator(manaUSDAggregator, manaUSDAggregatorTolerance);
 
         // Calculate the maximum MANA amount based on the USD limit.
-        // manaUsdRate has 18 decimals, so we multiply by 1e18 to get the result in MANA wei.
-        uint256 maxMANA = maxFeeUSD * 1e18 / uint256(manaUsdRate);
+        // manaUSDRate has 18 decimals, so we multiply by 1e18 to get the result in MANA wei.
+        uint256 maxMANA = maxUSDFee * 1e18 / uint256(manaUSDRate);
 
         if (_manaFee > maxMANA) {
             revert MANAforFeeExceeded();
@@ -207,10 +207,10 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     }
 
     /// @dev Internal function to update the maximum USD MANA fee.
-    /// @param _maxFeeUSD The new maximum USD MANA fee (in 18 decimals).
-    function _updateMaxFeeUSD(uint256 _maxFeeUSD) internal {
-        maxFeeUSD = _maxFeeUSD;
+    /// @param _maxUSDFee The new maximum USD MANA fee (in 18 decimals).
+    function _updateMaxUSDFee(uint256 _maxUSDFee) internal {
+        maxUSDFee = _maxUSDFee;
 
-        emit MaxFeeUSDUpdated(_maxFeeUSD);
+        emit MaxUSDFeeUpdated(_maxUSDFee);
     }
 }

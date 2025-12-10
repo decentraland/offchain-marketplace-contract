@@ -11,7 +11,7 @@ import {MockAggregator} from "src/mocks/MockAggregator.sol";
 contract RegisterNameCrossChainExecutorTestBase is Test {
     RegisterNameCrossChainExecutor internal executor;
     MockCoral internal coral;
-    MockAggregator internal manaUsdAggregator;
+    MockAggregator internal manaUSDAggregator;
 
     address internal owner;
     address internal creditsManager;
@@ -19,7 +19,7 @@ contract RegisterNameCrossChainExecutorTestBase is Test {
     address internal mana;
     address internal manaHolder;
     uint256 internal maxUSDMANAFee;
-    uint256 internal manaUsdAggregatorTolerance;
+    uint256 internal manaUSDAggregatorTolerance;
 
     // Mock external call data
     // Selector for fundAndRunMulticall
@@ -30,7 +30,7 @@ contract RegisterNameCrossChainExecutorTestBase is Test {
     event Executed(RegisterNameCrossChainExecutor.ExternalCall _externalCall);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
-    event MaxFeeUSDUpdated(uint256 _maxFeeUSD);
+    event MaxUSDFeeUpdated(uint256 _maxUSDFee);
 
     function setUp() public virtual {
         vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon", 68650527)); // Mar-04-2025 09:10:51 PM +UTC
@@ -50,16 +50,16 @@ contract RegisterNameCrossChainExecutorTestBase is Test {
         // Create mock aggregator
         // MANA/USD = $0.50 (with 8 decimals = 50000000)
         int256 manaUsdPrice = 50000000; // $0.50
-        manaUsdAggregator = new MockAggregator(owner, manaUsdPrice, 0, 8);
+        manaUSDAggregator = new MockAggregator(owner, manaUsdPrice, 0, 8);
 
         // Max fee: $5 USD (with 18 decimals)
         maxUSDMANAFee = 5 ether;
-        manaUsdAggregatorTolerance = 1 hours;
+        manaUSDAggregatorTolerance = 1 hours;
 
         // Deploy executor
         vm.startPrank(owner);
         executor = new RegisterNameCrossChainExecutor(
-            owner, creditsManager, IERC20(mana), address(coral), maxUSDMANAFee, address(manaUsdAggregator), manaUsdAggregatorTolerance
+            owner, creditsManager, IERC20(mana), address(coral), maxUSDMANAFee, address(manaUSDAggregator), manaUSDAggregatorTolerance
         );
 
         // Grant pauser role
