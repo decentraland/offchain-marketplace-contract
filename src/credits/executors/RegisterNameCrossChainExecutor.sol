@@ -47,8 +47,8 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
 
     /// @notice Struct containing the parameters for an external call to be executed.
     /// @param target The contract address of the external call.
-    /// @param data The calldata for the external call (without the selector).
-    /// @param extra Additional data containing the MANA fee amount needed for the transaction in Ethereum (abi.encoded).
+    /// @param data The calldata for the external call (including the function selector).
+    /// @param extra Additional data containing the MANA fee amount needed for the transaction (abi.encoded).
     struct ExternalCall {
         address target;
         bytes data;
@@ -94,7 +94,7 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
 
     /// @notice Executes a cross-chain name registration call through the Coral contract.
     /// @dev Can only be called by the credits manager. Validates the fee, transfers MANA, and executes the call.
-    /// @param _args The external call parameters including target, selector, data, MANA fee, and expiration.
+    /// @param _args The external call parameters including target, data (with selector), and extra (MANA fee).
     function execute(ExternalCall calldata _args) external nonReentrant whenNotPaused {
         // Get the sender of the transaction.
         // Defined here to prevent calling _msgSender() multiple times for this transaction.
