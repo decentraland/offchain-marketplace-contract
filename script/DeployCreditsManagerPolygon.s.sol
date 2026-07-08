@@ -13,6 +13,24 @@ contract DeployCreditsManagerPolygonScript is Script {
         return marketplaces;
     }
 
+    function _createSalesAllowedArray() private view returns (CreditsManagerPolygon.CreditTypeSalesAllowed[] memory) {
+        CreditsManagerPolygon.CreditTypeSalesAllowed[] memory salesAllowed = new CreditsManagerPolygon.CreditTypeSalesAllowed[](2);
+
+        salesAllowed[0] = CreditsManagerPolygon.CreditTypeSalesAllowed({
+            creditType: CreditsManagerPolygon.CreditType.SEASON,
+            primarySalesAllowed: vm.envBool("SEASON_PRIMARY_SALES_ALLOWED"),
+            secondarySalesAllowed: vm.envBool("SEASON_SECONDARY_SALES_ALLOWED")
+        });
+
+        salesAllowed[1] = CreditsManagerPolygon.CreditTypeSalesAllowed({
+            creditType: CreditsManagerPolygon.CreditType.DIRECT,
+            primarySalesAllowed: vm.envBool("DIRECT_PRIMARY_SALES_ALLOWED"),
+            secondarySalesAllowed: vm.envBool("DIRECT_SECONDARY_SALES_ALLOWED")
+        });
+
+        return salesAllowed;
+    }
+
     function run() public {
         // Start broadcasting transactions
         vm.startBroadcast();
@@ -32,8 +50,7 @@ contract DeployCreditsManagerPolygonScript is Script {
         CreditsManagerPolygon creditsManager = new CreditsManagerPolygon(
             roles,
             vm.envUint("MAX_MANA_CREDITED_PER_HOUR"),
-            vm.envBool("PRIMARY_SALES_ALLOWED"),
-            vm.envBool("SECONDARY_SALES_ALLOWED"),
+            _createSalesAllowedArray(),
             IERC20(vm.envAddress("MANA_TOKEN")),
             vm.envAddress("LEGACY_MARKETPLACE"),
             vm.envAddress("COLLECTION_STORE"),

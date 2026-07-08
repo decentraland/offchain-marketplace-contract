@@ -52,6 +52,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice Asset type for collection items for the Marketplace Trade struct.
     uint256 public constant ASSET_TYPE_COLLECTION_ITEM = 4;
 
+    /// @notice The type of a credit.
+    /// @dev SEASON credits are granted as part of a seasonal rewards program.
+    /// DIRECT credits are granted directly to a specific user outside of a season.
+    enum CreditType {
+        SEASON,
+        DIRECT
+    }
+
     /// @notice Whether a user is denied from using credits.
     mapping(address => bool) public isDenied;
 
@@ -75,11 +83,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice The hour of the last MANA credit.
     uint256 public hourOfLastManaCredit;
 
-    /// @notice Whether primary sales are allowed.
-    bool public primarySalesAllowed;
+    /// @notice Whether primary sales are allowed, scoped per credit type.
+    mapping(CreditType => bool) public primarySalesAllowed;
 
-    /// @notice Whether secondary sales are allowed.
-    bool public secondarySalesAllowed;
+    /// @notice Whether secondary sales are allowed, scoped per credit type.
+    mapping(CreditType => bool) public secondarySalesAllowed;
 
     /// @notice The address of the Legacy Marketplace contract.
     address public immutable legacyMarketplace;
@@ -96,8 +104,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice The address of the Marketplace contract.
     mapping(address => bool) public marketplaces;
 
-    /// @notice Tracks the allowed custom external calls.
-    mapping(address => mapping(bytes4 => bool)) public allowedCustomExternalCalls;
+    /// @notice Tracks the allowed custom external calls, scoped per credit type.
+    mapping(CreditType => mapping(address => mapping(bytes4 => bool))) public allowedCustomExternalCalls;
 
     /// @notice Tracks used custom external calls.
     /// @dev The key is the hash of the custom external call.
@@ -143,10 +151,22 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param value How much ERC20 the credit is worth.
     /// @param expiresAt The timestamp when the credit expires.
     /// @param salt Value used to generate unique credits.
+    /// @param creditType The type of the credit. Determines which sales/external call permissions apply.
     struct Credit {
         uint256 value;
         uint256 expiresAt;
         bytes32 salt;
+        CreditType creditType;
+    }
+
+    /// @notice The sales permissions to initialize a credit type with.
+    /// @param creditType The credit type these permissions apply to.
+    /// @param primarySalesAllowed Whether primary sales are allowed for this credit type.
+    /// @param secondarySalesAllowed Whether secondary sales are allowed for this credit type.
+    struct CreditTypeSalesAllowed {
+        CreditType creditType;
+        bool primarySalesAllowed;
+        bool secondarySalesAllowed;
     }
 
     /// @param target The contract address of the external call.
@@ -169,13 +189,15 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
     event MarketplaceAllowed(address indexed _sender, address indexed _target, bool _allowed);
-    event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
+    event CustomExternalCallAllowed(
+        address indexed _sender, CreditType indexed _creditType, address indexed _target, bytes4 _selector, bool _allowed
+    );
     event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _customExternalCallHash);
     event CreditUsed(address indexed _sender, bytes32 indexed _creditId, Credit _credit, uint256 _value);
     event CreditsUsed(address indexed _sender, uint256 _manaTransferred, uint256 _creditedValue);
     event MaxManaCreditedPerHourUpdated(address indexed _sender, uint256 _maxManaCreditedPerHour);
-    event PrimarySalesAllowedUpdated(address indexed _sender, bool _primarySalesAllowed);
-    event SecondarySalesAllowedUpdated(address indexed _sender, bool _secondarySalesAllowed);
+    event PrimarySalesAllowedUpdated(address indexed _sender, CreditType indexed _creditType, bool _primarySalesAllowed);
+    event SecondarySalesAllowedUpdated(address indexed _sender, CreditType indexed _creditType, bool _secondarySalesAllowed);
 
     error Unauthorized(address _sender);
     error InvalidUsersLength();
@@ -207,11 +229,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     error MaxManaCreditedPerHourExceeded(uint256 _creditableManaThisHour, uint256 _creditedValue);
     error MaxUncreditedValueExceeded(uint256 _uncreditedValue, uint256 _maxUncreditedValue);
     error NotDecentralandCollection(address _contractAddress);
+    error MixedCreditTypes();
 
     /// @param _roles The roles to initialize the contract with.
     /// @param _maxManaCreditedPerHour The maximum amount of MANA that can be credited per hour.
-    /// @param _primarySalesAllowed Whether primary sales are allowed.
-    /// @param _secondarySalesAllowed Whether secondary sales are allowed.
+    /// @param _salesAllowed The primary/secondary sales permissions per credit type.
     /// @param _mana The MANA token.
     /// @param _legacyMarketplace The Legacy Marketplace contract.
     /// @param _collectionStore The CollectionStore contract.
@@ -221,8 +243,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     constructor(
         Roles memory _roles,
         uint256 _maxManaCreditedPerHour,
-        bool _primarySalesAllowed,
-        bool _secondarySalesAllowed,
+        CreditTypeSalesAllowed[] memory _salesAllowed,
         IERC20 _mana,
         address _legacyMarketplace,
         address _collectionStore,
@@ -239,8 +260,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.customExternalCallRevoker);
 
         _updateMaxManaCreditedPerHour(_maxManaCreditedPerHour);
-        _updatePrimarySalesAllowed(_primarySalesAllowed);
-        _updateSecondarySalesAllowed(_secondarySalesAllowed);
+
+        for (uint256 i = 0; i < _salesAllowed.length; i++) {
+            _updatePrimarySalesAllowed(_salesAllowed[i].creditType, _salesAllowed[i].primarySalesAllowed);
+            _updateSecondarySalesAllowed(_salesAllowed[i].creditType, _salesAllowed[i].secondarySalesAllowed);
+        }
 
         for (uint256 i = 0; i < _marketplaces.length; i++) {
             _allowMarketplace(_marketplaces[i], true);
@@ -329,18 +353,20 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _updateMaxManaCreditedPerHour(_maxManaCreditedPerHour);
     }
 
-    /// @notice Update whether primary sales are allowed.
+    /// @notice Update whether primary sales are allowed for a credit type.
     /// @dev Only the owner can update whether primary sales are allowed.
-    /// @param _primarySalesAllowed Whether primary sales are allowed.
-    function updatePrimarySalesAllowed(bool _primarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updatePrimarySalesAllowed(_primarySalesAllowed);
+    /// @param _creditType The credit type to update.
+    /// @param _primarySalesAllowed Whether primary sales are allowed for the given credit type.
+    function updatePrimarySalesAllowed(CreditType _creditType, bool _primarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updatePrimarySalesAllowed(_creditType, _primarySalesAllowed);
     }
 
-    /// @notice Update whether secondary sales are allowed.
+    /// @notice Update whether secondary sales are allowed for a credit type.
     /// @dev Only the owner can update whether secondary sales are allowed.
-    /// @param _secondarySalesAllowed Whether secondary sales are allowed.
-    function updateSecondarySalesAllowed(bool _secondarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updateSecondarySalesAllowed(_secondarySalesAllowed);
+    /// @param _creditType The credit type to update.
+    /// @param _secondarySalesAllowed Whether secondary sales are allowed for the given credit type.
+    function updateSecondarySalesAllowed(CreditType _creditType, bool _secondarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateSecondarySalesAllowed(_creditType, _secondarySalesAllowed);
     }
 
     /// @notice Withdraw ERC20 tokens from the contract.
@@ -381,15 +407,16 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit MarketplaceAllowed(_msgSender(), _target, _allowed);
     }
 
-    /// @notice Allows a custom external call.
+    /// @notice Allows a custom external call for a given credit type.
     /// @dev Only the owner can allow custom external calls.
+    /// @param _creditType The credit type this permission applies to.
     /// @param _target The target of the external call.
     /// @param _selector The selector of the external call.
     /// @param _allowed Whether the external call is allowed.
-    function allowCustomExternalCall(address _target, bytes4 _selector, bool _allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        allowedCustomExternalCalls[_target][_selector] = _allowed;
+    function allowCustomExternalCall(CreditType _creditType, address _target, bytes4 _selector, bool _allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        allowedCustomExternalCalls[_creditType][_target][_selector] = _allowed;
 
-        emit CustomExternalCallAllowed(_msgSender(), _target, _selector, _allowed);
+        emit CustomExternalCallAllowed(_msgSender(), _creditType, _target, _selector, _allowed);
     }
 
     /// @notice Revokes custom external calls.
@@ -461,28 +488,53 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             revert DeniedUser(_sender);
         }
 
+        // Determine the credit type being used for this call. All credits in the batch must share the same type
+        // given that sales/external call permissions are scoped per credit type.
+        CreditType creditType = _getCreditType(_args.credits);
+
         // Route to the appropriate pre-execution handler based on the target contract
         if (_args.externalCall.target == legacyMarketplace) {
-            _handleLegacyMarketplacePreExecution(_args);
+            _handleLegacyMarketplacePreExecution(_args, creditType);
         } else if (marketplaces[_args.externalCall.target]) {
-            _handleMarketplacePreExecution(_args);
+            _handleMarketplacePreExecution(_args, creditType);
         } else if (_args.externalCall.target == collectionStore) {
-            _handleCollectionStorePreExecution(_args);
+            _handleCollectionStorePreExecution(_args, creditType);
         } else {
-            _handleCustomExternalCallPreExecution(_args, _sender);
+            _handleCustomExternalCallPreExecution(_args, _sender, creditType);
         }
+    }
+
+    /// @dev Determines the credit type used in this call from the provided credits.
+    /// @dev Reverts if no credits were provided, or if the provided credits mix more than one type.
+    /// @param _credits The credits to use.
+    /// @return The credit type shared by all the provided credits.
+    function _getCreditType(Credit[] calldata _credits) internal pure returns (CreditType) {
+        if (_credits.length == 0) {
+            revert NoCredits();
+        }
+
+        CreditType creditType = _credits[0].creditType;
+
+        for (uint256 i = 1; i < _credits.length; i++) {
+            if (_credits[i].creditType != creditType) {
+                revert MixedCreditTypes();
+            }
+        }
+
+        return creditType;
     }
 
     /// @dev Handles all checks that need to be done before executing the external call for the Legacy Marketplace.
     /// @param _args The arguments for the useCredits function.
-    function _handleLegacyMarketplacePreExecution(UseCreditsArgs calldata _args) internal view {
+    /// @param _creditType The credit type being used for this call.
+    function _handleLegacyMarketplacePreExecution(UseCreditsArgs calldata _args, CreditType _creditType) internal view {
         // Check that only executeOrder is being called.
         if (_args.externalCall.selector != ILegacyMarketplace.executeOrder.selector) {
             revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
         }
 
-        // Secondary sales have to be allowed.
-        if (!secondarySalesAllowed) {
+        // Secondary sales have to be allowed for this credit type.
+        if (!secondarySalesAllowed[_creditType]) {
             revert SecondarySalesNotAllowed();
         }
 
@@ -495,10 +547,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @dev Handles all checks that need to be done before executing the external call for the Marketplace.
     /// @param _args The arguments for the useCredits function.
-    function _handleMarketplacePreExecution(UseCreditsArgs memory _args) internal view {
+    /// @param _creditType The credit type being used for this call.
+    function _handleMarketplacePreExecution(UseCreditsArgs memory _args, CreditType _creditType) internal view {
         // Cache these flags to prevent multiple storage reads.
-        bool memPrimarySalesAllowed = primarySalesAllowed;
-        bool memSecondarySalesAllowed = secondarySalesAllowed;
+        bool memPrimarySalesAllowed = primarySalesAllowed[_creditType];
+        bool memSecondarySalesAllowed = secondarySalesAllowed[_creditType];
 
         // Check that only accept or acceptWithCoupon are being called.
         if (_args.externalCall.selector != IMarketplace.accept.selector && _args.externalCall.selector != IMarketplace.acceptWithCoupon.selector) {
@@ -566,13 +619,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @dev Handles all checks that need to be done before executing the external call for the Collection Store.
     /// @param _args The arguments for the useCredits function.
-    function _handleCollectionStorePreExecution(UseCreditsArgs calldata _args) internal view {
+    /// @param _creditType The credit type being used for this call.
+    function _handleCollectionStorePreExecution(UseCreditsArgs calldata _args, CreditType _creditType) internal view {
         // Check that only buy is being called.
         if (_args.externalCall.selector != ICollectionStore.buy.selector) {
             revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
         }
 
-        if (!primarySalesAllowed) {
+        if (!primarySalesAllowed[_creditType]) {
             revert PrimarySalesNotAllowed();
         }
 
@@ -595,9 +649,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @dev Handles all checks that need to be done before executing the external call for a custom external call.
     /// @param _args The arguments for the useCredits function.
     /// @param _sender The caller of the useCredits function.
-    function _handleCustomExternalCallPreExecution(UseCreditsArgs calldata _args, address _sender) internal {
-        // Check that the external call has been allowed.
-        if (!allowedCustomExternalCalls[_args.externalCall.target][_args.externalCall.selector]) {
+    /// @param _creditType The credit type being used for this call.
+    function _handleCustomExternalCallPreExecution(UseCreditsArgs calldata _args, address _sender, CreditType _creditType) internal {
+        // Check that the external call has been allowed for this credit type.
+        if (!allowedCustomExternalCalls[_creditType][_args.externalCall.target][_args.externalCall.selector]) {
             revert CustomExternalCallNotAllowed(_args.externalCall.target, _args.externalCall.selector);
         }
 
@@ -846,20 +901,22 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit MaxManaCreditedPerHourUpdated(_msgSender(), _maxManaCreditedPerHour);
     }
 
-    /// @dev Updates whether primary sales are allowed.
-    /// @param _primarySalesAllowed Whether primary sales are allowed.
-    function _updatePrimarySalesAllowed(bool _primarySalesAllowed) internal {
-        primarySalesAllowed = _primarySalesAllowed;
+    /// @dev Updates whether primary sales are allowed for a credit type.
+    /// @param _creditType The credit type to update.
+    /// @param _primarySalesAllowed Whether primary sales are allowed for the given credit type.
+    function _updatePrimarySalesAllowed(CreditType _creditType, bool _primarySalesAllowed) internal {
+        primarySalesAllowed[_creditType] = _primarySalesAllowed;
 
-        emit PrimarySalesAllowedUpdated(_msgSender(), _primarySalesAllowed);
+        emit PrimarySalesAllowedUpdated(_msgSender(), _creditType, _primarySalesAllowed);
     }
 
-    /// @dev Updates whether secondary sales are allowed.
-    /// @param _secondarySalesAllowed Whether secondary sales are allowed.
-    function _updateSecondarySalesAllowed(bool _secondarySalesAllowed) internal {
-        secondarySalesAllowed = _secondarySalesAllowed;
+    /// @dev Updates whether secondary sales are allowed for a credit type.
+    /// @param _creditType The credit type to update.
+    /// @param _secondarySalesAllowed Whether secondary sales are allowed for the given credit type.
+    function _updateSecondarySalesAllowed(CreditType _creditType, bool _secondarySalesAllowed) internal {
+        secondarySalesAllowed[_creditType] = _secondarySalesAllowed;
 
-        emit SecondarySalesAllowedUpdated(_msgSender(), _secondarySalesAllowed);
+        emit SecondarySalesAllowedUpdated(_msgSender(), _creditType, _secondarySalesAllowed);
     }
 
     /// @dev This is used to prevent users from consuming credits on non-decentraland collections.

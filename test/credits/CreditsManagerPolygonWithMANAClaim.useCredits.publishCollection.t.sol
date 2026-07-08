@@ -86,6 +86,7 @@ contract CreditsManagerPolygonWithMANAClaimUseCreditsPublishCollectionTest is Cr
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
         credits[0].value = 1000 ether;
         credits[0].expiresAt = type(uint256).max;
+        credits[0].creditType = CreditsManagerPolygon.CreditType.DIRECT;
 
         // Credits Signatures
         bytes[] memory creditsSignatures = new bytes[](1);
@@ -103,7 +104,7 @@ contract CreditsManagerPolygonWithMANAClaimUseCreditsPublishCollectionTest is Cr
         IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(collectionManager, createCollectionSelector, true);
+        creditsManager.allowCustomExternalCall(CreditsManagerPolygon.CreditType.DIRECT, collectionManager, createCollectionSelector, true);
 
         vm.prank(owner);
         creditsManager.updateMaxManaCreditedPerHour(type(uint256).max);
@@ -161,6 +162,7 @@ contract CreditsManagerPolygonWithMANAClaimUseCreditsPublishCollectionTest is Cr
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
         credits[0].value = 1000 ether;
         credits[0].expiresAt = type(uint256).max;
+        credits[0].creditType = CreditsManagerPolygon.CreditType.DIRECT;
 
         // Credits Signatures
         bytes[] memory creditsSignatures = new bytes[](1);
@@ -178,7 +180,7 @@ contract CreditsManagerPolygonWithMANAClaimUseCreditsPublishCollectionTest is Cr
         IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(collectionManager, createCollectionSelector, true);
+        creditsManager.allowCustomExternalCall(CreditsManagerPolygon.CreditType.DIRECT, collectionManager, createCollectionSelector, true);
 
         vm.prank(owner);
         creditsManager.updateMaxManaCreditedPerHour(type(uint256).max);

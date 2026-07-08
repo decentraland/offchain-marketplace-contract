@@ -49,13 +49,15 @@ contract CreditsManagerPolygonWithMANAClaimTestBase is Test, IERC721Receiver {
     event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
-    event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
+    event CustomExternalCallAllowed(
+        address indexed _sender, CreditsManagerPolygon.CreditType indexed _creditType, address indexed _target, bytes4 _selector, bool _allowed
+    );
     event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _customExternalCallHash);
     event CreditUsed(address indexed _sender, bytes32 indexed _creditId, CreditsManagerPolygon.Credit _credit, uint256 _value);
     event CreditsUsed(address indexed _sender, uint256 _manaTransferred, uint256 _creditedValue);
     event MaxManaCreditedPerHourUpdated(address indexed _sender, uint256 _maxManaCreditedPerHour);
-    event PrimarySalesAllowedUpdated(address indexed _sender, bool _primarySalesAllowed);
-    event SecondarySalesAllowedUpdated(address indexed _sender, bool _secondarySalesAllowed);
+    event PrimarySalesAllowedUpdated(address indexed _sender, CreditsManagerPolygon.CreditType indexed _creditType, bool _primarySalesAllowed);
+    event SecondarySalesAllowedUpdated(address indexed _sender, CreditsManagerPolygon.CreditType indexed _creditType, bool _secondarySalesAllowed);
 
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
         return this.onERC721Received.selector;
@@ -93,11 +95,22 @@ contract CreditsManagerPolygonWithMANAClaimTestBase is Test, IERC721Receiver {
         collectionFactory = 0xB549B2442b2BD0a53795BC5cDcBFE0cAF7ACA9f8;
         collectionFactoryV3 = 0x3195e88aE10704b359764CB38e429D24f1c2f781;
 
+        CreditsManagerPolygon.CreditTypeSalesAllowed[] memory salesAllowed = new CreditsManagerPolygon.CreditTypeSalesAllowed[](2);
+        salesAllowed[0] = CreditsManagerPolygon.CreditTypeSalesAllowed({
+            creditType: CreditsManagerPolygon.CreditType.SEASON,
+            primarySalesAllowed: primarySalesAllowed,
+            secondarySalesAllowed: secondarySalesAllowed
+        });
+        salesAllowed[1] = CreditsManagerPolygon.CreditTypeSalesAllowed({
+            creditType: CreditsManagerPolygon.CreditType.DIRECT,
+            primarySalesAllowed: primarySalesAllowed,
+            secondarySalesAllowed: secondarySalesAllowed
+        });
+
         creditsManager = new CreditsManagerPolygonWithMANAClaimHarness(
             roles,
             maxManaCreditedPerHour,
-            primarySalesAllowed,
-            secondarySalesAllowed,
+            salesAllowed,
             IERC20(mana),
             marketplace,
             legacyMarketplace,

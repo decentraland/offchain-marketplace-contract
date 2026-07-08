@@ -18,8 +18,10 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(creditsManager.hasRole(creditsManager.EXTERNAL_CALL_REVOKER_ROLE(), customExternalCallRevoker), true);
 
         assertEq(creditsManager.maxManaCreditedPerHour(), maxManaCreditedPerHour);
-        assertEq(creditsManager.primarySalesAllowed(), primarySalesAllowed);
-        assertEq(creditsManager.secondarySalesAllowed(), secondarySalesAllowed);
+        assertEq(creditsManager.primarySalesAllowed(CreditsManagerPolygon.CreditType.SEASON), primarySalesAllowed);
+        assertEq(creditsManager.secondarySalesAllowed(CreditsManagerPolygon.CreditType.SEASON), secondarySalesAllowed);
+        assertEq(creditsManager.primarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT), primarySalesAllowed);
+        assertEq(creditsManager.secondarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT), secondarySalesAllowed);
 
         assertEq(address(creditsManager.mana()), mana);
         assertEq(creditsManager.marketplaces(marketplace), true);
@@ -210,56 +212,56 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
         );
-        creditsManager.updatePrimarySalesAllowed(primarySalesAllowed);
+        creditsManager.updatePrimarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, primarySalesAllowed);
     }
 
     function test_updatePrimarySalesAllowed_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit PrimarySalesAllowedUpdated(owner, false);
+        emit PrimarySalesAllowedUpdated(owner, CreditsManagerPolygon.CreditType.DIRECT, false);
         vm.prank(owner);
-        creditsManager.updatePrimarySalesAllowed(false);
-        assertEq(creditsManager.primarySalesAllowed(), false);
+        creditsManager.updatePrimarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, false);
+        assertEq(creditsManager.primarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT), false);
 
         vm.expectEmit(address(creditsManager));
-        emit PrimarySalesAllowedUpdated(owner, true);
+        emit PrimarySalesAllowedUpdated(owner, CreditsManagerPolygon.CreditType.DIRECT, true);
         vm.prank(owner);
-        creditsManager.updatePrimarySalesAllowed(true);
-        assertEq(creditsManager.primarySalesAllowed(), true);
+        creditsManager.updatePrimarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, true);
+        assertEq(creditsManager.primarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT), true);
     }
 
     function test_updateSecondarySalesAllowed_RevertsWhenNotOwner() public {
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
         );
-        creditsManager.updateSecondarySalesAllowed(secondarySalesAllowed);
+        creditsManager.updateSecondarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, secondarySalesAllowed);
     }
 
     function test_updateSecondarySalesAllowed_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit SecondarySalesAllowedUpdated(owner, false);
+        emit SecondarySalesAllowedUpdated(owner, CreditsManagerPolygon.CreditType.DIRECT, false);
         vm.prank(owner);
-        creditsManager.updateSecondarySalesAllowed(false);
-        assertEq(creditsManager.secondarySalesAllowed(), false);
+        creditsManager.updateSecondarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, false);
+        assertEq(creditsManager.secondarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT), false);
 
         vm.expectEmit(address(creditsManager));
-        emit SecondarySalesAllowedUpdated(owner, true);
+        emit SecondarySalesAllowedUpdated(owner, CreditsManagerPolygon.CreditType.DIRECT, true);
         vm.prank(owner);
-        creditsManager.updateSecondarySalesAllowed(true);
-        assertEq(creditsManager.secondarySalesAllowed(), true);
+        creditsManager.updateSecondarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, true);
+        assertEq(creditsManager.secondarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT), true);
     }
 
     function test_allowCustomExternalCall_RevertsWhenNotOwner() public {
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
         );
-        creditsManager.allowCustomExternalCall(address(this), bytes4(0), true);
+        creditsManager.allowCustomExternalCall(CreditsManagerPolygon.CreditType.DIRECT, address(this), bytes4(0), true);
     }
 
     function test_allowCustomExternalCall_WhenOwner() public {
         vm.expectEmit(address(creditsManager));
-        emit CustomExternalCallAllowed(owner, address(this), bytes4(0), true);
+        emit CustomExternalCallAllowed(owner, CreditsManagerPolygon.CreditType.DIRECT, address(this), bytes4(0), true);
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(this), bytes4(0), true);
+        creditsManager.allowCustomExternalCall(CreditsManagerPolygon.CreditType.DIRECT, address(this), bytes4(0), true);
     }
 
     function test_revokeCustomExternalCalls_RevertsWhenNotCustomExternalCallRevoker() public {

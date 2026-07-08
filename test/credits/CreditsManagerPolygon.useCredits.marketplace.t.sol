@@ -16,7 +16,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenNotDecentralandItem() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -106,7 +111,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenTheSentBeneficiaryIsZero() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -195,7 +205,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenAssetIsCollectionItemAndPrimarySalesAreNotAllowed() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -278,7 +293,7 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         IERC20(mana).transfer(address(creditsManager), 100 ether);
 
         vm.prank(owner);
-        creditsManager.updatePrimarySalesAllowed(false);
+        creditsManager.updatePrimarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, false);
 
         vm.expectRevert(CreditsManagerPolygon.PrimarySalesNotAllowed.selector);
         creditsManager.useCredits(args);
@@ -287,7 +302,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenAssetIsERC721AndSecondarySalesAreNotAllowed() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -370,7 +390,7 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         IERC20(mana).transfer(address(creditsManager), 100 ether);
 
         vm.prank(owner);
-        creditsManager.updateSecondarySalesAllowed(false);
+        creditsManager.updateSecondarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, false);
 
         vm.expectRevert(CreditsManagerPolygon.SecondarySalesNotAllowed.selector);
         creditsManager.useCredits(args);
@@ -379,7 +399,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenSentAssetsIsEmpty() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -458,7 +483,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenReceivedAssetIsNotERC20OrUSDPeggedMANA() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -547,7 +577,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenMultipleAssetsAreReceived() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -636,7 +671,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenReceivedAssetIsNotMana() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -725,7 +765,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenTradesIsEmpty() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -771,7 +816,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenSelectorIsInvalid() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -855,7 +905,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsWhenTheCallerIsTheSameAsTheSeller() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -944,7 +999,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_RevertsIfSentAssetIsERC20() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1034,7 +1094,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_Success() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1135,7 +1200,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
     function test_useCredits_Success_MetaTx() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1323,7 +1393,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
         address disallowedMarketplace = makeAddr("disallowedMarketplace");
         
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(
@@ -1415,7 +1490,12 @@ contract CreditsManagerPolygonUseCreditsMarketplaceTest is CreditsManagerPolygon
 
         // Now test using credits with this newly allowed marketplace
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(

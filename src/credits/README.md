@@ -44,8 +44,22 @@ struct Credit {
     uint256 value;         // How much MANA the credit is worth
     uint256 expiresAt;     // The timestamp when the credit expires
     bytes32 salt;          // Value used to generate unique credits
+    CreditType creditType; // The type of the credit (SEASON or DIRECT). Determines which sales/external call permissions apply.
 }
 ```
+
+### CreditType
+
+Primary sales, secondary sales, and custom external call permissions are all scoped per `CreditType`, so each type can be independently enabled or disabled:
+
+```solidity
+enum CreditType {
+    SEASON,
+    DIRECT
+}
+```
+
+All credits provided in a single `useCredits` call must share the same `CreditType` — mixing types in one call reverts with `MixedCreditTypes`.
 
 ### ExternalCall
 
