@@ -8,8 +8,9 @@ import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPolygonTestBase.sol";
 import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
 
-/// @notice Tests that primary/secondary sales and custom external call permissions are scoped per CreditType,
-/// and that a single useCredits call cannot mix credits of different types.
+/// @notice Tests that primary/secondary sales and custom external call permissions are scoped per CreditType.
+/// Mixed credit types are allowed in a single useCredits call; only credits whose type does not permit
+/// the action being performed cause a revert.
 contract CreditsManagerPolygonCreditTypeTest is CreditsManagerPolygonTestBase {
     using MessageHashUtils for bytes32;
 
@@ -52,7 +53,7 @@ contract CreditsManagerPolygonCreditTypeTest is CreditsManagerPolygonTestBase {
         });
     }
 
-    function test_useCredits_RevertsWhenCreditsMixDifferentTypes() public {
+    function test_useCredits_SucceedsWithMixedCreditTypesWhenBothAllowed() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](2);
 
         credits[0] = CreditsManagerPolygon.Credit({
@@ -78,10 +79,95 @@ contract CreditsManagerPolygonCreditTypeTest is CreditsManagerPolygonTestBase {
         IERC20(mana).transfer(address(creditsManager), 369 ether);
 
         vm.prank(owner);
-        creditsManager.updateMaxManaCreditedPerHour(369 ether);
+        creditsManager.updateMaxManaCreditedPerHour(type(uint256).max);
 
-        vm.expectRevert(CreditsManagerPolygon.MixedCreditTypes.selector);
+        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
+
+        // Mixed SEASON + DIRECT credits should succeed when both types allow primary sales.
         creditsManager.useCredits(args);
+
+        assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - 369 ether);
+    }
+
+    function test_useCredits_RevertsWhenConsumedCreditTypeNotAllowedForAction() public {
+        // Disable primary sales for DIRECT credits only.
+        vm.prank(owner);
+        creditsManager.updatePrimarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, false);
+
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](2);
+
+        // First credit is SEASON (allowed for primary), second is DIRECT (not allowed).
+        // The purchase costs 369 MANA so both credits will be consumed.
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 200 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.SEASON
+        });
+        credits[1] = CreditsManagerPolygon.Credit({
+            value: 169 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(uint256(1)),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
+
+        bytes[] memory creditsSignatures = new bytes[](2);
+        creditsSignatures[0] = _signCredit(creditsSignerPk, address(this), credits[0]);
+        creditsSignatures[1] = _signCredit(creditsSignerPk, address(this), credits[1]);
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = _buildCollectionStoreArgs(credits, creditsSignatures);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 369 ether);
+
+        vm.prank(owner);
+        creditsManager.updateMaxManaCreditedPerHour(type(uint256).max);
+
+        // Should revert because the DIRECT credit (which must be consumed) does not allow primary sales.
+        vm.expectRevert(CreditsManagerPolygon.PrimarySalesNotAllowed.selector);
+        creditsManager.useCredits(args);
+    }
+
+    function test_useCredits_SucceedsWithMixedTypesWhenDisallowedCreditNotConsumed() public {
+        // Disable primary sales for DIRECT credits only.
+        vm.prank(owner);
+        creditsManager.updatePrimarySalesAllowed(CreditsManagerPolygon.CreditType.DIRECT, false);
+
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](2);
+
+        // First credit is SEASON (allowed) with enough value to cover the full purchase.
+        // Second credit is DIRECT (not allowed for primary) but won't need to be consumed.
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 369 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.SEASON
+        });
+        credits[1] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(uint256(1)),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
+
+        bytes[] memory creditsSignatures = new bytes[](2);
+        creditsSignatures[0] = _signCredit(creditsSignerPk, address(this), credits[0]);
+        creditsSignatures[1] = _signCredit(creditsSignerPk, address(this), credits[1]);
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = _buildCollectionStoreArgs(credits, creditsSignatures);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 369 ether);
+
+        vm.prank(owner);
+        creditsManager.updateMaxManaCreditedPerHour(type(uint256).max);
+
+        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
+
+        // Should succeed because SEASON credit covers the full amount; DIRECT credit is never consumed.
+        creditsManager.useCredits(args);
+
+        assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - 369 ether);
     }
 
     function test_useCredits_RevertsWhenNoCreditsProvided() public {
