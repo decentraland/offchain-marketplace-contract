@@ -16,13 +16,13 @@ abstract contract Signatures is Ownable, EIP712 {
     /// Signers can update this value to revoke signatures created with another value.
     mapping(address => uint256) public signerSignatureIndex;
 
-    /// @notice Mapping of cancelled signatures.
-    /// Signers can invalidate any particular signature by adding it to this mapping.
+    /// @notice Mapping of cancelled Trades/Coupons, keyed by keccak256(abi.encode(signer, EIP-712 digest)).
+    /// Keying on the digest instead of the raw signature bytes makes cancellations immune to signature malleability.
+    /// @dev Name kept for ABI/storage-layout stability.
     mapping(bytes32 => bool) public cancelledSignatures;
 
-    /// @notice Mapping of signature uses.
-    /// Tracks how many times a signature has been used.
-    /// Useful in case the signer wants to determine how many times a signature can be used.
+    /// @notice Mapping of Trade/Coupon uses, keyed identically to `cancelledSignatures`.
+    /// @dev Name kept for ABI/storage-layout stability.
     mapping(bytes32 => uint256) public signatureUses;
 
     event ContractSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
@@ -48,14 +48,14 @@ abstract contract Signatures is Ownable, EIP712 {
         emit SignerSignatureIndexIncreased(caller, newIndex);
     }
 
-    /// @dev Useful to cancel a signature so it cannot be used anymore.
-    /// The implementation should call this function after validating that the caller is the creator of the signature.
-    /// @param _hashedSignature The hash of the signature to cancel.
-    /// @param _caller The address that is canceling the signature.
-    function _cancelSignature(bytes32 _hashedSignature, address _caller) internal {
-        cancelledSignatures[keccak256(abi.encode(_caller, _hashedSignature))] = true;
+    /// @dev Cancels a Trade/Coupon regardless of how its signature is encoded.
+    /// Must be called only after validating that the caller is the signer.
+    /// @param _digest The EIP-712 digest of the Trade/Coupon to cancel.
+    /// @param _caller The address that is canceling it (must be the signer).
+    function _cancelSignature(bytes32 _digest, address _caller) internal {
+        cancelledSignatures[keccak256(abi.encode(_caller, _digest))] = true;
 
-        emit SignatureCancelled(_caller, _hashedSignature);
+        emit SignatureCancelled(_caller, _digest);
     }
 
     /// @dev Verifies that a signature has been signed by a particular signer.

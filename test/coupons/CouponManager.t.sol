@@ -132,12 +132,20 @@ contract UpdateAllowedCouponsTests is CouponsTests {
 }
 
 contract ApplyCouponTests is CouponsTests {
-    event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature, CouponManagerHarness.Coupon _coupon);
+    event CouponApplied(
+        address indexed _caller,
+        bytes32 indexed _tradeSignature,
+        bytes32 indexed _couponSignature,
+        bytes32 _tradeDigest,
+        bytes32 _couponDigest,
+        CouponManagerHarness.Coupon _coupon
+    );
 
     error UnauthorizedCaller(address _caller);
     error CouponNotAllowed(address _coupon);
     error Expired();
     error SignatureOveruse();
+    error NotAllowed();
 
     function test_RevertsIfCallerIsNotTheMarketplace() public {
         CouponManagerHarness.Trade memory trade;
@@ -145,7 +153,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSelector(UnauthorizedCaller.selector, other));
-        couponManager.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon, bytes32(0), other);
     }
 
     function test_RevertsIfCouponImplementationIsNotAllowed() public {
@@ -155,7 +163,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(marketplace);
         vm.expectRevert(abi.encodeWithSelector(CouponNotAllowed.selector, other));
-        couponManager.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon, bytes32(0), other);
     }
 
     function test_RevertsIfCheckFails() public {
@@ -165,7 +173,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(marketplace);
         vm.expectRevert(SignatureOveruse.selector);
-        couponManager.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon, bytes32(0), other);
     }
 
     function test_RevertsIfSignatureIsInvalid() public {
@@ -179,7 +187,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(marketplace);
         vm.expectRevert(InvalidSignature.selector);
-        couponManager.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon, bytes32(0), other);
     }
 
     function test_RevertsIfSignatureHasAlreadyBeenUsed() public {
@@ -193,11 +201,11 @@ contract ApplyCouponTests is CouponsTests {
         coupon.signature = signCoupon(coupon);
 
         vm.prank(marketplace);
-        couponManager.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon, bytes32(0), other);
 
         vm.prank(marketplace);
         vm.expectRevert(SignatureOveruse.selector);
-        couponManager.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon, bytes32(0), other);
     }
 
     function test_AppliesTheCouponToTheTrade() public {
@@ -209,17 +217,48 @@ contract ApplyCouponTests is CouponsTests {
         coupon.checks.uses = 1;
         coupon.signature = signCoupon(coupon);
 
-        bytes32 hashedCouponSignatureWithSigner = keccak256(abi.encode(signer.addr, keccak256(coupon.signature)));
+        bytes32 couponDigest = couponManager.eip712CouponHash(coupon);
+        bytes32 hashedCouponSignatureWithSigner = keccak256(abi.encode(signer.addr, couponDigest));
+        // The trade digest is provided by the calling marketplace and surfaced as-is in the event.
+        bytes32 tradeDigest = keccak256("tradeDigest");
 
         assertEq(couponManager.signatureUses(hashedCouponSignatureWithSigner), 0);
 
         vm.prank(marketplace);
         vm.expectEmit(address(couponManager));
-        emit CouponApplied(marketplace, keccak256(trade.signature), keccak256(coupon.signature), coupon);
-        CouponManagerHarness.Trade memory updatedTrade = couponManager.applyCoupon(trade, coupon);
+        // The event surfaces the forwarded end-user caller, not the marketplace (the msg.sender).
+        emit CouponApplied(other, keccak256(trade.signature), keccak256(coupon.signature), tradeDigest, couponDigest, coupon);
+        CouponManagerHarness.Trade memory updatedTrade = couponManager.applyCoupon(trade, coupon, tradeDigest, other);
         // Mock coupon implementation updates the signer of the trade to address(1337).
         assertEq(updatedTrade.signer, address(1337));
         assertEq(couponManager.signatureUses(hashedCouponSignatureWithSigner), 1);
+    }
+
+    /// Regression for the caller-forwarding fix: Coupon Checks that restrict WHO can use the coupon
+    /// (allowedRoot) must be evaluated against the end user forwarded by the marketplace, not against
+    /// the marketplace contract itself (the msg.sender), which made such coupons unusable.
+    function test_CouponChecksAreEvaluatedAgainstTheForwardedCaller() public {
+        address user = makeAddr("user");
+
+        CouponManagerHarness.Trade memory trade;
+        trade.signer = signer.addr;
+
+        CouponManagerHarness.Coupon memory coupon;
+        coupon.couponAddress = allowedCoupon;
+        coupon.checks.expiration = block.timestamp;
+        coupon.checks.uses = 2;
+        // Single-leaf allowlist containing only `user`; the root equals the leaf and the proof is empty.
+        coupon.checks.allowedRoot = keccak256(bytes.concat(keccak256(abi.encode(user))));
+        coupon.signature = signCoupon(coupon);
+
+        // Forwarding an address outside the allowlist fails, even though the marketplace is the msg.sender.
+        vm.prank(marketplace);
+        vm.expectRevert(NotAllowed.selector);
+        couponManager.applyCoupon(trade, coupon, bytes32(0), other);
+
+        // Forwarding the allowed user succeeds.
+        vm.prank(marketplace);
+        couponManager.applyCoupon(trade, coupon, bytes32(0), user);
     }
 }
 
@@ -237,7 +276,7 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         CouponManagerHarness.Coupon[] memory couponList = new CouponManagerHarness.Coupon[](1);
         couponList[0].signature = signCoupon(couponList[0]);
 
-        bytes32 hashedSignature = keccak256(couponList[0].signature);
+        bytes32 hashedSignature = couponManager.eip712CouponHash(couponList[0]);
         bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
 
         assertEq(couponManager.cancelledSignatures(cancellationKey), false);
@@ -257,8 +296,8 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         couponList[1].checks.expiration = block.timestamp + 1;
         couponList[1].signature = signCoupon(couponList[1]);
 
-        bytes32 hashedSignature1 = keccak256(couponList[0].signature);
-        bytes32 hashedSignature2 = keccak256(couponList[1].signature);
+        bytes32 hashedSignature1 = couponManager.eip712CouponHash(couponList[0]);
+        bytes32 hashedSignature2 = couponManager.eip712CouponHash(couponList[1]);
         bytes32 cancellationKey1 = keccak256(abi.encode(signer.addr, hashedSignature1));
         bytes32 cancellationKey2 = keccak256(abi.encode(signer.addr, hashedSignature2));
 
@@ -283,8 +322,8 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         couponList[0].signature = signCoupon(couponList[0]);
         couponList[1].signature = signCoupon(couponList[1]);
 
-        bytes32 hashedSignature1 = keccak256(couponList[0].signature);
-        bytes32 hashedSignature2 = keccak256(couponList[1].signature);
+        bytes32 hashedSignature1 = couponManager.eip712CouponHash(couponList[0]);
+        bytes32 hashedSignature2 = couponManager.eip712CouponHash(couponList[1]);
         bytes32 cancellationKey1 = keccak256(abi.encode(signer.addr, hashedSignature1));
         bytes32 cancellationKey2 = keccak256(abi.encode(signer.addr, hashedSignature2));
 
@@ -308,7 +347,7 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         CouponManagerHarness.Coupon[] memory couponList = new CouponManagerHarness.Coupon[](1);
         couponList[0].signature = signCoupon(couponList[0]);
 
-        bytes32 hashedSignature = keccak256(couponList[0].signature);
+        bytes32 hashedSignature = couponManager.eip712CouponHash(couponList[0]);
         bytes32 cancellationKey = keccak256(abi.encode(other, hashedSignature));
 
         assertEq(couponManager.cancelledSignatures(cancellationKey), false);
@@ -327,7 +366,7 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         CouponManagerHarness.Coupon[] memory couponList = new CouponManagerHarness.Coupon[](1);
         couponList[0].signature = signCoupon(couponList[0]);
 
-        bytes32 hashedSignature = keccak256(couponList[0].signature);
+        bytes32 hashedSignature = couponManager.eip712CouponHash(couponList[0]);
         bytes32 signerCancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
         bytes32 otherCancellationKey = keccak256(abi.encode(other, hashedSignature));
         bytes32 thirdPartyCancellationKey = keccak256(abi.encode(thirdParty, hashedSignature));
@@ -367,8 +406,8 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         fakeCoupon.signature = signCoupon(fakeCoupon);
         
         // Initially, the signature has 0 uses
-        bytes32 hashedSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateCoupon.signature)));
-        bytes32 hashedFakeSignature = keccak256(abi.encode(sc, keccak256(fakeCoupon.signature)));
+        bytes32 hashedSignature = keccak256(abi.encode(signer.addr, couponManager.eip712CouponHash(legitimateCoupon)));
+        bytes32 hashedFakeSignature = keccak256(abi.encode(sc, couponManager.eip712CouponHash(fakeCoupon)));
         assertNotEq(hashedSignature, hashedFakeSignature);
         assertEq(couponManager.signatureUses(hashedSignature), 0);
         assertEq(couponManager.signatureUses(hashedFakeSignature), 0);
@@ -379,7 +418,7 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         CouponManagerHarness.Trade memory trade;
         trade.signer = sc; // Set the trade signer to match the coupon signer
         vm.prank(marketplace);
-        couponManager.applyCoupon(trade, fakeCoupon);
+        couponManager.applyCoupon(trade, fakeCoupon, bytes32(0), other);
         
         // The signature use count is now 1
         assertEq(couponManager.signatureUses(hashedSignature), 0);
@@ -389,10 +428,116 @@ contract CancelSignatureTestsCouponManager is CouponsTests {
         // because the signature has already been used (SignatureOveruse error)
         trade.signer = signer.addr; // Set the trade signer to match the coupon signer
         vm.prank(marketplace);
-        couponManager.applyCoupon(trade, legitimateCoupon);
+        couponManager.applyCoupon(trade, legitimateCoupon, bytes32(0), other);
 
         assertEq(couponManager.signatureUses(hashedSignature), 1);
         assertEq(couponManager.signatureUses(hashedFakeSignature), 1);
     }
 
+}
+
+/// @notice Regression tests for the signature-encoding malleability fix on the COUPON path
+/// (symmetric to CancellationMalleabilityFixTests in test/marketplace/Marketplace.t.sol).
+/// Pre-fix, coupon cancellation/uses were keyed on keccak256(coupon.signature), so an ERC-1271 /
+/// EIP-7702 wallet accepting alternate encodings of the same signature could bypass both; now they
+/// are keyed on the signed EIP-712 digest. The coupon guard is keyed on the TRADE's signer, so the
+/// signer here is a contract wallet that accepts ANY signature bytes — the worst case for this bug.
+contract CouponMalleabilityFixTests is Test {
+    CouponManagerHarness couponManager;
+    MaliciousContractWithCorrectMagicValue wallet;
+    MockCoupon mockCoupon;
+    VmSafe.Wallet signer;
+    address marketplace;
+    address user;
+
+    function setUp() public {
+        marketplace = makeAddr("marketplace");
+        user = makeAddr("user");
+        mockCoupon = new MockCoupon();
+        wallet = new MaliciousContractWithCorrectMagicValue();
+        signer = vm.createWallet("signer");
+
+        address[] memory allowed = new address[](1);
+        allowed[0] = address(mockCoupon);
+        couponManager = new CouponManagerHarness(marketplace, address(this), allowed);
+    }
+
+    function _coupon(bytes32 salt) internal view returns (CouponManagerHarness.Coupon memory c) {
+        c.couponAddress = address(mockCoupon);
+        c.checks.uses = 1;
+        c.checks.expiration = block.timestamp + 1000;
+        c.checks.salt = salt;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, couponManager.eip712CouponHash(c));
+        c.signature = abi.encodePacked(r, s, v);
+    }
+
+    // A different byte-encoding of the "same" signature. The wallet accepts it just like the original.
+    function _variant(bytes memory sig) internal pure returns (bytes memory) {
+        return abi.encodePacked(sig, hex"00");
+    }
+
+    // The coupon guard is keyed on the trade's signer; the all-accepting wallet is that signer.
+    function _trade() internal view returns (CouponManagerHarness.Trade memory t) {
+        t.signer = address(wallet);
+    }
+
+    function _arr(CouponManagerHarness.Coupon memory c) internal pure returns (CouponManagerHarness.Coupon[] memory a) {
+        a = new CouponManagerHarness.Coupon[](1);
+        a[0] = c;
+    }
+
+    /// A single-use coupon that was already applied cannot be reused via a different encoding.
+    function test_singleUseCoupon_cannotBeReusedWithADifferentEncoding() public {
+        CouponManagerHarness.Coupon memory c = _coupon(keccak256("A"));
+
+        // sanity: the variant is a genuinely different byte-string that the wallet still accepts.
+        assertTrue(keccak256(c.signature) != keccak256(_variant(c.signature)));
+
+        // First (legitimate) use consumes the single allowed use.
+        vm.prank(marketplace);
+        couponManager.applyCoupon(_trade(), c, bytes32(0), user);
+
+        // Replay the same coupon with a different encoding.
+        c.signature = _variant(c.signature);
+        vm.prank(marketplace);
+        vm.expectRevert(abi.encodeWithSignature("SignatureOveruse()"));
+        couponManager.applyCoupon(_trade(), c, bytes32(0), user);
+    }
+
+    /// A cancelled coupon cannot be applied by submitting a different signature encoding.
+    function test_cancelledCoupon_cannotBeReExecutedWithADifferentEncoding() public {
+        CouponManagerHarness.Coupon memory c = _coupon(keccak256("B"));
+
+        // The signer (the wallet — the trade signer the guard is keyed on) cancels the coupon.
+        vm.prank(address(wallet));
+        couponManager.cancelSignature(_arr(c));
+
+        // Applying the same coupon with a DIFFERENT signature encoding must still be blocked.
+        c.signature = _variant(c.signature);
+        vm.prank(marketplace);
+        vm.expectRevert(abi.encodeWithSignature("UsingCancelledSignature()"));
+        couponManager.applyCoupon(_trade(), c, bytes32(0), user);
+    }
+
+    /// Baseline: cancellation still blocks the canonical encoding (held before and after the fix).
+    function test_baseline_couponCancellationBlocksTheCanonicalEncoding() public {
+        CouponManagerHarness.Coupon memory c = _coupon(keccak256("C"));
+        vm.prank(address(wallet));
+        couponManager.cancelSignature(_arr(c));
+
+        vm.prank(marketplace);
+        vm.expectRevert(abi.encodeWithSignature("UsingCancelledSignature()"));
+        couponManager.applyCoupon(_trade(), c, bytes32(0), user);
+    }
+
+    /// Regression: cancelling one coupon must not affect a different coupon.
+    function test_cancellingOneCouponDoesNotBlockAnother() public {
+        CouponManagerHarness.Coupon memory a = _coupon(keccak256("A2"));
+        CouponManagerHarness.Coupon memory b = _coupon(keccak256("B2"));
+        vm.prank(address(wallet));
+        couponManager.cancelSignature(_arr(a));
+
+        vm.prank(marketplace);
+        couponManager.applyCoupon(_trade(), b, bytes32(0), user); // must NOT revert
+    }
 }

@@ -10,6 +10,8 @@ import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarket
 import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
 import {CouponManager} from "src/coupons/CouponManager.sol";
 import {CollectionDiscountCoupon} from "src/coupons/CollectionDiscountCoupon.sol";
+import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
+import {CouponTypes} from "src/coupons/CouponTypes.sol";
 
 // Import the malicious contract from the marketplace tests
 contract MaliciousContractWithCorrectMagicValue {
@@ -926,6 +928,65 @@ contract TransferCollectionItemTests is DecentralandMarketplacePolygonTests {
 
         assertEq(collection.ownerOf(expectedTokenId), signer.addr);
     }
+
+    /// @notice Malleability regression on the primary-sale MINT path.
+    /// A uses=1 collection-item listing signed by a lenient ERC-1271/EIP-7702 wallet is minted once;
+    /// re-submitting the SAME trade + SAME signer with a DIFFERENT signature encoding must revert
+    /// SignatureOveruse (pre-fix it minted a second item under a different signature-hash key).
+    function test_PrimarySaleSingleUseItemCannotBeReMintedWithADifferentEncoding() public {
+        MaliciousContractWithCorrectMagicValue wallet = new MaliciousContractWithCorrectMagicValue();
+
+        // The all-accepting wallet becomes the creator, and the marketplace a minter, so the
+        // collection-item sale MINTS via issueTokens.
+        vm.prank(collectionItemOriginalCreator);
+        collection.transferCreatorship(address(wallet));
+
+        vm.prank(address(wallet));
+        address[] memory minters = new address[](1);
+        minters[0] = address(marketplace);
+        bool[] memory values = new bool[](1);
+        values[0] = true;
+        collection.setMinters(minters, values);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_COLLECTION_ITEM();
+        sent[0].contractAddress = address(collection);
+        sent[0].value = collectionItemId;
+
+        DecentralandMarketplacePolygonHarness.Trade memory trade;
+        trade.checks.expiration = block.timestamp;
+        trade.checks.uses = 1;
+        trade.sent = sent;
+        trade.signer = address(wallet);
+        trade.signature = signTrade(trade);
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0] = trade;
+
+        bytes32 key = keccak256(abi.encode(address(wallet), marketplace.eip712TradeHash(trade)));
+        assertEq(marketplace.signatureUses(key), 0);
+
+        uint256 expectedTokenId = 1053122916685571866979180276836704323188950954005491112543109775772;
+
+        // First accept: mints the item exactly once and consumes the single use.
+        vm.prank(other);
+        marketplace.accept(trades);
+        assertEq(collection.ownerOf(expectedTokenId), other);
+        assertEq(marketplace.signatureUses(key), 1);
+
+        // Re-mint attempt with a different signature encoding, from a DIFFERENT caller: usedTradeIds is
+        // caller-scoped and would block a same-caller replay first, so it is the digest-keyed
+        // signatureUses guard (the one the fix hardens) that must stop this.
+        trade.signature = abi.encodePacked(trade.signature, hex"00");
+        trades[0] = trade;
+
+        vm.prank(makeAddr("attacker"));
+        vm.expectRevert(abi.encodeWithSignature("SignatureOveruse()"));
+        marketplace.accept(trades);
+
+        // The digest key was not advanced again; no second mint occurred.
+        assertEq(marketplace.signatureUses(key), 1);
+    }
 }
 
 contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
@@ -1412,6 +1473,204 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         assertEq(erc20.balanceOf(signer.addr), signerBalance + 48.75 ether);
     }
 
+    /// On a coupon purchase, `CouponApplied._tradeDigest` and `Traded._tradeDigest` carry the SAME value —
+    /// the digest of the ORIGINAL signed order — enabling the digest-based coupon->trade join off-chain.
+    function test_AcceptWithCoupon_CouponAppliedAndTradedEmitTheSignedTradeDigest() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        vm.prank(collectionItemOriginalCreator);
+        collection.transferCreatorship(signer.addr);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        vm.prank(signer.addr);
+        address[] memory setMintersMinters = new address[](1);
+        setMintersMinters[0] = address(marketplace);
+        bool[] memory setMintersValues = new bool[](1);
+        setMintersValues[0] = true;
+        collection.setMinters(setMintersMinters, setMintersValues);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_COLLECTION_ITEM();
+        sent[0].contractAddress = address(collection);
+        sent[0].value = collectionItemId;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        received[0].contractAddress = address(erc20);
+        received[0].value = erc20Sent;
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        CollectionDiscountCoupon.CollectionDiscountCouponData memory collectionDiscountCouponData;
+        collectionDiscountCouponData.discount = 500_000;
+        collectionDiscountCouponData.discountType = collectionDiscountCoupon.DISCOUNT_TYPE_RATE();
+        collectionDiscountCouponData.root = 0x68ad9c0c778776109596c0568ba9c69ca861338e902dfb8aa5be05be190c65ae;
+
+        CollectionDiscountCoupon.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
+        collectionDiscountCouponCallerData.proofs = new bytes32[][](1);
+        collectionDiscountCouponCallerData.proofs[0] = new bytes32[](3);
+        collectionDiscountCouponCallerData.proofs[0][0] = 0x161691c7185a37ff918e70bebef716ddd87844ac47f419ea23eaf4fe983fbf2c;
+        collectionDiscountCouponCallerData.proofs[0][1] = 0xf1bd988d50408c15a0d017a73ff63ab5c30cc78771b609d99142fa4052c02baa;
+        collectionDiscountCouponCallerData.proofs[0][2] = 0xd50d464af1a64cdd6868c42456bc58cfc561fac83e19d742b6397ae5eb44660f;
+
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
+        coupons[0].checks.expiration = block.timestamp;
+        coupons[0].checks.uses = 1;
+        coupons[0].couponAddress = address(collectionDiscountCoupon);
+        coupons[0].data = abi.encode(collectionDiscountCouponData);
+        coupons[0].callerData = abi.encode(collectionDiscountCouponCallerData);
+        coupons[0].signature = signCoupon(coupons[0]);
+
+        // The digests of the ORIGINAL signed structs, computed before any on-chain mutation.
+        bytes32 signedTradeDigest = marketplace.eip712TradeHash(trades[0]);
+        bytes32 signedCouponDigest = couponManager.eip712CouponHash(coupons[0]);
+
+        vm.recordLogs();
+        vm.prank(other);
+        marketplace.acceptWithCoupon(trades, coupons);
+
+        EmittedDigestEvents memory e = _extractDigestEvents();
+
+        assertTrue(e.foundTraded);
+        assertTrue(e.foundCouponApplied);
+
+        // Both events carry the signed (pre-coupon, pre-fee) trade digest -> digest-based join.
+        assertEq(e.tradedDigestTopic, signedTradeDigest);
+        assertEq(e.couponAppliedTradeDigest, signedTradeDigest);
+        assertEq(e.couponAppliedCouponDigest, signedCouponDigest);
+
+        // The legacy intra-tx join by raw-signature hash also remains coherent.
+        assertEq(e.tradedSignatureTopic, keccak256(trades[0].signature));
+        assertEq(e.couponAppliedTradeSignatureTopic, keccak256(trades[0].signature));
+
+        // The emitted struct no longer hashes to the signed digest (its received values and extra data were
+        // mutated on-chain), which is why the digest must be emitted instead of recomputed from event data.
+        assertTrue(marketplace.eip712TradeHash(e.emittedTrade) != signedTradeDigest);
+    }
+
+    struct EmittedDigestEvents {
+        bool foundTraded;
+        bool foundCouponApplied;
+        bytes32 tradedSignatureTopic;
+        bytes32 tradedDigestTopic;
+        bytes32 couponAppliedTradeSignatureTopic;
+        bytes32 couponAppliedTradeDigest;
+        bytes32 couponAppliedCouponDigest;
+        MarketplaceTypes.Trade emittedTrade;
+    }
+
+    /// Extracts the digest-related fields of the Traded and CouponApplied events from the recorded logs.
+    function _extractDigestEvents() internal returns (EmittedDigestEvents memory e) {
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].emitter == address(marketplace)) {
+                // The marketplace emits a single event on this path: Traded.
+                e.foundTraded = true;
+                e.tradedSignatureTopic = logs[i].topics[2];
+                e.tradedDigestTopic = logs[i].topics[3];
+                e.emittedTrade = abi.decode(logs[i].data, (MarketplaceTypes.Trade));
+            } else if (logs[i].emitter == address(couponManager)) {
+                // The coupon manager emits a single event on this path: CouponApplied.
+                // topics: [0] selector, [1] _caller, [2] _tradeSignature, [3] _couponSignature.
+                e.foundCouponApplied = true;
+                e.couponAppliedTradeSignatureTopic = logs[i].topics[2];
+                (e.couponAppliedTradeDigest, e.couponAppliedCouponDigest,) =
+                    abi.decode(logs[i].data, (bytes32, bytes32, CouponTypes.Coupon));
+            }
+        }
+    }
+
+    /// Regression for the caller-forwarding fix: a Coupon whose Checks restrict WHO can use it (allowedRoot)
+    /// works end-to-end because the marketplace forwards the end user to the CouponManager. Previously the
+    /// CouponManager evaluated those checks against its msg.sender — the marketplace contract — so an
+    /// allowlisted coupon could never be applied by anyone.
+    function test_AcceptWithCoupon_CouponAllowedRootIsCheckedAgainstTheEndUser() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        vm.prank(collectionItemOriginalCreator);
+        collection.transferCreatorship(signer.addr);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        vm.prank(signer.addr);
+        address[] memory setMintersMinters = new address[](1);
+        setMintersMinters[0] = address(marketplace);
+        bool[] memory setMintersValues = new bool[](1);
+        setMintersValues[0] = true;
+        collection.setMinters(setMintersMinters, setMintersValues);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_COLLECTION_ITEM();
+        sent[0].contractAddress = address(collection);
+        sent[0].value = collectionItemId;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        received[0].contractAddress = address(erc20);
+        received[0].value = erc20Sent;
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        CollectionDiscountCoupon.CollectionDiscountCouponData memory collectionDiscountCouponData;
+        collectionDiscountCouponData.discount = 500_000;
+        collectionDiscountCouponData.discountType = collectionDiscountCoupon.DISCOUNT_TYPE_RATE();
+        collectionDiscountCouponData.root = 0x68ad9c0c778776109596c0568ba9c69ca861338e902dfb8aa5be05be190c65ae;
+
+        CollectionDiscountCoupon.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
+        collectionDiscountCouponCallerData.proofs = new bytes32[][](1);
+        collectionDiscountCouponCallerData.proofs[0] = new bytes32[](3);
+        collectionDiscountCouponCallerData.proofs[0][0] = 0x161691c7185a37ff918e70bebef716ddd87844ac47f419ea23eaf4fe983fbf2c;
+        collectionDiscountCouponCallerData.proofs[0][1] = 0xf1bd988d50408c15a0d017a73ff63ab5c30cc78771b609d99142fa4052c02baa;
+        collectionDiscountCouponCallerData.proofs[0][2] = 0xd50d464af1a64cdd6868c42456bc58cfc561fac83e19d742b6397ae5eb44660f;
+
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
+        coupons[0].checks.expiration = block.timestamp;
+        coupons[0].checks.uses = 1;
+        // Single-leaf allowlist containing only the buyer; the root equals the leaf and the proof is empty.
+        coupons[0].checks.allowedRoot = keccak256(bytes.concat(keccak256(abi.encode(other))));
+        coupons[0].couponAddress = address(collectionDiscountCoupon);
+        coupons[0].data = abi.encode(collectionDiscountCouponData);
+        coupons[0].callerData = abi.encode(collectionDiscountCouponCallerData);
+        coupons[0].signature = signCoupon(coupons[0]);
+
+        // A caller outside the coupon's allowlist is rejected by the coupon Checks.
+        vm.prank(makeAddr("unauthorized"));
+        vm.expectRevert(abi.encodeWithSignature("NotAllowed()"));
+        marketplace.acceptWithCoupon(trades, coupons);
+
+        uint256 daoBalance = erc20.balanceOf(dao);
+        uint256 signerBalance = erc20.balanceOf(signer.addr);
+
+        // The allowlisted buyer can apply the coupon and pays the discounted price.
+        vm.prank(other);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 1.25 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 48.75 ether);
+        marketplace.acceptWithCoupon(trades, coupons);
+
+        assertEq(erc20.balanceOf(dao), daoBalance + 1.25 ether);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance + 48.75 ether);
+    }
+
     function test_TradeERC721ForUsdPeggedMana_ERC721IsCollectionNFT_ApplyCollectionDiscountCoupon() public {
         vm.prank(erc20OriginalHolder);
         erc20.transfer(other, 1000 ether);
@@ -1596,16 +1855,16 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         DecentralandMarketplacePolygonHarness.Coupon memory maliciousCoupon = legitimateCoupon; // Exact same coupon
        {
             // Initially, the trade signature has 0 uses
-            bytes32 hashedTradeSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateTrade.signature)));
-            bytes32 hashedMaliciousTradeSignature = keccak256(abi.encode(address(maliciousContract), keccak256(maliciousTrade.signature)));
+            bytes32 hashedTradeSignature = keccak256(abi.encode(signer.addr, marketplace.eip712TradeHash(legitimateTrade)));
+            bytes32 hashedMaliciousTradeSignature = keccak256(abi.encode(address(maliciousContract), marketplace.eip712TradeHash(maliciousTrade)));
             assertNotEq(hashedTradeSignature, hashedMaliciousTradeSignature);
             assertEq(legitimateTrade.signature, maliciousTrade.signature);
             assertEq(marketplace.signatureUses(hashedTradeSignature), 0);
             assertEq(marketplace.signatureUses(hashedMaliciousTradeSignature), 0);
             
             // Initially, the signature has 0 uses
-            bytes32 hashedCouponSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateCoupon.signature)));
-            bytes32 hashedFakeCouponSignature = keccak256(abi.encode(maliciousContract, keccak256(maliciousCoupon.signature)));
+            bytes32 hashedCouponSignature = keccak256(abi.encode(signer.addr, couponManager.eip712CouponHash(legitimateCoupon)));
+            bytes32 hashedFakeCouponSignature = keccak256(abi.encode(maliciousContract, couponManager.eip712CouponHash(maliciousCoupon)));
             assertNotEq(hashedCouponSignature, hashedFakeCouponSignature);
             assertEq(couponManager.signatureUses(hashedCouponSignature), 0);
             assertEq(couponManager.signatureUses(hashedFakeCouponSignature), 0);
@@ -1624,10 +1883,10 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
             vm.prank(address(maliciousContract));
             marketplace.acceptWithCoupon(maliciousTrades, maliciousCoupons);
         
-            bytes32 hashedTradeSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateTrade.signature)));
-            bytes32 hashedMaliciousTradeSignature = keccak256(abi.encode(address(maliciousContract), keccak256(maliciousTrade.signature)));
-            bytes32 hashedCouponSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateCoupon.signature)));
-            bytes32 hashedFakeCouponSignature = keccak256(abi.encode(maliciousContract, keccak256(maliciousCoupon.signature)));
+            bytes32 hashedTradeSignature = keccak256(abi.encode(signer.addr, marketplace.eip712TradeHash(legitimateTrade)));
+            bytes32 hashedMaliciousTradeSignature = keccak256(abi.encode(address(maliciousContract), marketplace.eip712TradeHash(maliciousTrade)));
+            bytes32 hashedCouponSignature = keccak256(abi.encode(signer.addr, couponManager.eip712CouponHash(legitimateCoupon)));
+            bytes32 hashedFakeCouponSignature = keccak256(abi.encode(maliciousContract, couponManager.eip712CouponHash(maliciousCoupon)));
             // The trade signature use count is now 1 for the malicious trade
             assertEq(marketplace.signatureUses(hashedTradeSignature), 0);
             assertEq(marketplace.signatureUses(hashedMaliciousTradeSignature), 1);
@@ -1650,14 +1909,14 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
             // The trade signature use count is now 1 for both trades
             {
-                bytes32 hashedTradeSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateTrade.signature)));
-                bytes32 hashedMaliciousTradeSignature = keccak256(abi.encode(address(maliciousContract), keccak256(maliciousTrade.signature)));
+                bytes32 hashedTradeSignature = keccak256(abi.encode(signer.addr, marketplace.eip712TradeHash(legitimateTrade)));
+                bytes32 hashedMaliciousTradeSignature = keccak256(abi.encode(address(maliciousContract), marketplace.eip712TradeHash(maliciousTrade)));
                 assertEq(marketplace.signatureUses(hashedTradeSignature), 1);
                 assertEq(marketplace.signatureUses(hashedMaliciousTradeSignature), 1);
             }
 
-            bytes32 hashedCouponSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateCoupon.signature)));
-            bytes32 hashedFakeCouponSignature = keccak256(abi.encode(maliciousContract, keccak256(maliciousCoupon.signature)));
+            bytes32 hashedCouponSignature = keccak256(abi.encode(signer.addr, couponManager.eip712CouponHash(legitimateCoupon)));
+            bytes32 hashedFakeCouponSignature = keccak256(abi.encode(maliciousContract, couponManager.eip712CouponHash(maliciousCoupon)));
             assertEq(couponManager.signatureUses(hashedCouponSignature), 1);
             assertEq(couponManager.signatureUses(hashedFakeCouponSignature), 1);
         }

@@ -25,10 +25,12 @@ abstract contract MarketplaceWithCouponManager is Marketplace, CouponTypes {
 
         for (uint256 i = 0; i < _trades.length; i++) {
             // It is important to verify the Trade before applying the coupons to avoid issues with the signature.
-            _verifyTrade(_trades[i], caller);
+            bytes32 tradeDigest = _verifyTrade(_trades[i], caller);
 
-            // Modify the Trade with the coupon and accept it normally.
-            _accept(couponManager.applyCoupon(_trades[i], _coupons[i]), caller);
+            // Modify the Trade with the coupon and accept it normally. The signed digest is computed pre-coupon
+            // (applyCoupon mutates the Trade) and passed to applyCoupon so CouponApplied can surface it.
+            // The caller is forwarded so the Coupon Checks are evaluated against the user, not this contract.
+            _accept(couponManager.applyCoupon(_trades[i], _coupons[i], tradeDigest, caller), caller, tradeDigest);
         }
     }
 

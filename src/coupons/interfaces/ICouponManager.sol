@@ -6,5 +6,7 @@ import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 
 /// @notice Interface for the Coupon Manager contract.
 interface ICouponManager {
-    function applyCoupon(MarketplaceTypes.Trade calldata _trade, CouponTypes.Coupon calldata _coupon) external returns (MarketplaceTypes.Trade memory);
+    function applyCoupon(MarketplaceTypes.Trade calldata _trade, CouponTypes.Coupon calldata _coupon, bytes32 _tradeDigest, address _caller)
+        external
+        returns (MarketplaceTypes.Trade memory);
 }

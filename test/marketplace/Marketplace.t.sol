@@ -223,9 +223,12 @@ contract CancelSignatureTests is MarketplaceTests {
 
         trades[0].signature = signTrade(trades[0]);
 
+        // Compute the digest before the prank so the eip712TradeHash() call doesn't consume it.
+        bytes32 orderHash = marketplace.eip712TradeHash(trades[0]);
+
         vm.prank(signer.addr);
         vm.expectEmit(address(marketplace));
-        emit SignatureCancelled(signer.addr, keccak256(trades[0].signature));
+        emit SignatureCancelled(signer.addr, orderHash);
         marketplace.cancelSignature(trades);
     }
 
@@ -234,7 +237,7 @@ contract CancelSignatureTests is MarketplaceTests {
 
         trades[0].signature = signTrade(trades[0]);
 
-        bytes32 hashedSignature = keccak256(trades[0].signature);
+        bytes32 hashedSignature = marketplace.eip712TradeHash(trades[0]);
         bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
 
         assertEq(marketplace.cancelledSignatures(cancellationKey), false);
@@ -250,7 +253,7 @@ contract CancelSignatureTests is MarketplaceTests {
 
         trades[0].signature = signTrade(trades[0]);
 
-        bytes32 hashedSignature = keccak256(trades[0].signature);
+        bytes32 hashedSignature = marketplace.eip712TradeHash(trades[0]);
         bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
 
         assertEq(marketplace.cancelledSignatures(cancellationKey), false);
@@ -270,7 +273,7 @@ contract CancelSignatureTests is MarketplaceTests {
             trades[i].checks.salt = bytes32(i);
             trades[i].signature = signTrade(trades[i]);
 
-            bytes32 hashedSignature = keccak256(trades[i].signature);
+            bytes32 hashedSignature = marketplace.eip712TradeHash(trades[i]);
             bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
             assertEq(marketplace.cancelledSignatures(cancellationKey), false);
         }
@@ -279,7 +282,7 @@ contract CancelSignatureTests is MarketplaceTests {
         marketplace.cancelSignature(trades);
 
         for (uint256 i = 0; i < trades.length; i++) {
-            bytes32 hashedSignature = keccak256(trades[i].signature);
+            bytes32 hashedSignature = marketplace.eip712TradeHash(trades[i]);
             bytes32 cancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
             assertEq(marketplace.cancelledSignatures(cancellationKey), true);
         }
@@ -307,7 +310,7 @@ contract CancelSignatureTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
         trades[0].signature = signTrade(trades[0]);
 
-        bytes32 hashedSignature = keccak256(trades[0].signature);
+        bytes32 hashedSignature = marketplace.eip712TradeHash(trades[0]);
         bytes32 cancellationKey = keccak256(abi.encode(other, hashedSignature));
 
         assertEq(marketplace.cancelledSignatures(cancellationKey), false);
@@ -329,7 +332,7 @@ contract CancelSignatureTests is MarketplaceTests {
         trades[0].checks.expiration = block.timestamp + 1; // Set expiration to future
         trades[0].signature = signTrade(trades[0]);
 
-        bytes32 hashedSignature = keccak256(trades[0].signature);
+        bytes32 hashedSignature = marketplace.eip712TradeHash(trades[0]);
         bytes32 signerCancellationKey = keccak256(abi.encode(signer.addr, hashedSignature));
         bytes32 otherCancellationKey = keccak256(abi.encode(other, hashedSignature));
         bytes32 thirdPartyCancellationKey = keccak256(abi.encode(thirdParty, hashedSignature));
@@ -374,8 +377,8 @@ contract CancelSignatureTests is MarketplaceTests {
         maliciousTrade.signer = address(maliciousContract);
         
         // Initially, the signature has 0 uses
-        bytes32 hashedSignature = keccak256(abi.encode(signer.addr, keccak256(legitimateTrade.signature)));
-        bytes32 hashedMaliciousSignature = keccak256(abi.encode(address(maliciousContract), keccak256(maliciousTrade.signature)));
+        bytes32 hashedSignature = keccak256(abi.encode(signer.addr, marketplace.eip712TradeHash(legitimateTrade)));
+        bytes32 hashedMaliciousSignature = keccak256(abi.encode(address(maliciousContract), marketplace.eip712TradeHash(maliciousTrade)));
         assertNotEq(hashedSignature, hashedMaliciousSignature);
         assertEq(legitimateTrade.signature, maliciousTrade.signature);
         assertEq(marketplace.signatureUses(hashedSignature), 0);
@@ -409,7 +412,7 @@ contract CancelSignatureTests is MarketplaceTests {
 }
 
 contract AcceptTests is MarketplaceTests {
-    event Traded(address indexed _caller, bytes32 indexed _signature, MarketplaceHarness.Trade _trade);
+    event Traded(address indexed _caller, bytes32 indexed _signature, bytes32 indexed _tradeDigest, MarketplaceHarness.Trade _trade);
 
     error UsedTradeId();
     error NotEffective();
@@ -976,10 +979,145 @@ contract AcceptTests is MarketplaceTests {
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 
+        bytes32 tradeDigest = marketplace.eip712TradeHash(trades[0]);
+
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit Traded(other, keccak256(trades[0].signature), trades[0]);
+        emit Traded(other, keccak256(trades[0].signature), tradeDigest, trades[0]);
         marketplace.accept(trades);
+    }
+}
+
+/// @notice Regression tests for the signature-encoding malleability fix.
+/// Pre-fix, `cancelledSignatures` and `signatureUses` were keyed on `keccak256(signature)`, so an
+/// ERC-1271 / EIP-7702 wallet accepting alternate encodings of the same signature could bypass both;
+/// now they are keyed on the signed EIP-712 digest, invariant across encodings. The signer here is a
+/// contract wallet that accepts ANY signature bytes — the worst case for this bug.
+contract CancellationMalleabilityFixTests is Test {
+    MarketplaceHarness marketplace;
+    MaliciousContractWithCorrectMagicValue wallet;
+    VmSafe.Wallet signer;
+    address attacker1;
+    address attacker2;
+
+    function setUp() public {
+        marketplace = new MarketplaceHarness(address(this));
+        wallet = new MaliciousContractWithCorrectMagicValue();
+        signer = vm.createWallet("signer");
+        attacker1 = makeAddr("attacker1");
+        attacker2 = makeAddr("attacker2");
+    }
+
+    function _order(bytes32 salt) internal view returns (MarketplaceHarness.Trade memory t) {
+        t.signer = address(wallet);
+        t.checks.uses = 1;
+        t.checks.expiration = block.timestamp + 1000;
+        t.checks.salt = salt;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, marketplace.eip712TradeHash(t));
+        t.signature = abi.encodePacked(r, s, v);
+    }
+
+    // A different byte-encoding of the "same" signature. The wallet accepts it just like the original.
+    function _variant(bytes memory sig) internal pure returns (bytes memory) {
+        return abi.encodePacked(sig, hex"00");
+    }
+
+    function _arr(MarketplaceHarness.Trade memory t) internal pure returns (MarketplaceHarness.Trade[] memory a) {
+        a = new MarketplaceHarness.Trade[](1);
+        a[0] = t;
+    }
+
+    /// A cancelled order cannot be re-executed by submitting a different signature encoding.
+    function test_cancelledOrder_cannotBeReExecutedWithADifferentEncoding() public {
+        MarketplaceHarness.Trade memory t = _order(keccak256("A"));
+
+        // sanity: the variant is a genuinely different byte-string that the wallet still accepts.
+        assertTrue(keccak256(t.signature) != keccak256(_variant(t.signature)));
+
+        // The signer (the wallet) cancels the order.
+        vm.prank(address(wallet));
+        marketplace.cancelSignature(_arr(t));
+
+        // An attacker re-submits the SAME order with a DIFFERENT signature encoding.
+        t.signature = _variant(t.signature);
+        vm.prank(attacker1);
+        vm.expectRevert(abi.encodeWithSignature("UsingCancelledSignature()"));
+        marketplace.accept(_arr(t));
+    }
+
+    /// A single-use order that was already accepted cannot be reused via a different encoding.
+    function test_singleUseOrder_cannotBeReusedWithADifferentEncoding() public {
+        MarketplaceHarness.Trade memory t = _order(keccak256("B"));
+
+        // First (legitimate) use consumes the single allowed use.
+        vm.prank(attacker1);
+        marketplace.accept(_arr(t));
+
+        // Replay the same order with a different encoding and a different caller.
+        t.signature = _variant(t.signature);
+        vm.prank(attacker2);
+        vm.expectRevert(abi.encodeWithSignature("SignatureOveruse()"));
+        marketplace.accept(_arr(t));
+    }
+
+    /// Baseline: cancellation still blocks the canonical encoding (held before and after the fix).
+    function test_baseline_cancellationBlocksTheCanonicalEncoding() public {
+        MarketplaceHarness.Trade memory t = _order(keccak256("C"));
+        vm.prank(address(wallet));
+        marketplace.cancelSignature(_arr(t));
+        vm.prank(attacker1);
+        vm.expectRevert(abi.encodeWithSignature("UsingCancelledSignature()"));
+        marketplace.accept(_arr(t));
+    }
+
+    /// Regression: cancelling one order must not affect a different order.
+    function test_cancellingOneOrderDoesNotBlockAnother() public {
+        MarketplaceHarness.Trade memory a = _order(keccak256("A2"));
+        MarketplaceHarness.Trade memory b = _order(keccak256("B2"));
+        vm.prank(address(wallet));
+        marketplace.cancelSignature(_arr(a));
+        vm.prank(attacker1);
+        marketplace.accept(_arr(b)); // must NOT revert
+    }
+
+    /// Off-chain correlation: two fills of the same order with different signature encodings emit the SAME
+    /// `_tradeDigest` topic (the stable, malleability-proof identifier) while the legacy `_signature` topic
+    /// differs per encoding — pinning down why indexers must key on the digest, not on keccak256(signature).
+    function test_tradedEventEmitsTheSameTradeDigestAcrossSignatureEncodings() public {
+        MarketplaceHarness.Trade memory t = _order(keccak256("D"));
+        t.checks.uses = 2; // allow two fills; the wallet signer accepts any signature bytes.
+
+        vm.recordLogs();
+
+        vm.prank(attacker1);
+        marketplace.accept(_arr(t));
+
+        // Same order, different (still accepted) signature encoding, different caller.
+        t.signature = _variant(t.signature);
+        vm.prank(attacker2);
+        marketplace.accept(_arr(t));
+
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+
+        // The harness marketplace emits a single event per accept: Traded.
+        bytes32[2] memory digestTopics;
+        bytes32[2] memory signatureTopics;
+        uint256 found;
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].emitter == address(marketplace)) {
+                digestTopics[found] = logs[i].topics[3];
+                signatureTopics[found] = logs[i].topics[2];
+                found++;
+            }
+        }
+
+        assertEq(found, 2);
+        // The digest topic is invariant across encodings and equals the signed digest...
+        assertEq(digestTopics[0], digestTopics[1]);
+        assertEq(digestTopics[0], marketplace.eip712TradeHash(t));
+        // ...while the raw-signature-hash topic varies with the encoding.
+        assertTrue(signatureTopics[0] != signatureTopics[1]);
     }
 }
 

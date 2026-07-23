@@ -14,8 +14,12 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     /// Salt + Caller + Received Assets (Contract Address + Value)
     mapping(bytes32 => bool) public usedTradeIds;
 
-    /// @dev The event is emitted with the hashed signature so it can be identified off chain.
-    event Traded(address indexed _caller, bytes32 indexed _signature, Trade _trade);
+    /// @dev Emitted when a Trade is accepted.
+    /// @param _signature keccak256 of the raw signature bytes (malleable; kept for indexing continuity).
+    /// @param _tradeDigest The signed EIP-712 digest of the trade — the canonical, malleability-proof identifier;
+    /// prefer it for off-chain correlation. Emitted explicitly because the `_trade` struct is post-modification
+    /// and no longer hashes to the signed digest.
+    event Traded(address indexed _caller, bytes32 indexed _signature, bytes32 indexed _tradeDigest, Trade _trade);
 
     error UsedTradeId();
 
@@ -37,7 +41,8 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade calldata trade = _trades[i];
 
-            _cancelSignature(keccak256(trade.signature), caller);
+            // Keyed on the signed EIP-712 digest of the trade, not the raw signature bytes. See _verifyTrade.
+            _cancelSignature(_hashTypedDataV4(_hashTrade(trade)), caller);
         }
     }
 
@@ -47,9 +52,9 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         address caller = _msgSender();
 
         for (uint256 i = 0; i < _trades.length; i++) {
-            _verifyTrade(_trades[i], caller);
+            bytes32 tradeDigest = _verifyTrade(_trades[i], caller);
 
-            _accept(_trades[i], caller);
+            _accept(_trades[i], caller, tradeDigest);
         }
     }
 
@@ -74,7 +79,9 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     /// @dev Accepts a Trade.
     /// This function is internal to allow child contracts to use it in their own accept function.
     /// Does not perform any checks, only transfers the assets and emits the Traded event.
-    function _accept(Trade memory _trade, address _caller) internal {
+    /// @param _tradeDigest The signed EIP-712 digest of the trade, as returned by `_verifyTrade`. Passed in
+    /// because `_trade` gets modified and would no longer hash to the signed digest.
+    function _accept(Trade memory _trade, address _caller, bytes32 _tradeDigest) internal {
         _modifyTrade(_trade);
 
         bytes32 hashedSignature = keccak256(_trade.signature);
@@ -83,29 +90,30 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         _transferAssets(_trade.sent, signer, _caller, signer, _caller);
         _transferAssets(_trade.received, _caller, signer, signer, _caller);
 
-        emit Traded(_caller, hashedSignature, _trade);
+        emit Traded(_caller, hashedSignature, _tradeDigest, _trade);
     }
 
     /// @dev Verifies that the Trade passes all checks and the signature is valid.
-    function _verifyTrade(Trade calldata _trade, address _caller) internal {
-        bytes32 hashedSignature = keccak256(_trade.signature);
+    /// @return tradeDigest The signed EIP-712 digest of the trade (the key cancellation/uses are tracked under).
+    function _verifyTrade(Trade calldata _trade, address _caller) internal returns (bytes32 tradeDigest) {
         address signer = _trade.signer;
         bytes32 tradeId = getTradeId(_trade, _caller);
-        bytes32 hashedSignatureWithSigner = keccak256(abi.encode(signer, hashedSignature));
-        uint256 currentSignatureUses = signatureUses[hashedSignatureWithSigner];
+        tradeDigest = _hashTypedDataV4(_hashTrade(_trade));
+        bytes32 hashedTradeWithSigner = keccak256(abi.encode(signer, tradeDigest));
+        uint256 currentSignatureUses = signatureUses[hashedTradeWithSigner];
 
         if (usedTradeIds[tradeId]) {
             revert UsedTradeId();
         }
 
-        _verifyChecks(_trade.checks, hashedSignatureWithSigner, currentSignatureUses, signer, _caller);
+        _verifyChecks(_trade.checks, hashedTradeWithSigner, currentSignatureUses, signer, _caller);
         _verifyTradeSignature(_trade, signer);
 
         if (currentSignatureUses + 1 == _trade.checks.uses) {
             usedTradeIds[tradeId] = true;
         }
 
-        signatureUses[hashedSignatureWithSigner]++;
+        signatureUses[hashedTradeWithSigner]++;
     }
 
     /// @dev Verifies that the Trade signature is valid.
