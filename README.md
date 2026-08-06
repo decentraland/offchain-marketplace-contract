@@ -913,6 +913,52 @@ Just running `forge test` should be enough, but I find it a good practice to run
 
 It would be a good idea to check the foundry deployment [docs](https://book.getfoundry.sh/forge/deploying).
 
+### Deploy scripts (recommended)
+
+There is one full-stack script per network that deploys every contract in the correct order and, on testnet, wires the CouponManager automatically in the same signing session:
+
+| Network          | Script                             | Deploys (in order)                                                             |
+| ---------------- | ---------------------------------- | ------------------------------------------------------------------------------ |
+| Ethereum mainnet | `script/DeployEthereumStack.s.sol` | Marketplace → CouponManager → `updateCouponManager`                            |
+| Sepolia          | `script/DeploySepoliaStack.s.sol`  | same as Ethereum                                                               |
+| Polygon mainnet  | `script/DeployPolygonStack.s.sol`  | Marketplace → CollectionDiscountCoupon → CouponManager → `updateCouponManager` |
+| Amoy             | `script/DeployAmoyStack.s.sol`     | same as Polygon                                                                |
+
+Mainnet values (owner, fee collector, MANA, aggregators, …) are hardcoded from the addresses documented below, so there is nothing to configure. On testnet the owner defaults to the deployer, so the whole stack — including `updateCouponManager` — runs in one signing session; first fill the `TODO` addresses (MANA, aggregators) at the top of the testnet script.
+
+> On mainnet the owner is the DAO/SAB multisig, so the `onlyOwner` `updateCouponManager` step cannot be signed by the deployer. The stack deploys everything and logs the exact governance call to run afterwards.
+
+Each script prints an "are you sure?" banner listing every parameter before broadcasting; run it once without `--broadcast` to review it.
+
+Use the `deploy.sh` helper, which fills in the RPC url, chain, verification and signer per network:
+
+```bash
+./deploy.sh DeployAmoyStack             # dry-run: simulate + show the banner
+./deploy.sh DeployAmoyStack broadcast   # deploy + verify
+```
+
+It reads the following from `.env` (git-ignored):
+
+```bash
+ETHEREUM_RPC_URL=https://rpc.decentraland.org/mainnet
+SEPOLIA_RPC_URL=https://rpc.decentraland.org/sepolia
+POLYGON_RPC_URL=https://rpc.decentraland.org/polygon
+AMOY_RPC_URL=https://rpc.decentraland.org/amoy
+ETHERSCAN_API_KEY=...            # a single Etherscan v2 key verifies all four chains
+```
+
+See `.env.example` for the full template. `deploy.sh` never prints the private key or the API key (they are redacted in the echoed command).
+
+**Signing.** `deploy.sh` picks the signer with the precedence `PRIVATE_KEY` > `LEDGER` > keystore:
+
+- **Private key:** set `PRIVATE_KEY=0x...` in `.env`. That is all — the script adds `--private-key` for you. To deploy without `deploy.sh`, the equivalent is `forge script <stack> --rpc-url <url> --broadcast --private-key 0x...`.
+- **Ledger:** set `LEDGER=true` and `SENDER=0xYourLedgerAddress`.
+- **Keystore (fallback):** leave both unset — it uses `--account "${KEYSTORE_ACCOUNT:-deployer}"`. Import your key once with `cast wallet import deployer --interactive` (stored encrypted, unlocked by a password at deploy time).
+
+`SENDER` is also useful on its own: in a dry-run it makes the "are you sure?" banner show your real signer/owner.
+
+### Manual deployment (`forge create`)
+
 The contracts are to be deployed in the following order,
 
 Ethereum: 
