@@ -13,7 +13,7 @@ import {IAggregator} from "src/marketplace/interfaces/IAggregator.sol";
 import {AggregatorHelper} from "src/marketplace/AggregatorHelper.sol";
 
 /// @title RegisterNameCrossChainExecutor
-/// @notice Contract that executes cross-chain name registrations using the Coral contract
+/// @notice Contract that executes cross-chain name registrations using the executor contract
 /// @dev This contract validates and executes external calls to register names cross-chain, ensuring proper MANA fee limits
 contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGuard, AggregatorHelper {
     using SafeERC20 for IERC20;
@@ -31,8 +31,8 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     /// @notice The address of the MANA token.
     IERC20 public immutable mana;
 
-    /// @notice The address of the Coral contract used for cross-chain execution.
-    address public immutable coral;
+    /// @notice The address of the executor contract used for cross-chain execution.
+    address public executor;
 
     /// @notice The MANA/USD Chainlink aggregator.
     /// @dev Used to obtain the rate of MANA expressed in USD.
@@ -59,6 +59,7 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
     event MaxUSDFeeUpdated(uint256 _maxUSDFee);
+    event ExecutorUpdated(address _executor);
 
     error Unauthorized(address _sender);
     error InvalidTarget();
@@ -68,7 +69,7 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
     /// @param _owner The owner of the contract who will have DEFAULT_ADMIN_ROLE.
     /// @param _creditsManager The address of the credits manager contract.
     /// @param _mana The address of the MANA token contract.
-    /// @param _coral The address of the Coral contract for cross-chain execution.
+    /// @param _executor The address of the executor contract for cross-chain execution.
     /// @param _maxUSDFee The maximum USD amount (in 18 decimals) that can be paid in MANA for the fee.
     /// @param _manaUSDAggregator The address of the MANA/USD price aggregator.
     /// @param _manaUSDAggregatorTolerance The tolerance (in seconds) that indicates if the result provided by the aggregator is old.
@@ -76,7 +77,7 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
         address _owner,
         address _creditsManager,
         IERC20 _mana,
-        address _coral,
+        address _executor,
         uint256 _maxUSDFee,
         address _manaUSDAggregator,
         uint256 _manaUSDAggregatorTolerance
@@ -85,14 +86,14 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
 
         creditsManager = _creditsManager;
         mana = _mana;
-        coral = _coral;
         manaUSDAggregator = IAggregator(_manaUSDAggregator);
         manaUSDAggregatorTolerance = _manaUSDAggregatorTolerance;
 
+        _updateExecutor(_executor);
         _updateMaxUSDFee(_maxUSDFee);
     }
 
-    /// @notice Executes a cross-chain name registration call through the Coral contract.
+    /// @notice Executes a cross-chain name registration call through the executor contract.
     /// @dev Can only be called by the credits manager. Validates the fee, transfers MANA, and executes the call.
     /// @param _args The external call parameters including target, data (with selector), and extra (MANA fee).
     function execute(ExternalCall calldata _args) external nonReentrant whenNotPaused {
@@ -105,8 +106,8 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
             revert Unauthorized(sender);
         }
 
-        // Validate that the target is the coral contract.
-        if (_args.target != coral) {
+        // Validate that the target is the executor contract.
+        if (_args.target != executor) {
             revert InvalidTarget();
         }
 
@@ -116,14 +117,14 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
 
         // Transfer the name price in MANA to the contract from the credits manager.
         mana.transferFrom(creditsManager, address(this), NAME_PRICE);
-        // Approve the MANA tokens to the coral contract for the total amount of the MANA fee plus the name price.
-        mana.forceApprove(coral, manaFee + NAME_PRICE);
+        // Approve the MANA tokens to the executor contract for the total amount of the MANA fee plus the name price.
+        mana.forceApprove(executor, manaFee + NAME_PRICE);
 
         // Execute the external call using OpenZeppelin's Address library which automatically bubbles up errors.
         _args.target.functionCall(_args.data);
 
-        // Reset the approval of the MANA tokens to the coral contract.
-        mana.forceApprove(coral, 0);
+        // Reset the approval of the MANA tokens to the executor contract.
+        mana.forceApprove(executor, 0);
 
         emit Executed(_args);
     }
@@ -175,6 +176,13 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
         _updateMaxUSDFee(_maxUSDFee);
     }
 
+    /// @notice Updates the address of the executor contract used for cross-chain execution.
+    /// @dev Only the contract admin can call this function.
+    /// @param _executor The new executor contract address.
+    function updateExecutor(address _executor) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateExecutor(_executor);
+    }
+
     /// @notice Validates that the MANA fee does not exceed the maximum allowed USD value.
     /// @dev Converts the maximum USD fee to MANA using the current price from the aggregator.
     /// @param _manaFee The MANA fee amount to validate.
@@ -197,5 +205,13 @@ contract RegisterNameCrossChainExecutor is AccessControl, Pausable, ReentrancyGu
         maxUSDFee = _maxUSDFee;
 
         emit MaxUSDFeeUpdated(_maxUSDFee);
+    }
+
+    /// @dev Internal function to update the executor contract address.
+    /// @param _executor The new executor contract address.
+    function _updateExecutor(address _executor) internal {
+        executor = _executor;
+
+        emit ExecutorUpdated(_executor);
     }
 }
