@@ -15,7 +15,7 @@ contract RegisterNameCrossChainExecutorCoreTest is RegisterNameCrossChainExecuto
         assertEq(executor.hasRole(executor.PAUSER_ROLE(), pauser), true);
         assertEq(executor.creditsManager(), creditsManager);
         assertEq(address(executor.mana()), mana);
-        assertEq(executor.coral(), address(coral));
+        assertEq(executor.executor(), address(coral));
         assertEq(executor.maxUSDFee(), maxUSDMANAFee);
         assertEq(address(executor.manaUSDAggregator()), address(manaUSDAggregator));
         assertEq(executor.manaUSDAggregatorTolerance(),     manaUSDAggregatorTolerance);
@@ -78,6 +78,25 @@ contract RegisterNameCrossChainExecutorCoreTest is RegisterNameCrossChainExecuto
         executor.updateMaxUSDFee(newMaxFee);
 
         assertEq(executor.maxUSDFee(), newMaxFee);
+    }
+
+    function test_updateExecutor_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), executor.DEFAULT_ADMIN_ROLE())
+        );
+        executor.updateExecutor(makeAddr("newExecutor"));
+    }
+
+    function test_updateExecutor_WhenOwner() public {
+        address newExecutor = makeAddr("newExecutor");
+
+        vm.expectEmit(address(executor));
+        emit ExecutorUpdated(newExecutor);
+
+        vm.prank(owner);
+        executor.updateExecutor(newExecutor);
+
+        assertEq(executor.executor(), newExecutor);
     }
 
     function test_withdrawERC20_RevertsWhenNotOwner() public {
