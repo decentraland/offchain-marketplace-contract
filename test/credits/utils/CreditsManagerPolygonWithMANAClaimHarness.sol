@@ -27,8 +27,7 @@ contract CreditsManagerPolygonWithMANAClaimHarness is CreditsManagerPolygonWithM
     constructor(
         Roles memory _roles,
         uint256 _maxManaCreditedPerHour,
-        bool _primarySalesAllowed,
-        bool _secondarySalesAllowed,
+        CreditTypeSalesAllowed[] memory _salesAllowed,
         IERC20 _mana,
         address _marketplace,
         address _legacyMarketplace,
@@ -39,8 +38,7 @@ contract CreditsManagerPolygonWithMANAClaimHarness is CreditsManagerPolygonWithM
         CreditsManagerPolygonWithMANAClaim(
             _roles,
             _maxManaCreditedPerHour,
-            _primarySalesAllowed,
-            _secondarySalesAllowed,
+            _salesAllowed,
             _mana,
             _marketplace,
             _legacyMarketplace,

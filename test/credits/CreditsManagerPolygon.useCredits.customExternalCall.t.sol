@@ -14,7 +14,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCustomExternalCallNotAllowed() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -39,7 +39,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCustomExternalCallHasExpired() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -58,7 +58,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(0), bytes4(0), true);
+        creditsManager.allowCustomExternalCall(CreditsManagerPolygon.CreditType.DIRECT, address(0), bytes4(0), true);
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.CustomExternalCallExpired.selector, 0));
         creditsManager.useCredits(args);
@@ -67,7 +67,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCustomExternalCallHasExpired_Inclusive() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -91,7 +91,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(0), bytes4(0), true);
+        creditsManager.allowCustomExternalCall(CreditsManagerPolygon.CreditType.DIRECT, address(0), bytes4(0), true);
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.CustomExternalCallExpired.selector, block.timestamp));
         creditsManager.useCredits(args);
@@ -100,7 +100,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCustomExternalCallECDSAInvalidSignatureLength() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -124,7 +124,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(0), bytes4(0), true);
+        creditsManager.allowCustomExternalCall(CreditsManagerPolygon.CreditType.DIRECT, address(0), bytes4(0), true);
 
         vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignatureLength.selector, 0));
         creditsManager.useCredits(args);
@@ -133,7 +133,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenInvalidCustomExternalCallSignature() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -164,7 +164,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(0), bytes4(0), true);
+        creditsManager.allowCustomExternalCall(CreditsManagerPolygon.CreditType.DIRECT, address(0), bytes4(0), true);
 
         vm.expectRevert(
             abi.encodeWithSelector(CreditsManagerPolygon.InvalidCustomExternalCallSignature.selector, 0x6237cF0957Bb2455F0BdB0D7c4545780bAa56Ff5)
@@ -175,7 +175,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenNoManaWasTransferred() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -208,7 +208,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.NoMANATransfer.selector));
         creditsManager.useCredits(args);
@@ -217,7 +219,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenNotEnoughManaWasApproved() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -250,7 +252,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.ExternalCallFailed.selector, externalCall));
         creditsManager.useCredits(args);
@@ -259,7 +263,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCallerBalanceIsNotEnough() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -292,7 +296,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         creditsManager.useCredits(args);
@@ -301,7 +307,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCallerDidNotApproveEnoughMana() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -334,7 +340,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -346,7 +354,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditsManagerDoesNotHaveEnoughMana() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -379,7 +387,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -394,7 +404,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenTheCallerBalanceIsUpdated() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -428,7 +438,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -446,7 +458,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditDoesNotHaveEnoughValue() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({value: 0, expiresAt: 0, salt: bytes32(0), creditType: CreditsManagerPolygon.CreditType.DIRECT});
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -479,7 +491,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -497,7 +511,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditIsExpired() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: 0, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: 0,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -532,7 +551,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -550,7 +571,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditIsExpired_Inclusive() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: block.timestamp, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: block.timestamp,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -585,7 +611,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -603,7 +631,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditECDSAInvalidSignatureLength() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -636,7 +669,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -654,7 +689,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditInvalidSignature() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -693,7 +733,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -717,7 +759,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenMaxCreditedValueExceeded() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -756,7 +803,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -774,7 +823,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenMaxManaCreditedPerHourExceeded() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 101 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 101 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -813,7 +867,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -831,7 +887,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenMaxManaCreditedPerHourExceeded_DifferentCalls() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 200 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 200 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -870,7 +931,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -897,7 +960,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenExecuteCallIsReused() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 200 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 200 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -935,7 +1003,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -962,7 +1032,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
 
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1001,7 +1076,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1019,7 +1096,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditWasRevoked() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1063,7 +1145,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1081,7 +1165,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenMaxUncreditedValueIsExceeded() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 50 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 50 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1120,7 +1209,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 50 ether);
@@ -1169,7 +1260,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1187,7 +1280,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditsAndSignaturesLengthsDiffer() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](0);
 
@@ -1220,7 +1318,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1238,7 +1338,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenMaxCreditedValueIsZero() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1277,7 +1382,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1295,7 +1402,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_RevertsWhenCreditIsFullyConsumed() public {
         // Create a credit with a specific value
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1334,7 +1446,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         // Transfer MANA to the credits manager to simulate available balance
         vm.prank(manaHolder);
@@ -1385,7 +1499,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_Success() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1424,7 +1543,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1457,7 +1578,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_CreditsManagerAsBeneficiary_RevertsIfEverythingIsReturned() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 100 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1497,7 +1623,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1518,7 +1646,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
         // Credit is worth 500 mana
-        credits[0] = CreditsManagerPolygon.Credit({value: 500 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 500 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1572,7 +1705,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         creditsManager.updateMaxManaCreditedPerHour(1000 ether);
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1617,7 +1752,12 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_Success_MaxManaCreditedPerHourIsResetAfterHour() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 200 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 200 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
@@ -1656,7 +1796,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1708,8 +1850,18 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_Success_TwoCredits() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](2);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 50 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
-        credits[1] = CreditsManagerPolygon.Credit({value: 50 ether, expiresAt: type(uint256).max, salt: bytes32(uint256(1))});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 50 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
+        credits[1] = CreditsManagerPolygon.Credit({
+            value: 50 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(uint256(1)),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](2);
 
@@ -1763,7 +1915,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
@@ -1800,8 +1954,18 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     function test_useCredits_Success_TwoCredits_WithUncreditedValue() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](2);
 
-        credits[0] = CreditsManagerPolygon.Credit({value: 50 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
-        credits[1] = CreditsManagerPolygon.Credit({value: 25 ether, expiresAt: type(uint256).max, salt: bytes32(uint256(1))});
+        credits[0] = CreditsManagerPolygon.Credit({
+            value: 50 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(0),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
+        credits[1] = CreditsManagerPolygon.Credit({
+            value: 25 ether,
+            expiresAt: type(uint256).max,
+            salt: bytes32(uint256(1)),
+            creditType: CreditsManagerPolygon.CreditType.DIRECT
+        });
 
         bytes[] memory creditsSignatures = new bytes[](2);
 
@@ -1855,7 +2019,9 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         });
 
         vm.prank(owner);
-        creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
+        creditsManager.allowCustomExternalCall(
+            CreditsManagerPolygon.CreditType.DIRECT, address(externalCallTarget), externalCallTarget.someFunction.selector, true
+        );
 
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(this), 1000 ether);
