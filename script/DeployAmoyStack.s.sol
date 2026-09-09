@@ -17,7 +17,7 @@ contract DeployAmoyStackScript is PolygonStackDeployer {
             royaltiesRate: 25000, // 2.5%
             mana: vm.parseAddress("0x7ad72b9f944ea9793cf4055d88f81138cc2c63a0"), // TODO: MANA on Amoy
             manaUsdAggregator: vm.parseAddress("0xdcf00f5f60b62b07e668a84c0cedaf6f453d416e"), // TODO: MANA/USD feed on Amoy (or a mock)
-            manaUsdAggregatorTolerance: 27
+            manaUsdAggregatorTolerance: 54 // 2x the 27s feed heartbeat, same as Polygon mainnet
         });
     }
 }

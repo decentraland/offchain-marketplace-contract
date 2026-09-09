@@ -103,7 +103,7 @@ contract DeployPolygonStackScript is PolygonStackDeployer {
             royaltiesRate: 25000, // 2.5%
             mana: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4,
             manaUsdAggregator: 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512,
-            manaUsdAggregatorTolerance: 27 // heartbeat
+            manaUsdAggregatorTolerance: 54 // 2x the 27s feed heartbeat, matches the deployed RegisterNameCrossChainExecutor
         });
     }
 }
