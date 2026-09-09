@@ -21,3 +21,6 @@ lcov.info
 
 .gas-report
 .gas-report.diff
+
+# macOS Finder metadata
+.DS_Store
