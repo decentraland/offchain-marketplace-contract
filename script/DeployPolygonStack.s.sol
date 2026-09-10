@@ -117,7 +117,7 @@ contract DeployPolygonStackScript is PolygonStackDeployer {
             mana: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4,
             manaUsdAggregator: 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512,
             manaUsdAggregatorTolerance: 54, // 2x the 27s feed heartbeat, matches the deployed RegisterNameCrossChainExecutor
-            collectionDiscountCoupon: 0x1b67D0e31eeB6B52D8eEEd71D3616C2F5b33b8E7 // verified, byte-identical to this build; deployed 2025-10-17 by the stack deployer
+            collectionDiscountCoupon: 0xc914507fE297b2dddd1232Ac3A8903F1c125e794 // verified, same source as this build (paris target); the coupon allowed by the live CouponManager
         });
     }
 }

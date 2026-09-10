@@ -928,7 +928,7 @@ Mainnet values (owner, fee collector, MANA, aggregators, …) are hardcoded from
 
 > On mainnet the owner is the DAO/SAB multisig, so the `onlyOwner` `updateCouponManager` step cannot be signed by the deployer. The stack deploys everything and logs the exact governance call to run afterwards.
 
-On Polygon mainnet the `CollectionDiscountCoupon` is not redeployed. It is stateless (no constructor, no storage) and the verified deployment at `0x1b67D0e31eeB6B52D8eEEd71D3616C2F5b33b8E7` is byte-identical to this build, so the script only whitelists it in the new CouponManager. Set `collectionDiscountCoupon` to `address(0)` in `_config()` to deploy a fresh one instead.
+On Polygon mainnet the `CollectionDiscountCoupon` is not redeployed. It is stateless (no constructor, no storage) and the verified deployment at `0xc914507fE297b2dddd1232Ac3A8903F1c125e794`, the coupon allowed by the live CouponManager, compiles from the same source as this build (it only targets `paris` instead of `shanghai`), so the script only whitelists it in the new CouponManager. Set `collectionDiscountCoupon` to `address(0)` in `_config()` to deploy a fresh one instead.
 
 Each script prints an "are you sure?" banner listing every parameter before broadcasting; run it once without `--broadcast` to review it.
 
