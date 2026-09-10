@@ -1050,6 +1050,35 @@ Constructor Args:
 
 > After the CouponManager is deployed on Polygon. Call the `updateCouponManager` on the DecentralandPolygonMarketplace contract as the owner to set the CouponManager.
 
+### RegisterNameCrossChainExecutor (Polygon)
+
+The executor is deployed with a wrapper script that runs everything in one go: it first simulates the deployment and echoes every parameter for review, asks for confirmation, and only then broadcasts, verifies the contract on Polygonscan, and (optionally) allows the executor as a custom external call on the CreditsManager.
+
+All the values (owner, credits manager, MANA, cross-chain executor, max USD fee, aggregator, tolerance) are baked into the `_config()` function of [`script/DeployRegisterNameCrossChainExecutor.s.sol`](script/DeployRegisterNameCrossChainExecutor.s.sol) with a comment per field — edit them there before deploying. No constructor args are passed on the command line.
+
+Requirements:
+
+- `ETHERSCAN_API_KEY` set in the repo `.env` (an Etherscan V2 key works for all chains). The script sources the `.env` automatically.
+- Optionally `POLYGON_RPC_URL` in the `.env`; defaults to `https://rpc.decentraland.org/polygon`.
+
+```bash
+# With a Ledger (adjust the derivation path to the account you want to sign with)
+$ ./script/deploy-register-name-executor.sh --ledger --mnemonic-derivation-paths "m/44'/60'/4'/0/0"
+
+# With a foundry keystore account
+$ ./script/deploy-register-name-executor.sh --account {accountName}
+
+# With a raw private key
+$ ./script/deploy-register-name-executor.sh --private-key {privateKey}
+```
+
+Any extra arguments are passed through to `forge script` (wallet flags, `--sender`, etc.).
+
+About the CreditsManager allow-list step (`allowInCreditsManager` in `_config()`):
+
+- If the signer holds the `DEFAULT_ADMIN_ROLE` on the CreditsManager, the script calls `allowCustomExternalCall(executor, execute selector, true)` automatically in the same signing session.
+- Otherwise the step is skipped and the exact governance call (CreditsManager address + ready-to-use calldata) is printed at the end so the admin/multisig can execute it.
+
 ## Notes For Auditors
 
 The contracts that will be deployed are:

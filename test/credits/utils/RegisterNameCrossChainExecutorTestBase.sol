@@ -31,6 +31,7 @@ contract RegisterNameCrossChainExecutorTestBase is Test {
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
     event MaxUSDFeeUpdated(uint256 _maxUSDFee);
+    event ExecutorUpdated(address _executor);
 
     function setUp() public virtual {
         vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon", 68650527)); // Mar-04-2025 09:10:51 PM +UTC
