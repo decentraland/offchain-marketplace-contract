@@ -921,12 +921,14 @@ There is one full-stack script per network that deploys every contract in the co
 | ---------------- | ---------------------------------- | ------------------------------------------------------------------------------ |
 | Ethereum mainnet | `script/DeployEthereumStack.s.sol` | Marketplace → CouponManager → `updateCouponManager`                            |
 | Sepolia          | `script/DeploySepoliaStack.s.sol`  | same as Ethereum                                                               |
-| Polygon mainnet  | `script/DeployPolygonStack.s.sol`  | Marketplace → CollectionDiscountCoupon → CouponManager → `updateCouponManager` |
-| Amoy             | `script/DeployAmoyStack.s.sol`     | same as Polygon                                                                |
+| Polygon mainnet  | `script/DeployPolygonStack.s.sol`  | Marketplace → CouponManager (reusing the live CollectionDiscountCoupon) → `updateCouponManager` |
+| Amoy             | `script/DeployAmoyStack.s.sol`     | Marketplace → CollectionDiscountCoupon → CouponManager → `updateCouponManager` |
 
 Mainnet values (owner, fee collector, MANA, aggregators, …) are hardcoded from the addresses documented below, so there is nothing to configure. On testnet the owner defaults to the deployer, so the whole stack — including `updateCouponManager` — runs in one signing session; first fill the `TODO` addresses (MANA, aggregators) at the top of the testnet script.
 
 > On mainnet the owner is the DAO/SAB multisig, so the `onlyOwner` `updateCouponManager` step cannot be signed by the deployer. The stack deploys everything and logs the exact governance call to run afterwards.
+
+On Polygon mainnet the `CollectionDiscountCoupon` is not redeployed. It is stateless (no constructor, no storage) and the verified deployment at `0x1b67D0e31eeB6B52D8eEEd71D3616C2F5b33b8E7` is byte-identical to this build, so the script only whitelists it in the new CouponManager. Set `collectionDiscountCoupon` to `address(0)` in `_config()` to deploy a fresh one instead.
 
 Each script prints an "are you sure?" banner listing every parameter before broadcasting; run it once without `--broadcast` to review it.
 

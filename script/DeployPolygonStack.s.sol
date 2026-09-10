@@ -10,7 +10,7 @@ import {CouponManager} from "src/coupons/CouponManager.sol";
 /// @notice Deploy logic shared by the Polygon-family stacks (mainnet below, Amoy in DeployAmoyStack.s.sol).
 /// Values are baked into each concrete `_config()` — no .env needed. Deploys in README#Deployment order:
 ///   1. DecentralandMarketplacePolygon   (couponManager = address(0) at construction)
-///   2. CollectionDiscountCoupon         (no constructor args)
+///   2. CollectionDiscountCoupon         (config.collectionDiscountCoupon if set, else a fresh deploy; it is stateless)
 ///   3. CouponManager                     (owner = config.owner, allowed coupons = [CollectionDiscountCoupon])
 ///   4. marketplace.updateCouponManager(couponManager)   [only when the deployer is the owner]
 ///
@@ -26,6 +26,7 @@ abstract contract PolygonStackDeployer is DeployStackBase {
         address mana;
         address manaUsdAggregator;
         uint256 manaUsdAggregatorTolerance;
+        address collectionDiscountCoupon;
     }
 
     /// @dev Per-network values. Override in the concrete script.
@@ -47,7 +48,11 @@ abstract contract PolygonStackDeployer is DeployStackBase {
         console.log("  mana:", c.mana);
         console.log("  manaUsdAggregator:", c.manaUsdAggregator);
         console.log("  manaUsdAggregatorTolerance:", c.manaUsdAggregatorTolerance);
-        console.log("  allowed coupons: the CollectionDiscountCoupon deployed in this run");
+        if (c.collectionDiscountCoupon == address(0)) {
+            console.log("  allowed coupons: the CollectionDiscountCoupon deployed in this run");
+        } else {
+            console.log("  allowed coupons: existing CollectionDiscountCoupon", c.collectionDiscountCoupon);
+        }
         console.log("  auto-wire updateCouponManager?", c.owner == deployer);
         console.log("If anything looks wrong, Ctrl-C now. Run without --broadcast first to review.");
         console.log("========================================================================");
@@ -60,13 +65,19 @@ abstract contract PolygonStackDeployer is DeployStackBase {
         );
         console.log("DecentralandMarketplacePolygon deployed at:", address(marketplace));
 
-        // 2. CollectionDiscountCoupon (the only allowed coupon implementation today).
-        CollectionDiscountCoupon collectionDiscountCoupon = new CollectionDiscountCoupon();
-        console.log("CollectionDiscountCoupon deployed at:", address(collectionDiscountCoupon));
+        // 2. CollectionDiscountCoupon (the only allowed coupon implementation today). Stateless, so a configured deployment is reused.
+        address collectionDiscountCoupon = c.collectionDiscountCoupon;
+        if (collectionDiscountCoupon == address(0)) {
+            collectionDiscountCoupon = address(new CollectionDiscountCoupon());
+            console.log("CollectionDiscountCoupon deployed at:", collectionDiscountCoupon);
+        } else {
+            require(collectionDiscountCoupon.code.length != 0, "collectionDiscountCoupon has no code");
+            console.log("CollectionDiscountCoupon reused at:", collectionDiscountCoupon);
+        }
 
         // 3. CouponManager allowing the CollectionDiscountCoupon.
         address[] memory allowedCoupons = new address[](1);
-        allowedCoupons[0] = address(collectionDiscountCoupon);
+        allowedCoupons[0] = collectionDiscountCoupon;
         CouponManager couponManager = new CouponManager(address(marketplace), c.owner, allowedCoupons);
         console.log("CouponManager deployed at:", address(couponManager));
 
@@ -86,7 +97,9 @@ abstract contract PolygonStackDeployer is DeployStackBase {
         console.log("=========================================================================");
         console.log("DEPLOYED CONTRACTS");
         _logDeployed("DecentralandMarketplacePolygon", address(marketplace));
-        _logDeployed("CollectionDiscountCoupon", address(collectionDiscountCoupon));
+        _logDeployed(
+            c.collectionDiscountCoupon == address(0) ? "CollectionDiscountCoupon" : "CollectionDiscountCoupon (reused)", collectionDiscountCoupon
+        );
         _logDeployed("CouponManager", address(couponManager));
         console.log("=========================================================================");
     }
@@ -103,7 +116,8 @@ contract DeployPolygonStackScript is PolygonStackDeployer {
             royaltiesRate: 25000, // 2.5%
             mana: 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4,
             manaUsdAggregator: 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512,
-            manaUsdAggregatorTolerance: 54 // 2x the 27s feed heartbeat, matches the deployed RegisterNameCrossChainExecutor
+            manaUsdAggregatorTolerance: 54, // 2x the 27s feed heartbeat, matches the deployed RegisterNameCrossChainExecutor
+            collectionDiscountCoupon: 0x1b67D0e31eeB6B52D8eEEd71D3616C2F5b33b8E7 // verified, byte-identical to this build; deployed 2025-10-17 by the stack deployer
         });
     }
 }
