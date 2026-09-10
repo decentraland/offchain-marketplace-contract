@@ -919,14 +919,14 @@ There is one full-stack script per network that deploys every contract in the co
 
 | Network          | Script                             | Deploys (in order)                                                             |
 | ---------------- | ---------------------------------- | ------------------------------------------------------------------------------ |
-| Ethereum mainnet | `script/DeployEthereumStack.s.sol` | Marketplace → CouponManager → `updateCouponManager`                            |
+| Ethereum mainnet | `script/DeployEthereumStack.s.sol` | Marketplace → CouponManager → `updateCouponManager` → `transferOwnership(DAO)` |
 | Sepolia          | `script/DeploySepoliaStack.s.sol`  | same as Ethereum                                                               |
-| Polygon mainnet  | `script/DeployPolygonStack.s.sol`  | Marketplace → CouponManager (reusing the live CollectionDiscountCoupon) → `updateCouponManager` |
+| Polygon mainnet  | `script/DeployPolygonStack.s.sol`  | Marketplace → CouponManager (reusing the live CollectionDiscountCoupon) → `updateCouponManager` → `transferOwnership(SAB)` |
 | Amoy             | `script/DeployAmoyStack.s.sol`     | Marketplace → CollectionDiscountCoupon → CouponManager → `updateCouponManager` |
 
-Mainnet values (owner, fee collector, MANA, aggregators, …) are hardcoded from the addresses documented below, so there is nothing to configure. On testnet the owner defaults to the deployer, so the whole stack — including `updateCouponManager` — runs in one signing session; first fill the `TODO` addresses (MANA, aggregators) at the top of the testnet script.
+Mainnet values (owner, fee collector, MANA, aggregators, …) are hardcoded from the addresses documented below, so there is nothing to configure. The marketplace is deployed with the deployer as owner so `updateCouponManager` runs in the same signing session, and ownership is transferred to the final owner at the end of the run. On testnet the owner is the deployer, so there is no transfer; first fill the `TODO` addresses (MANA, aggregators) at the top of the testnet script.
 
-> On mainnet the owner is the DAO/SAB multisig, so the `onlyOwner` `updateCouponManager` step cannot be signed by the deployer. The stack deploys everything and logs the exact governance call to run afterwards.
+> On mainnet the final owner is the DAO/SAB multisig. The script refuses to transfer ownership to an address without code and asserts, before anything is broadcast, that the marketplace ends up owned by it with the CouponManager wired. Governance never has to run setup calls; the only action left for it is pausing the old marketplace.
 
 On Polygon mainnet the `CollectionDiscountCoupon` is not redeployed. It is stateless (no constructor, no storage) and the verified deployment at `0xc914507fE297b2dddd1232Ac3A8903F1c125e794`, the coupon allowed by the live CouponManager, compiles from the same source as this build (it only targets `paris` instead of `shanghai`), so the script only whitelists it in the new CouponManager. Set `collectionDiscountCoupon` to `address(0)` in `_config()` to deploy a fresh one instead.
 

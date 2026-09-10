@@ -8,12 +8,13 @@ import {CouponManager} from "src/coupons/CouponManager.sol";
 
 /// @notice Deploy logic shared by the Ethereum-family stacks (mainnet below, Sepolia in DeploySepoliaStack.s.sol).
 /// Values are baked into each concrete `_config()` — no .env needed. Deploys in README#Deployment order:
-///   1. DecentralandMarketplaceEthereum  (couponManager = address(0) at construction)
+///   1. DecentralandMarketplaceEthereum  (owner = deployer, couponManager = address(0) at construction)
 ///   2. CouponManager                     (owner = config.owner, no allowed coupons — Ethereum has none today)
-///   3. marketplace.updateCouponManager(couponManager)   [only when the deployer is the owner]
+///   3. marketplace.updateCouponManager(couponManager)   [deployer is still the owner, so it always runs]
+///   4. marketplace.transferOwnership(config.owner)      [only when config.owner differs from the deployer]
 ///
-/// Step 3 is `onlyOwner`: on testnet the owner is the deployer EOA so it runs automatically ("just sign");
-/// on mainnet the owner is the DAO multisig, so step 3 is skipped and the exact governance call is logged.
+/// Deploying with the deployer as owner wires the whole stack in one signing session; the final owner
+/// (DAO multisig on mainnet) receives ownership at the end and never has to run setup calls.
 abstract contract EthereumStackDeployer is DeployStackBase {
     struct Config {
         address owner;
@@ -37,7 +38,7 @@ abstract contract EthereumStackDeployer is DeployStackBase {
         console.log("=========================================================================");
         console.log("Are you sure you want to deploy the ETHEREUM stack with these parameters?");
         console.log("  signer (deployer):", deployer);
-        console.log("  owner:", c.owner);
+        console.log("  owner (final, after wiring):", c.owner);
         console.log("  feeCollector:", c.feeCollector);
         console.log("  feeRate (bps/1e6):", c.feeRate);
         console.log("  mana:", c.mana);
@@ -46,15 +47,15 @@ abstract contract EthereumStackDeployer is DeployStackBase {
         console.log("  ethUsdAggregator:", c.ethUsdAggregator);
         console.log("  ethUsdAggregatorTolerance:", c.ethUsdAggregatorTolerance);
         console.log("  couponManager: deployed in this run, no allowed coupons (Ethereum has none)");
-        console.log("  auto-wire updateCouponManager?", c.owner == deployer);
+        console.log("  transfer ownership to owner after wiring?", c.owner != deployer);
         console.log("If anything looks wrong, Ctrl-C now. Run without --broadcast first to review.");
         console.log("=========================================================================");
 
         vm.startBroadcast();
 
-        // 1. Marketplace (no coupon manager yet; wired in step 3 / by governance).
+        // 1. Marketplace owned by the deployer for now (no coupon manager yet; wired in step 3).
         DecentralandMarketplaceEthereum marketplace = new DecentralandMarketplaceEthereum(
-            c.owner,
+            deployer,
             address(0),
             c.feeCollector,
             c.feeRate,
@@ -70,17 +71,23 @@ abstract contract EthereumStackDeployer is DeployStackBase {
         CouponManager couponManager = new CouponManager(address(marketplace), c.owner, new address[](0));
         console.log("CouponManager deployed at:", address(couponManager));
 
-        // 3. Wire the CouponManager into the marketplace if the deployer owns it (testnet); else log the call.
-        if (c.owner == deployer) {
-            marketplace.updateCouponManager(address(couponManager));
-            console.log("Wired CouponManager into marketplace via updateCouponManager.");
-        } else {
-            console.log("Owner is a multisig, not the deployer -> governance must finish wiring:");
-            console.log("  on marketplace:", address(marketplace));
-            console.log("  call updateCouponManager(couponManager):", address(couponManager));
+        // 3. Wire the CouponManager while the deployer is still the owner.
+        marketplace.updateCouponManager(address(couponManager));
+        console.log("Wired CouponManager into marketplace via updateCouponManager.");
+
+        // 4. Hand the marketplace over to its final owner (DAO multisig on mainnet; no-op on testnet).
+        if (c.owner != deployer) {
+            require(c.owner.code.length != 0, "final owner has no code; refusing to transfer ownership");
+            marketplace.transferOwnership(c.owner);
+            console.log("Transferred marketplace ownership to:", c.owner);
         }
 
         vm.stopBroadcast();
+
+        // Post-conditions: a failure here aborts the simulation, so nothing gets broadcast.
+        require(marketplace.owner() == c.owner, "marketplace owner mismatch");
+        require(address(marketplace.couponManager()) == address(couponManager), "couponManager not wired");
+        require(couponManager.owner() == c.owner, "couponManager owner mismatch");
 
         // Final summary: every contract deployed by this run, in one place.
         console.log("=========================================================================");
