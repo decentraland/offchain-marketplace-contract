@@ -1025,14 +1025,14 @@ Polygon:
 **DecentralandMarketplacePolygon.sol**
 
 ```bash
-$ forge create --rpc-url {rpcUrl} --constructor-args 0x0E659A116e161d8e502F9036bAbDA51334F2667E 0x0000000000000000000000000000000000000000 0xB08E3e7cc815213304d884C88cA476ebC50EaAB2 25000 0x90958D4531258ca11D18396d4174a007edBc2b42 25000 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512 54 --private-key {privateKey} --etherscan-api-key {polygonscanApiKey} --verify src/marketplace/DecentralandMarketplacePolygon.sol:DecentralandMarketplacePolygon
+$ forge create --rpc-url {rpcUrl} --constructor-args 0x0E659A116e161d8e502F9036bAbDA51334F2667E 0x0000000000000000000000000000000000000000 0x184e4D9A26Add0aF1eAfC145550E890a421f16d7 25000 0x90958D4531258ca11D18396d4174a007edBc2b42 25000 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512 54 --private-key {privateKey} --etherscan-api-key {polygonscanApiKey} --verify src/marketplace/DecentralandMarketplacePolygon.sol:DecentralandMarketplacePolygon
 ```
 
 Constructor Args:
 
 - `0x0E659A116e161d8e502F9036bAbDA51334F2667E` SAB as owner
 - `0x0000000000000000000000000000000000000000` No Coupon Manager
-- `0xB08E3e7cc815213304d884C88cA476ebC50EaAB2` DAO as Fee Collector
+- `0x184e4D9A26Add0aF1eAfC145550E890a421f16d7` DAO Fee Collector
 - `25000` Fee rate (2.5%)
 - `0x90958D4531258ca11D18396d4174a007edBc2b42` Royalty Manager
 - `25000` Royalty rate (2.5%)
