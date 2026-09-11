@@ -941,6 +941,14 @@ Ethereum mainnet, deployed 2026-09-10 with `DeployEthereumStack.s.sol` (run in `
 
 Previous Ethereum marketplace: `0x1b67D0e31eeB6B52D8eEEd71D3616C2F5b33b8E7`, to be paused by the DAO.
 
+Polygon mainnet, deployed 2026-09-10 with `DeployPolygonStack.s.sol` (run in `broadcast/DeployPolygonStack.s.sol/137/`):
+
+- `0xe38EF22aBe871513555cBa89adfe45aB4f548ada` DecentralandMarketplacePolygon (owner: SAB, fee collector `0x184e4D9A26Add0aF1eAfC145550E890a421f16d7`)
+- `0x655fDFa91d69EA49F4Ce1a8f7F7E2622C8630813` CouponManager (wired, allowed coupon: the existing CollectionDiscountCoupon)
+- `0xc914507fE297b2dddd1232Ac3A8903F1c125e794` CollectionDiscountCoupon (reused, deployed 2024)
+
+Previous Polygon marketplace: `0xa40b1d129b8906888720686f3a01921ddf37716f`, to be paused by the SAB. The SAB also has to allow the new marketplace in the CreditsManager `0x8B3A40CA1b6F5CaFC99d112a4d02E897d1FD8Cc5` via `allowMarketplaces`.
+
 
 Use the `deploy.sh` helper, which fills in the RPC url, chain, verification and signer per network:
 
