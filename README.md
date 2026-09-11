@@ -932,6 +932,16 @@ On Polygon mainnet the `CollectionDiscountCoupon` is not redeployed. It is state
 
 Each script prints an "are you sure?" banner listing every parameter before broadcasting; run it once without `--broadcast` to review it.
 
+### Live deployments
+
+Ethereum mainnet, deployed 2026-09-10 with `DeployEthereumStack.s.sol` (run in `broadcast/DeployEthereumStack.s.sol/1/`):
+
+- `0x0F11d0d1671519683bD48Abf3dBe779E300941cd` DecentralandMarketplaceEthereum (owner: DAO)
+- `0xf9180eeD9fcD5F8B3921C1b8caEB771C10FaEb26` CouponManager (wired, no allowed coupons)
+
+Previous Ethereum marketplace: `0x1b67D0e31eeB6B52D8eEEd71D3616C2F5b33b8E7`, to be paused by the DAO.
+
+
 Use the `deploy.sh` helper, which fills in the RPC url, chain, verification and signer per network:
 
 ```bash
