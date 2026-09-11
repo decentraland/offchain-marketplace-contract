@@ -913,6 +913,72 @@ Just running `forge test` should be enough, but I find it a good practice to run
 
 It would be a good idea to check the foundry deployment [docs](https://book.getfoundry.sh/forge/deploying).
 
+### Deploy scripts (recommended)
+
+There is one full-stack script per network that deploys every contract in the correct order and, on testnet, wires the CouponManager automatically in the same signing session:
+
+| Network          | Script                             | Deploys (in order)                                                             |
+| ---------------- | ---------------------------------- | ------------------------------------------------------------------------------ |
+| Ethereum mainnet | `script/DeployEthereumStack.s.sol` | Marketplace → CouponManager → `updateCouponManager` → `transferOwnership(DAO)` |
+| Sepolia          | `script/DeploySepoliaStack.s.sol`  | same as Ethereum                                                               |
+| Polygon mainnet  | `script/DeployPolygonStack.s.sol`  | Marketplace → CouponManager (reusing the live CollectionDiscountCoupon) → `updateCouponManager` → `transferOwnership(SAB)` |
+| Amoy             | `script/DeployAmoyStack.s.sol`     | Marketplace → CollectionDiscountCoupon → CouponManager → `updateCouponManager` |
+
+Mainnet values (owner, fee collector, MANA, aggregators, …) are hardcoded from the addresses documented below, so there is nothing to configure. The marketplace is deployed with the deployer as owner so `updateCouponManager` runs in the same signing session, and ownership is transferred to the final owner at the end of the run. On testnet the owner is the deployer, so there is no transfer; first fill the `TODO` addresses (MANA, aggregators) at the top of the testnet script.
+
+> On mainnet the final owner is the DAO/SAB multisig. The script refuses to transfer ownership to an address without code and asserts, before anything is broadcast, that the marketplace ends up owned by it with the CouponManager wired. Governance never has to run setup calls; the only action left for it is pausing the old marketplace.
+
+On Polygon mainnet the `CollectionDiscountCoupon` is not redeployed. It is stateless (no constructor, no storage) and the verified deployment at `0xc914507fE297b2dddd1232Ac3A8903F1c125e794`, the coupon allowed by the live CouponManager, compiles from the same source as this build (it only targets `paris` instead of `shanghai`), so the script only whitelists it in the new CouponManager. Set `collectionDiscountCoupon` to `address(0)` in `_config()` to deploy a fresh one instead.
+
+Each script prints an "are you sure?" banner listing every parameter before broadcasting; run it once without `--broadcast` to review it.
+
+### Live deployments
+
+Ethereum mainnet, deployed 2026-09-10 with `DeployEthereumStack.s.sol` (run in `broadcast/DeployEthereumStack.s.sol/1/`):
+
+- `0x0F11d0d1671519683bD48Abf3dBe779E300941cd` DecentralandMarketplaceEthereum (owner: DAO)
+- `0xf9180eeD9fcD5F8B3921C1b8caEB771C10FaEb26` CouponManager (wired, no allowed coupons)
+
+Previous Ethereum marketplace: `0x1b67D0e31eeB6B52D8eEEd71D3616C2F5b33b8E7`, to be paused by the DAO.
+
+Polygon mainnet, deployed 2026-09-10 with `DeployPolygonStack.s.sol` (run in `broadcast/DeployPolygonStack.s.sol/137/`):
+
+- `0xe38EF22aBe871513555cBa89adfe45aB4f548ada` DecentralandMarketplacePolygon (owner: SAB, fee collector `0x184e4D9A26Add0aF1eAfC145550E890a421f16d7`)
+- `0x655fDFa91d69EA49F4Ce1a8f7F7E2622C8630813` CouponManager (wired, allowed coupon: the existing CollectionDiscountCoupon)
+- `0xc914507fE297b2dddd1232Ac3A8903F1c125e794` CollectionDiscountCoupon (reused, deployed 2024)
+
+Previous Polygon marketplace: `0xa40b1d129b8906888720686f3a01921ddf37716f`, to be paused by the SAB. The SAB also has to allow the new marketplace in the CreditsManager `0x8B3A40CA1b6F5CaFC99d112a4d02E897d1FD8Cc5` via `allowMarketplaces`.
+
+
+Use the `deploy.sh` helper, which fills in the RPC url, chain, verification and signer per network:
+
+```bash
+./deploy.sh DeployAmoyStack             # dry-run: simulate + show the banner
+./deploy.sh DeployAmoyStack broadcast   # deploy + verify
+```
+
+It reads the following from `.env` (git-ignored):
+
+```bash
+ETHEREUM_RPC_URL=https://rpc.decentraland.org/mainnet
+SEPOLIA_RPC_URL=https://rpc.decentraland.org/sepolia
+POLYGON_RPC_URL=https://rpc.decentraland.org/polygon
+AMOY_RPC_URL=https://rpc.decentraland.org/amoy
+ETHERSCAN_API_KEY=...            # a single Etherscan v2 key verifies all four chains
+```
+
+See `.env.example` for the full template. `deploy.sh` never prints the private key or the API key (they are redacted in the echoed command).
+
+**Signing.** `deploy.sh` picks the signer with the precedence `PRIVATE_KEY` > `LEDGER` > keystore:
+
+- **Private key:** set `PRIVATE_KEY=0x...` in `.env`. That is all — the script adds `--private-key` for you. To deploy without `deploy.sh`, the equivalent is `forge script <stack> --rpc-url <url> --broadcast --private-key 0x...`.
+- **Ledger:** set `LEDGER=true` and `SENDER=0xYourLedgerAddress`.
+- **Keystore (fallback):** leave both unset — it uses `--account "${KEYSTORE_ACCOUNT:-deployer}"`. Import your key once with `cast wallet import deployer --interactive` (stored encrypted, unlocked by a password at deploy time).
+
+`SENDER` is also useful on its own: in a dry-run it makes the "are you sure?" banner show your real signer/owner.
+
+### Manual deployment (`forge create`)
+
 The contracts are to be deployed in the following order,
 
 Ethereum: 
@@ -967,20 +1033,20 @@ Polygon:
 **DecentralandMarketplacePolygon.sol**
 
 ```bash
-$ forge create --rpc-url {rpcUrl} --constructor-args 0x0E659A116e161d8e502F9036bAbDA51334F2667E 0x0000000000000000000000000000000000000000 0xB08E3e7cc815213304d884C88cA476ebC50EaAB2 25000 0x90958D4531258ca11D18396d4174a007edBc2b42 25000 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512 27 --private-key {privateKey} --etherscan-api-key {polygonscanApiKey} --verify src/marketplace/DecentralandMarketplacePolygon.sol:DecentralandMarketplacePolygon
+$ forge create --rpc-url {rpcUrl} --constructor-args 0x0E659A116e161d8e502F9036bAbDA51334F2667E 0x0000000000000000000000000000000000000000 0x184e4D9A26Add0aF1eAfC145550E890a421f16d7 25000 0x90958D4531258ca11D18396d4174a007edBc2b42 25000 0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4 0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512 54 --private-key {privateKey} --etherscan-api-key {polygonscanApiKey} --verify src/marketplace/DecentralandMarketplacePolygon.sol:DecentralandMarketplacePolygon
 ```
 
 Constructor Args:
 
 - `0x0E659A116e161d8e502F9036bAbDA51334F2667E` SAB as owner
 - `0x0000000000000000000000000000000000000000` No Coupon Manager
-- `0xB08E3e7cc815213304d884C88cA476ebC50EaAB2` DAO as Fee Collector
+- `0x184e4D9A26Add0aF1eAfC145550E890a421f16d7` DAO Fee Collector
 - `25000` Fee rate (2.5%)
 - `0x90958D4531258ca11D18396d4174a007edBc2b42` Royalty Manager
 - `25000` Royalty rate (2.5%)
 - `0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4` MANA
 - `0xA1CbF3Fe43BC3501e3Fc4b573e822c70e76A7512` MANA / USD Chainlink Aggregator
-- `27` MANA / USD Aggregator Heartbeat (Used as tolerance)
+- `54` MANA / USD Aggregator Tolerance (2x the 27s heartbeat, matches the deployed RegisterNameCrossChainExecutor)
 
 **CollectionDiscountCoupon.sol**
 

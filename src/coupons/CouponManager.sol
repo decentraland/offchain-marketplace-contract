@@ -23,7 +23,21 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
 
     event MarketplaceUpdated(address indexed _caller, address indexed _marketplace);
     event AllowedCouponsUpdated(address indexed _caller, address indexed _coupon, bool _value);
-    event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature, Coupon _coupon);
+    /// @dev Emitted when a Coupon is applied to a Trade.
+    /// @param _caller The address executing the Trade, as forwarded by the marketplace (not the marketplace itself).
+    /// @param _tradeSignature keccak256 of the trade signature bytes (malleable; kept for indexing continuity).
+    /// @param _couponSignature keccak256 of the coupon signature bytes (malleable; kept for indexing continuity).
+    /// @param _tradeDigest The signed EIP-712 digest of the trade, as provided by the calling marketplace.
+    /// Equals `Traded._tradeDigest` in the same transaction.
+    /// @param _couponDigest The signed EIP-712 digest of the coupon; the canonical coupon identifier.
+    event CouponApplied(
+        address indexed _caller,
+        bytes32 indexed _tradeSignature,
+        bytes32 indexed _couponSignature,
+        bytes32 _tradeDigest,
+        bytes32 _couponDigest,
+        Coupon _coupon
+    );
 
     error LengthMissmatch();
     error UnauthorizedCaller(address _caller);
@@ -65,20 +79,23 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         for (uint256 i = 0; i < _coupons.length; i++) {
             Coupon calldata coupon = _coupons[i];
 
-            _cancelSignature(keccak256(coupon.signature), caller);
+            _cancelSignature(_hashTypedDataV4(_hashCoupon(coupon)), caller);
         }
     }
 
     /// @notice Applies a Coupon to a Trade.
     /// @param _trade The Trade to apply the Coupon to.
     /// @param _coupon The Coupon to apply.
+    /// @param _tradeDigest The signed EIP-712 digest of the Trade. Not used for validation; only surfaced in the
+    /// CouponApplied event, so it is trusted from the marketplace (the only authorized caller).
+    /// @param _caller The address executing the Trade on the marketplace, forwarded so the Coupon Checks
+    /// (allowedRoot, externalChecks) are evaluated against the actual user instead of the marketplace contract.
+    /// Trusted from the marketplace (the only authorized caller).
     /// @return The Trade with the Coupon applied.
-    function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external returns (Trade memory) {
-        address caller = _msgSender();
-
+    function applyCoupon(Trade calldata _trade, Coupon calldata _coupon, bytes32 _tradeDigest, address _caller) external returns (Trade memory) {
         // Only the marketplace is allowed to apply Coupons.
-        if (caller != marketplace) {
-            revert UnauthorizedCaller(caller);
+        if (_msgSender() != marketplace) {
+            revert UnauthorizedCaller(_msgSender());
         }
 
         address couponAddress = _coupon.couponAddress;
@@ -89,20 +106,20 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         }
 
         address signer = _trade.signer;
-        bytes32 hashedCouponSignature = keccak256(_coupon.signature);
-        bytes32 hashedTradeSignature = keccak256(_trade.signature);
-        bytes32 hashedCouponSignatureWithSigner = keccak256(abi.encode(signer, hashedCouponSignature));
-        uint256 currentSignatureUses = signatureUses[hashedCouponSignatureWithSigner];
+        bytes32 couponDigest = _hashTypedDataV4(_hashCoupon(_coupon));
+        bytes32 hashedCouponWithSigner = keccak256(abi.encode(signer, couponDigest));
+        uint256 currentSignatureUses = signatureUses[hashedCouponWithSigner];
 
         // Verify that the check values provided in the Coupon are correct.
-        _verifyChecks(_coupon.checks, hashedCouponSignatureWithSigner, currentSignatureUses, signer, caller);
+        _verifyChecks(_coupon.checks, hashedCouponWithSigner, currentSignatureUses, signer, _caller);
         // Verify that the Coupon signature is valid.
         _verifyCouponSignature(_coupon, signer);
 
-        emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature, _coupon);
+        // Raw-signature hashes are emitted only as event identifiers, hashed inline to keep the stack shallow.
+        emit CouponApplied(_caller, keccak256(_trade.signature), keccak256(_coupon.signature), _tradeDigest, couponDigest, _coupon);
 
         // Increase the amount of uses of the Coupon signature.
-        signatureUses[hashedCouponSignatureWithSigner]++;
+        signatureUses[hashedCouponWithSigner]++;
 
         // Apply the Coupon and return the modified Trade.
         return ICoupon(couponAddress).applyCoupon(_trade, _coupon);

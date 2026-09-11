@@ -23,17 +23,18 @@ abstract contract Verifications is Signatures, CommonTypes {
     error NotAllowed();
     error ExternalChecksFailed();
 
-    /// @dev Verifies that the Check values are correct and that the signature has not been canceled or overused.
+    /// @dev Verifies that the Check values are correct and that the Trade/Coupon has not been canceled or overused.
     /// @param _checks The Checks to verify.
-    /// @param _hashedSignatureWithSigner The hash of the signature with the signer.
-    /// @param _currentSignatureUses The number of times the signature has been used.
+    /// @param _hashedDigestWithSigner keccak256(abi.encode(signer, digest)) — the per-signer key of the EIP-712
+    /// digest of the Trade/Coupon, invariant across signature encodings.
+    /// @param _currentSignatureUses The number of times this key has already been used.
     /// @param _signer The address that created the signature.
     /// @param _caller The address that sent the transaction.
-    function _verifyChecks(Checks calldata _checks, bytes32 _hashedSignatureWithSigner, uint256 _currentSignatureUses, address _signer, address _caller)
+    function _verifyChecks(Checks calldata _checks, bytes32 _hashedDigestWithSigner, uint256 _currentSignatureUses, address _signer, address _caller)
         internal
         view
     {
-        if (cancelledSignatures[_hashedSignatureWithSigner]) {
+        if (cancelledSignatures[_hashedDigestWithSigner]) {
             revert UsingCancelledSignature();
         }
 
