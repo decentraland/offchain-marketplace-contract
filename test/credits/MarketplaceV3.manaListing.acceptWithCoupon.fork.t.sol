@@ -15,6 +15,7 @@ import {MarketplaceTypesHashing} from "src/marketplace/MarketplaceTypesHashing.s
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {CouponTypesHashing} from "src/coupons/CouponTypesHashing.sol";
 import {CollectionDiscountCoupon} from "src/coupons/CollectionDiscountCoupon.sol";
+import {Verifications} from "src/common/Verifications.sol";
 
 contract V3TradeHashing is MarketplaceTypesHashing {
     function hashTrade(Trade calldata _trade) external pure returns (bytes32) {
@@ -32,10 +33,19 @@ interface IV3SignatureIndexes {
     function contractSignatureIndex() external view returns (uint256);
     function signerSignatureIndex(address) external view returns (uint256);
     function couponManager() external view returns (address);
+    function feeRate() external view returns (uint256);
+    function feeCollector() external view returns (address);
+    function allowedCoupons(address) external view returns (bool);
 }
 
+/// `IMarketplace` declares its own Trade/Coupon structs, which are not convertible from MarketplaceTypes /
+/// CouponTypes, so the wallet path calls the marketplace through this interface over the shared types.
 interface IMarketplaceAcceptWithCoupon {
     function acceptWithCoupon(MarketplaceTypes.Trade[] calldata _trades, CouponTypes.Coupon[] calldata _coupons) external;
+}
+
+interface IV3Collection {
+    function globalMinters(address) external view returns (bool);
 }
 
 /// Whether a creator discount coupon applies to a MANA-priced (ERC20) primary listing, not only to a
@@ -43,9 +53,10 @@ interface IMarketplaceAcceptWithCoupon {
 /// manager wired into it, forked from Polygon mainnet.
 ///
 /// Everything is the deployed bytecode: CreditsManager, marketplace V3, its CouponManager, the
-/// CollectionDiscountCoupon, MANA, and a real collection with an open V3 MANA listing. Faked: the keys (a test
-/// creator and a test credits signer granted the role by the manager's admin) and the collection's `creator()`,
-/// mocked to the test creator so the coupon is signed by "the creator".
+/// CollectionDiscountCoupon, MANA, and a real collection V3 can mint. Faked: the keys (a test creator and a test
+/// credits signer granted the role by the manager's admin) and the collection's `creator()`, mocked to the test
+/// creator so the listings and the coupon are signed by "the creator". The listings are signed here, not taken
+/// from the order book.
 contract MarketplaceV3ManaListingAcceptWithCouponForkTest is Test, IERC721Receiver {
     using MessageHashUtils for bytes32;
 
@@ -56,7 +67,7 @@ contract MarketplaceV3ManaListingAcceptWithCouponForkTest is Test, IERC721Receiv
     address constant COLLECTION_DISCOUNT_COUPON = 0xc914507fE297b2dddd1232Ac3A8903F1c125e794;
     address constant CREDITS_MANAGER = 0x8B3A40CA1b6F5CaFC99d112a4d02E897d1FD8Cc5;
     address constant CREDITS_MANAGER_ADMIN = 0x67e5CF7C368C0a4A81b714dF57B2c6143D4C16A2;
-    // A real collection with an open V3 MANA primary listing for item 0 on the fork block.
+    // "PROM BULL 2025", item 0: rare, 88 of 5,000 minted on the fork block, marketplace V3 is a global minter.
     address constant COLLECTION = 0xD5A806d332B45d62adF4d7d6E1b5DEf073f69768;
     uint256 constant ITEM_ID = 0;
 
@@ -104,6 +115,13 @@ contract MarketplaceV3ManaListingAcceptWithCouponForkTest is Test, IERC721Receiv
         assertEq(IV3SignatureIndexes(MARKETPLACE_V3).couponManager(), COUPON_MANAGER_V3, "V3 is wired to another CouponManager");
         assertTrue(creditsManager.marketplaces(MARKETPLACE_V3), "V3 must be an allowed marketplace");
         assertTrue(creditsManager.primarySalesAllowed(), "primary sales must be allowed");
+        assertTrue(IV3SignatureIndexes(COUPON_MANAGER_V3).allowedCoupons(COLLECTION_DISCOUNT_COUPON), "the V3 manager must allow the coupon");
+        assertTrue(IV3Collection(COLLECTION).globalMinters(MARKETPLACE_V3), "V3 must be able to mint the collection");
+    }
+
+    /// The creator's cut of a primary sale at the fee V3 charges on the fork block.
+    function _creatorCut(uint256 _sale) internal view returns (uint256) {
+        return _sale - _sale * IV3SignatureIndexes(MARKETPLACE_V3).feeRate() / 1_000_000;
     }
 
     function _checks(bytes32 _salt, uint256 _contractIndex, uint256 _signerIndex) internal view returns (CommonTypes.Checks memory) {
@@ -234,7 +252,7 @@ contract MarketplaceV3ManaListingAcceptWithCouponForkTest is Test, IERC721Receiv
         assertEq(IERC721(COLLECTION).balanceOf(buyer), ownedBefore + 1, "buyer did not receive the minted item");
         assertEq(manaOut, expected, "MANA out is not 70% of the MANA price");
         assertEq(creditSpent, manaOut, "credit consumed != MANA transferred");
-        assertEq(creatorIn, manaOut * 975 / 1000, "creator payout is not the sale price less the 2.5% fee");
+        assertEq(creatorIn, _creatorCut(manaOut), "creator payout is not the sale price less the marketplace fee");
         emit log_named_decimal_uint("MANA listing price", MANA_PRICE, 18);
         emit log_named_decimal_uint("MANA paid with 30% coupon", manaOut, 18);
         emit log_named_decimal_uint("creator received", creatorIn, 18);
@@ -257,8 +275,10 @@ contract MarketplaceV3ManaListingAcceptWithCouponForkTest is Test, IERC721Receiv
         deal(MANA, buyer, 100 ether);
         IERC20(MANA).approve(MARKETPLACE_V3, type(uint256).max);
 
+        address feeCollector = IV3SignatureIndexes(MARKETPLACE_V3).feeCollector();
         uint256 buyerBefore = IERC20(MANA).balanceOf(buyer);
         uint256 creatorBefore = IERC20(MANA).balanceOf(creator);
+        uint256 feeBefore = IERC20(MANA).balanceOf(feeCollector);
         uint256 ownedBefore = IERC721(COLLECTION).balanceOf(buyer);
 
         IMarketplaceAcceptWithCoupon(MARKETPLACE_V3)
@@ -269,31 +289,52 @@ contract MarketplaceV3ManaListingAcceptWithCouponForkTest is Test, IERC721Receiv
 
         assertEq(IERC721(COLLECTION).balanceOf(buyer), ownedBefore + 1, "buyer did not receive the minted item");
         assertEq(buyerBefore - IERC20(MANA).balanceOf(buyer), expected, "buyer did not pay 70% of the MANA price");
-        assertEq(IERC20(MANA).balanceOf(creator) - creatorBefore, expected * 975 / 1000, "creator payout");
+        assertEq(IERC20(MANA).balanceOf(creator) - creatorBefore, _creatorCut(expected), "creator payout");
+        assertEq(IERC20(MANA).balanceOf(feeCollector) - feeBefore, expected - _creatorCut(expected), "fee collector cut");
     }
 
-    /// A one-use coupon must refuse a second unit: this is what caps a sale to N units.
+    /// A one-use coupon must refuse a second unit: this is what caps a sale to N units. Asserted on the wallet
+    /// path, where the CouponManager's own error reaches the caller; through `useCredits` every inner failure
+    /// becomes ExternalCallFailed, which would not say why.
     function test_fork_v3_oneUseCoupon_refusesTheSecondUnit() public {
+        deal(MANA, buyer, 100 ether);
+        IERC20(MANA).approve(MARKETPLACE_V3, type(uint256).max);
         CouponTypes.Coupon memory coupon = _signedCoupon(keccak256("coupon-one-use"), 1);
-        _buyWithCredits(
-            IMarketplace.acceptWithCoupon.selector,
-            abi.encode(_one(_signedListing(keccak256("unit-1"), creditsManager.ASSET_TYPE_USD_PEGGED_MANA(), USD_PRICE)), _one(coupon)),
-            100 ether,
-            keccak256("credit-unit-1")
-        );
 
-        (CreditsManagerPolygon.UseCreditsArgs memory args,) = _useCreditsArgs(
-            IMarketplace.acceptWithCoupon.selector,
-            abi.encode(_one(_signedListing(keccak256("unit-2"), creditsManager.ASSET_TYPE_USD_PEGGED_MANA(), USD_PRICE)), _one(coupon)),
-            100 ether,
-            keccak256("credit-unit-2")
-        );
-        // The CouponManager refuses it with SignatureOveruse inside the external call.
-        vm.expectRevert();
-        creditsManager.useCredits(args);
+        IMarketplaceAcceptWithCoupon(MARKETPLACE_V3)
+            .acceptWithCoupon(_one(_signedListing(keccak256("unit-1"), creditsManager.ASSET_TYPE_ERC20(), MANA_PRICE)), _one(coupon));
+
+        // Built before expectRevert: signing reads the marketplace's indexes, and the expectation would
+        // otherwise attach to that read instead of the purchase.
+        MarketplaceTypes.Trade[] memory secondUnit = _one(_signedListing(keccak256("unit-2"), creditsManager.ASSET_TYPE_ERC20(), MANA_PRICE));
+        CouponTypes.Coupon[] memory sameCoupon = _one(coupon);
+        vm.expectRevert(Verifications.SignatureOveruse.selector);
+        IMarketplaceAcceptWithCoupon(MARKETPLACE_V3).acceptWithCoupon(secondUnit, sameCoupon);
     }
 
-    /// The Credits listing on V3, the case the Shop runs today, still settles at 70% through credits.
+    /// Control for the cap: the same second listing with a fresh coupon goes through, so the refusal above is
+    /// the coupon's use limit and not supply, minting or the listing.
+    function test_fork_v3_oneUseCoupon_secondUnitSettlesWithAFreshCoupon() public {
+        deal(MANA, buyer, 100 ether);
+        IERC20(MANA).approve(MARKETPLACE_V3, type(uint256).max);
+        uint256 ownedBefore = IERC721(COLLECTION).balanceOf(buyer);
+
+        IMarketplaceAcceptWithCoupon(MARKETPLACE_V3)
+            .acceptWithCoupon(
+                _one(_signedListing(keccak256("unit-1"), creditsManager.ASSET_TYPE_ERC20(), MANA_PRICE)),
+                _one(_signedCoupon(keccak256("coupon-one-use"), 1))
+            );
+        IMarketplaceAcceptWithCoupon(MARKETPLACE_V3)
+            .acceptWithCoupon(
+                _one(_signedListing(keccak256("unit-2"), creditsManager.ASSET_TYPE_ERC20(), MANA_PRICE)),
+                _one(_signedCoupon(keccak256("coupon-fresh"), 1))
+            );
+
+        assertEq(IERC721(COLLECTION).balanceOf(buyer), ownedBefore + 2, "both units should have minted");
+    }
+
+    /// A Credits (USD-pegged) listing on V3 settles at 70% through credits. Production creator sales are signed
+    /// against the V3 manager, so this is #34's case on the marketplace they redeem through.
     function test_fork_v3_usdPeggedListing_creditsWithCoupon_chargesSeventyPercent() public {
         (uint256 fullMana,,) = _buyWithCredits(
             IMarketplace.accept.selector,
