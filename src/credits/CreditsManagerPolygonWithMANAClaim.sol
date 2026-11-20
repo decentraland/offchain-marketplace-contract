@@ -172,6 +172,8 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
     event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
+    event BuyerProxyERC20Withdrawn(address indexed _sender, address indexed _buyer, address indexed _token, uint256 _amount, address _to);
+    event BuyerProxyERC721Withdrawn(address indexed _sender, address indexed _buyer, address indexed _token, uint256 _tokenId, address _to);
     event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
     event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _customExternalCallHash);
     event CreditUsed(address indexed _sender, bytes32 indexed _creditId, Credit _credit, uint256 _value);
@@ -366,8 +368,16 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
         emit ERC721Withdrawn(_msgSender(), _token, _tokenId, _to);
     }
 
-    function withdrawFromBuyerProxy(address _buyer, address _token, bytes calldata _data) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        BuyerProxy(_deployBuyerProxy(_buyer)).withdraw(_token, _data);
+    function withdrawERC20FromBuyerProxy(address _buyer, address _token, uint256 _amount, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        BuyerProxy(_deployBuyerProxy(_buyer)).withdrawERC20(_token, _amount, _to);
+
+        emit BuyerProxyERC20Withdrawn(_msgSender(), _buyer, _token, _amount, _to);
+    }
+
+    function withdrawERC721FromBuyerProxy(address _buyer, address _token, uint256 _tokenId, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        BuyerProxy(_deployBuyerProxy(_buyer)).withdrawERC721(_token, _tokenId, _to);
+
+        emit BuyerProxyERC721Withdrawn(_msgSender(), _buyer, _token, _tokenId, _to);
     }
 
     /// @notice Allows a custom external call.
