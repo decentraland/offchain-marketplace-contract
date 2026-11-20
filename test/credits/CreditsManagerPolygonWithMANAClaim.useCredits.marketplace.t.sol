@@ -8,6 +8,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {CreditsManagerPolygonWithMANAClaim as CreditsManagerPolygon} from "src/credits/CreditsManagerPolygonWithMANAClaim.sol";
 import {CreditsManagerPolygonWithMANAClaimTestBase} from "test/credits/utils/CreditsManagerPolygonWithMANAClaimTestBase.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
+import {BuyerProxy} from "src/credits/BuyerProxy.sol";
 
 contract CreditsManagerPolygonWithMANAClaimUseCreditsMarketplaceTest is CreditsManagerPolygonWithMANAClaimTestBase {
     using MessageHashUtils for bytes32;
@@ -1235,5 +1236,175 @@ contract CreditsManagerPolygonWithMANAClaimUseCreditsMarketplaceTest is CreditsM
         assertEq(IERC20(mana).balanceOf(metaTxSigner), buyerBalanceBefore);
 
         assertEq(IERC721(collection).ownerOf(collectionTokenId), metaTxSigner);
+    }
+
+    function _listing(uint256 _signerPk, uint256 _tokenId, address _beneficiary, bytes32 _salt)
+        internal
+        view
+        returns (IMarketplace.Trade[] memory trades)
+    {
+        trades = new IMarketplace.Trade[](1);
+        trades[0] = IMarketplace.Trade({
+            signer: vm.addr(_signerPk),
+            signature: "",
+            checks: IMarketplace.Checks({
+                uses: 1,
+                expiration: type(uint256).max,
+                effective: 0,
+                salt: _salt,
+                contractSignatureIndex: 0,
+                signerSignatureIndex: 0,
+                allowedRoot: bytes32(0),
+                allowedProof: new bytes32[](0),
+                externalChecks: new IMarketplace.ExternalCheck[](0)
+            }),
+            sent: new IMarketplace.Asset[](1),
+            received: new IMarketplace.Asset[](1)
+        });
+
+        trades[0].received[0] = IMarketplace.Asset({
+            assetType: creditsManager.ASSET_TYPE_ERC20(),
+            contractAddress: mana,
+            value: 100 ether,
+            beneficiary: address(0),
+            extra: new bytes(0)
+        });
+
+        trades[0].sent[0] = IMarketplace.Asset({
+            assetType: creditsManager.ASSET_TYPE_ERC721(),
+            contractAddress: collection,
+            value: _tokenId,
+            beneficiary: _beneficiary,
+            extra: new bytes(0)
+        });
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signerPk, creditsManager.tradeToTypedHashData(trades[0], marketplace));
+
+        trades[0].signature = abi.encodePacked(r, s, v);
+    }
+
+    function _useCreditsArgs(address _buyer, IMarketplace.Trade[] memory _trades, bytes32 _creditSalt)
+        internal
+        view
+        returns (CreditsManagerPolygon.UseCreditsArgs memory)
+    {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: _creditSalt});
+
+        bytes[] memory creditsSignatures = new bytes[](1);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(creditsSignerPk, keccak256(abi.encode(_buyer, block.chainid, address(creditsManager), credits[0])).toEthSignedMessageHash());
+
+        creditsSignatures[0] = abi.encodePacked(r, s, v);
+
+        return CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: CreditsManagerPolygon.ExternalCall({
+                target: marketplace,
+                selector: IMarketplace.accept.selector,
+                data: abi.encode(_trades),
+                expiresAt: 0,
+                salt: bytes32(0)
+            }),
+            customExternalCallSignature: bytes(""),
+            maxUncreditedValue: 0,
+            maxCreditedValue: 100 ether
+        });
+    }
+
+    function test_useCredits_TradeIdsAreNotSharedBetweenBuyers() public {
+        (, uint256 otherSellerPk) = makeAddrAndKey("otherSeller");
+        address otherBuyer = makeAddr("otherBuyer");
+
+        vm.startPrank(collectionTokenOwner);
+        IERC721(collection).transferFrom(collectionTokenOwner, seller, 1);
+        IERC721(collection).transferFrom(collectionTokenOwner, vm.addr(otherSellerPk), 2);
+        vm.stopPrank();
+
+        vm.prank(seller);
+        IERC721(collection).setApprovalForAll(marketplace, true);
+
+        vm.prank(vm.addr(otherSellerPk));
+        IERC721(collection).setApprovalForAll(marketplace, true);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 200 ether);
+
+        CreditsManagerPolygon.UseCreditsArgs memory otherBuyerArgs =
+            _useCreditsArgs(otherBuyer, _listing(otherSellerPk, 2, otherBuyer, bytes32(uint256(1))), bytes32(0));
+        CreditsManagerPolygon.UseCreditsArgs memory buyerArgs =
+            _useCreditsArgs(address(this), _listing(sellerPk, 1, address(this), bytes32(uint256(1))), bytes32(0));
+
+        vm.prank(otherBuyer);
+        creditsManager.useCredits(otherBuyerArgs);
+
+        vm.warp(block.timestamp + 1 hours);
+
+        creditsManager.useCredits(buyerArgs);
+
+        assertEq(IERC721(collection).ownerOf(1), address(this));
+        assertEq(IERC721(collection).ownerOf(2), otherBuyer);
+    }
+
+    function test_useCredits_ReusesTheBuyerProxy() public {
+        vm.startPrank(collectionTokenOwner);
+        IERC721(collection).transferFrom(collectionTokenOwner, seller, 1);
+        IERC721(collection).transferFrom(collectionTokenOwner, seller, 2);
+        vm.stopPrank();
+
+        vm.prank(seller);
+        IERC721(collection).setApprovalForAll(marketplace, true);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 200 ether);
+
+        address buyerProxy = creditsManager.getBuyerProxy(address(this));
+
+        assertEq(buyerProxy.code.length, 0);
+
+        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
+
+        creditsManager.useCredits(_useCreditsArgs(address(this), _listing(sellerPk, 1, address(this), bytes32(uint256(1))), bytes32(0)));
+
+        assertGt(buyerProxy.code.length, 0);
+        assertEq(IERC20(mana).balanceOf(buyerProxy), 0);
+
+        vm.warp(block.timestamp + 1 hours);
+
+        creditsManager.useCredits(_useCreditsArgs(address(this), _listing(sellerPk, 2, address(this), bytes32(uint256(2))), bytes32(uint256(1))));
+
+        assertEq(IERC20(mana).balanceOf(buyerProxy), 0);
+        assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - 200 ether);
+        assertEq(IERC721(collection).ownerOf(1), address(this));
+        assertEq(IERC721(collection).ownerOf(2), address(this));
+
+        vm.expectRevert(abi.encodeWithSelector(BuyerProxy.UnauthorizedCaller.selector, address(this)));
+        BuyerProxy(buyerProxy).execute(marketplace, "", 0);
+    }
+
+    function test_useCredits_IgnoresManaHeldByTheBuyerProxy() public {
+        vm.prank(collectionTokenOwner);
+        IERC721(collection).transferFrom(collectionTokenOwner, seller, 1);
+
+        vm.prank(seller);
+        IERC721(collection).setApprovalForAll(marketplace, true);
+
+        address buyerProxy = creditsManager.getBuyerProxy(address(this));
+
+        vm.startPrank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 100 ether);
+        IERC20(mana).transfer(buyerProxy, 1000 ether);
+        vm.stopPrank();
+
+        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
+
+        creditsManager.useCredits(_useCreditsArgs(address(this), _listing(sellerPk, 1, address(this), bytes32(uint256(1))), bytes32(0)));
+
+        assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - 100 ether);
+        assertEq(IERC20(mana).balanceOf(buyerProxy), 1000 ether);
+        assertEq(IERC721(collection).ownerOf(1), address(this));
     }
 }
