@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 contract BuyerProxy {
     using SafeERC20 for IERC20;
@@ -32,5 +33,13 @@ contract BuyerProxy {
         mana.forceApprove(_target, 0);
 
         mana.safeTransfer(creditsManager, _amount - (balanceBefore - mana.balanceOf(address(this))));
+    }
+
+    function withdraw(address _token, bytes calldata _data) external {
+        if (msg.sender != creditsManager) {
+            revert UnauthorizedCaller(msg.sender);
+        }
+
+        Address.functionCall(_token, _data);
     }
 }

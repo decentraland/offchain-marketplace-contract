@@ -366,6 +366,10 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
         emit ERC721Withdrawn(_msgSender(), _token, _tokenId, _to);
     }
 
+    function withdrawFromBuyerProxy(address _buyer, address _token, bytes calldata _data) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        BuyerProxy(_deployBuyerProxy(_buyer)).withdraw(_token, _data);
+    }
+
     /// @notice Allows a custom external call.
     /// @dev Only the owner can allow custom external calls.
     /// @param _target The target of the external call.
@@ -695,15 +699,19 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
     }
 
     function _executeFromBuyerProxy(ExternalCall calldata _externalCall, address _sender, uint256 _manaAmount) internal returns (bool) {
-        address buyerProxy = getBuyerProxy(_sender);
-
-        if (buyerProxy.code.length == 0) {
-            Clones.cloneDeterministic(buyerProxyImplementation, bytes32(uint256(uint160(_sender))));
-        }
+        address buyerProxy = _deployBuyerProxy(_sender);
 
         mana.safeTransfer(buyerProxy, _manaAmount);
 
         return BuyerProxy(buyerProxy).execute(_externalCall.target, abi.encodePacked(_externalCall.selector, _externalCall.data), _manaAmount);
+    }
+
+    function _deployBuyerProxy(address _buyer) internal returns (address buyerProxy) {
+        buyerProxy = getBuyerProxy(_buyer);
+
+        if (buyerProxy.code.length == 0) {
+            Clones.cloneDeterministic(buyerProxyImplementation, bytes32(uint256(uint160(_buyer))));
+        }
     }
 
     // -----------------------------------------------------------------------------------------------------------------

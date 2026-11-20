@@ -370,6 +370,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit ERC721Withdrawn(_msgSender(), _token, _tokenId, _to);
     }
 
+    function withdrawFromBuyerProxy(address _buyer, address _token, bytes calldata _data) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        BuyerProxy(_deployBuyerProxy(_buyer)).withdraw(_token, _data);
+    }
+
     /// @notice Allows marketplaces.
     /// @dev Only the owner can allow marketplace.
     /// @param _target The target of the marketplace.
@@ -707,15 +711,19 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     }
 
     function _executeFromBuyerProxy(ExternalCall calldata _externalCall, address _sender, uint256 _manaAmount) internal returns (bool) {
-        address buyerProxy = getBuyerProxy(_sender);
-
-        if (buyerProxy.code.length == 0) {
-            Clones.cloneDeterministic(buyerProxyImplementation, bytes32(uint256(uint160(_sender))));
-        }
+        address buyerProxy = _deployBuyerProxy(_sender);
 
         mana.safeTransfer(buyerProxy, _manaAmount);
 
         return BuyerProxy(buyerProxy).execute(_externalCall.target, abi.encodePacked(_externalCall.selector, _externalCall.data), _manaAmount);
+    }
+
+    function _deployBuyerProxy(address _buyer) internal returns (address buyerProxy) {
+        buyerProxy = getBuyerProxy(_buyer);
+
+        if (buyerProxy.code.length == 0) {
+            Clones.cloneDeterministic(buyerProxyImplementation, bytes32(uint256(uint160(_buyer))));
+        }
     }
 
     // -----------------------------------------------------------------------------------------------------------------

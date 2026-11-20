@@ -351,4 +351,37 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
         assertEq(IERC721(collection).ownerOf(collectionTokenId), address(this));
     }
+
+    function test_withdrawFromBuyerProxy_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.withdrawFromBuyerProxy(address(this), address(mana), abi.encodeCall(IERC20.transfer, (address(this), 1 ether)));
+    }
+
+    function test_withdrawFromBuyerProxy_WhenOwner() public {
+        address buyerProxy = creditsManager.getBuyerProxy(address(this));
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(buyerProxy, 1 ether);
+
+        vm.prank(collectionTokenOwner);
+        IERC721(collection).transferFrom(collectionTokenOwner, buyerProxy, collectionTokenId);
+
+        assertEq(buyerProxy.code.length, 0);
+
+        vm.prank(owner);
+        creditsManager.withdrawFromBuyerProxy(address(this), address(mana), abi.encodeCall(IERC20.transfer, (owner, 1 ether)));
+
+        assertGt(buyerProxy.code.length, 0);
+        assertEq(IERC20(mana).balanceOf(buyerProxy), 0);
+        assertEq(IERC20(mana).balanceOf(owner), 1 ether);
+
+        vm.prank(owner);
+        creditsManager.withdrawFromBuyerProxy(
+            address(this), collection, abi.encodeWithSignature("transferFrom(address,address,uint256)", buyerProxy, owner, collectionTokenId)
+        );
+
+        assertEq(IERC721(collection).ownerOf(collectionTokenId), owner);
+    }
 }
