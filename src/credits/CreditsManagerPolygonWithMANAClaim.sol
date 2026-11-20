@@ -10,12 +10,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {NativeMetaTransaction, EIP712} from "src/common/NativeMetaTransaction.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
 import {ILegacyMarketplace} from "src/credits/interfaces/ILegacyMarketplace.sol";
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
+import {BuyerProxy} from "src/credits/BuyerProxy.sol";
 
 contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction, IERC721Receiver {
     using ECDSA for bytes32;
@@ -96,6 +98,8 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
     /// @notice The address of the CollectionFactoryV3 contract.
     ICollectionFactory public immutable collectionFactoryV3;
 
+    address public immutable buyerProxyImplementation;
+
     /// @notice Tracks the allowed custom external calls.
     mapping(address => mapping(bytes4 => bool)) public allowedCustomExternalCalls;
 
@@ -168,6 +172,8 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
     event CreditRevoked(address indexed _sender, bytes32 indexed _creditId);
     event ERC20Withdrawn(address indexed _sender, address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _sender, address indexed _token, uint256 indexed _tokenId, address _to);
+    event BuyerProxyERC20Withdrawn(address indexed _sender, address indexed _buyer, address indexed _token, uint256 _amount, address _to);
+    event BuyerProxyERC721Withdrawn(address indexed _sender, address indexed _buyer, address indexed _token, uint256 _tokenId, address _to);
     event CustomExternalCallAllowed(address indexed _sender, address indexed _target, bytes4 indexed _selector, bool _allowed);
     event CustomExternalCallRevoked(address indexed _sender, bytes32 indexed _customExternalCallHash);
     event CreditUsed(address indexed _sender, bytes32 indexed _creditId, Credit _credit, uint256 _value);
@@ -247,6 +253,7 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
         collectionStore = _collectionStore;
         collectionFactory = _collectionFactory;
         collectionFactoryV3 = _collectionFactoryV3;
+        buyerProxyImplementation = address(new BuyerProxy(_mana));
     }
 
     /// @notice Pauses the contract.
@@ -361,6 +368,18 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
         emit ERC721Withdrawn(_msgSender(), _token, _tokenId, _to);
     }
 
+    function withdrawERC20FromBuyerProxy(address _buyer, address _token, uint256 _amount, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        BuyerProxy(_deployBuyerProxy(_buyer)).withdrawERC20(_token, _amount, _to);
+
+        emit BuyerProxyERC20Withdrawn(_msgSender(), _buyer, _token, _amount, _to);
+    }
+
+    function withdrawERC721FromBuyerProxy(address _buyer, address _token, uint256 _tokenId, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        BuyerProxy(_deployBuyerProxy(_buyer)).withdrawERC721(_token, _tokenId, _to);
+
+        emit BuyerProxyERC721Withdrawn(_msgSender(), _buyer, _token, _tokenId, _to);
+    }
+
     /// @notice Allows a custom external call.
     /// @dev Only the owner can allow custom external calls.
     /// @param _target The target of the external call.
@@ -426,6 +445,10 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
     /// @dev Required for the Legacy Marketplace to work given that the purchased asset is transferred to this contract.
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
         return this.onERC721Received.selector;
+    }
+
+    function getBuyerProxy(address _buyer) public view returns (address) {
+        return Clones.predictDeterministicAddress(buyerProxyImplementation, bytes32(uint256(uint160(_buyer))));
     }
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -641,18 +664,26 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
             maxCreditedValue = _currentHourCreditableManaAmount;
         }
 
-        // Approves the maximum amount of MANA that can possibly be transferred out of the contract.
-        // This is the sum of the max amount the user is willing to pay out of pocket and the max amount to be credited.
-        mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + maxCreditedValue);
-
         // Store the mana balance before the external call.
         uint256 balanceBefore = mana.balanceOf(address(this));
 
         // Store the sender's balance before the external call.
         uint256 senderBalanceBefore = mana.balanceOf(_sender);
 
-        // Execute the external call.
-        (bool success,) = _args.externalCall.target.call(abi.encodePacked(_args.externalCall.selector, _args.externalCall.data));
+        uint256 manaToApprove = _args.maxUncreditedValue + maxCreditedValue;
+
+        bool success;
+
+        if (_args.externalCall.target == marketplace) {
+            success = _executeFromBuyerProxy(_args.externalCall, _sender, manaToApprove < balanceBefore ? manaToApprove : balanceBefore);
+        } else {
+            // Approves the maximum amount of MANA that can possibly be transferred out of the contract.
+            // This is the sum of the max amount the user is willing to pay out of pocket and the max amount to be credited.
+            mana.forceApprove(_args.externalCall.target, manaToApprove);
+
+            // Execute the external call.
+            (success,) = _args.externalCall.target.call(abi.encodePacked(_args.externalCall.selector, _args.externalCall.data));
+        }
 
         if (!success) {
             revert ExternalCallFailed(_args.externalCall);
@@ -675,6 +706,22 @@ contract CreditsManagerPolygonWithMANAClaim is AccessControl, Pausable, Reentran
 
         // Reset the approval back to 0 in case less than the approved was transferred out.
         mana.forceApprove(_args.externalCall.target, 0);
+    }
+
+    function _executeFromBuyerProxy(ExternalCall calldata _externalCall, address _sender, uint256 _manaAmount) internal returns (bool) {
+        address buyerProxy = _deployBuyerProxy(_sender);
+
+        mana.safeTransfer(buyerProxy, _manaAmount);
+
+        return BuyerProxy(buyerProxy).execute(_externalCall.target, abi.encodePacked(_externalCall.selector, _externalCall.data), _manaAmount);
+    }
+
+    function _deployBuyerProxy(address _buyer) internal returns (address buyerProxy) {
+        buyerProxy = getBuyerProxy(_buyer);
+
+        if (buyerProxy.code.length == 0) {
+            Clones.cloneDeterministic(buyerProxyImplementation, bytes32(uint256(uint160(_buyer))));
+        }
     }
 
     // -----------------------------------------------------------------------------------------------------------------

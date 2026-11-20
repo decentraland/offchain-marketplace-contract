@@ -351,4 +351,66 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
         assertEq(IERC721(collection).ownerOf(collectionTokenId), address(this));
     }
+
+    function test_withdrawERC20FromBuyerProxy_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.withdrawERC20FromBuyerProxy(address(this), address(mana), 1 ether, address(this));
+    }
+
+    function test_withdrawERC20FromBuyerProxy_WhenOwner() public {
+        address buyerProxy = creditsManager.getBuyerProxy(address(this));
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(buyerProxy, 1 ether);
+
+        assertEq(buyerProxy.code.length, 0);
+
+        vm.expectEmit(address(creditsManager));
+        emit BuyerProxyERC20Withdrawn(owner, address(this), address(mana), 1 ether, owner);
+        vm.prank(owner);
+        creditsManager.withdrawERC20FromBuyerProxy(address(this), address(mana), 1 ether, owner);
+
+        assertGt(buyerProxy.code.length, 0);
+        assertEq(IERC20(mana).balanceOf(buyerProxy), 0);
+        assertEq(IERC20(mana).balanceOf(owner), 1 ether);
+    }
+
+    function test_withdrawERC721FromBuyerProxy_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.withdrawERC721FromBuyerProxy(address(this), collection, collectionTokenId, address(this));
+    }
+
+    function test_withdrawERC721FromBuyerProxy_WhenOwner() public {
+        address buyerProxy = creditsManager.getBuyerProxy(address(this));
+
+        vm.prank(collectionTokenOwner);
+        IERC721(collection).transferFrom(collectionTokenOwner, buyerProxy, collectionTokenId);
+
+        assertEq(buyerProxy.code.length, 0);
+
+        vm.expectEmit(address(creditsManager));
+        emit BuyerProxyERC721Withdrawn(owner, address(this), collection, collectionTokenId, address(this));
+        vm.prank(owner);
+        creditsManager.withdrawERC721FromBuyerProxy(address(this), collection, collectionTokenId, address(this));
+
+        assertGt(buyerProxy.code.length, 0);
+        assertEq(IERC721(collection).ownerOf(collectionTokenId), address(this));
+    }
+
+    function test_withdrawERC721FromBuyerProxy_RevertsWhenReceiverIsNotERC721Receiver() public {
+        address buyerProxy = creditsManager.getBuyerProxy(address(this));
+
+        vm.prank(collectionTokenOwner);
+        IERC721(collection).transferFrom(collectionTokenOwner, buyerProxy, collectionTokenId);
+
+        vm.prank(owner);
+        vm.expectRevert();
+        creditsManager.withdrawERC721FromBuyerProxy(address(this), collection, collectionTokenId, address(mana));
+
+        assertEq(IERC721(collection).ownerOf(collectionTokenId), buyerProxy);
+    }
 }
